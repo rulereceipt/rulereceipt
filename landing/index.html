@@ -357,12 +357,12 @@
     <blockquote><span>&#8220;</span>CLAUDE.md is a wish list, not a contract.<span>&#8221;</span></blockquote>
     <div class="quote-cite">— a developer, after writing 200 lines of rules the agent ignored</div>
     <div class="evidence-card">
-      <div class="evidence-label">Documented, not guessed</div>
+      <div class="evidence-label">Not unique to Claude — a structural limit of how LLMs process long instructions, documented, not guessed</div>
       <div class="issue-row">
         <div class="issue"><span class="num">#18660</span><span>CLAUDE.md instructions are read but not reliably followed</span></div>
         <div class="issue"><span class="num">#15443</span><span>Claude ignores explicit instructions while claiming to understand them</span></div>
         <div class="issue"><span class="num">#24318</span><span>Claude ignores explicit user instructions and acts without approval</span></div>
-        <div class="issue"><span class="num">→</span><span>Claude Code starts selectively ignoring CLAUDE.md content after around 80 lines — not a bug, a real limit on how many instructions get reliably followed</span></div>
+        <div class="issue"><span class="num">→</span><span>A known limit of how LLMs process long instruction files, not a Claude-specific flaw — in Claude Code specifically, content starts getting selectively skipped after around 80 lines</span></div>
       </div>
       <div class="evidence-divider"></div>
       <p class="founder-note">I built this after hitting the same wall myself — running Claude Code daily, writing rules into CLAUDE.md, and having no way to tell whether they were actually followed or just quietly skipped. Vibe coding with it is genuinely good. Trusting it to follow my own rules, without checking, wasn't.</p>
