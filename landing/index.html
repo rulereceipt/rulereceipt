@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>RuleReceipt — a lie detector for your AI agent</title>
-<meta name="description" content="RuleReceipt traces a Claude Code session against your CLAUDE.md rules and shows exactly where it held the line and where it didn't — with evidence. Runs locally. Nothing stored, nothing sent anywhere." />
+<title>RuleReceipt — see what your AI agent actually did</title>
+<meta name="description" content="RuleReceipt checks a Claude Code session against your own rules and shows precisely what was followed, what wasn't, and why — with evidence. Runs locally. Nothing stored, nothing sent anywhere." />
 <style>
   :root {
     --bg: #0E1220;
@@ -277,8 +277,8 @@
 
     <div class="hero">
       <div class="eyebrow">for AI coding agents</div>
-      <h1>A lie detector<br>for your <span>AI agent</span></h1>
-      <p class="sub">RuleReceipt traces a coding agent's session against your own rules — AGENTS.md, CLAUDE.md, whatever you wrote — and shows exactly where it held the line. Starting with Claude Code, more agents next.</p>
+      <h1>See exactly what<br>your <span>agent actually did</span></h1>
+      <p class="sub">RuleReceipt checks a coding agent's session against your own rules — AGENTS.md, CLAUDE.md, whatever you wrote — and shows precisely what was followed, what wasn't, and why. Starting with Claude Code, more agents next.</p>
       <div class="install">
         <span class="prompt">$</span>
         <span class="cmd">npx rulereceipt check</span>
@@ -287,7 +287,7 @@
 
     <div class="trace-stage">
       <div class="trace-panel">
-        <div class="label-row"><span>signal — rule adherence</span><span id="trace-status">reading session…</span></div>
+        <div class="label-row"><span>rule adherence, this session</span><span id="trace-status">reading session…</span></div>
         <canvas id="trace"></canvas>
       </div>
     </div>
@@ -317,14 +317,14 @@
           </div>
           <div class="r-evidence">evidence: no error occurred this session, nothing to verify against</div>
         </div>
-        <div class="r-foot"><span>8 pass · 2 fail · 1 unclear</span><span>0 bytes sent</span></div>
+        <div class="r-foot"><span>8 pass · 2 fail · 1 unclear</span><span>no data sent</span></div>
       </div>
     </div>
   </div>
 
   <div class="quote-block">
     <blockquote><span>&#8220;</span>CLAUDE.md is a wish list, not a contract.<span>&#8221;</span></blockquote>
-    <div class="quote-cite">— a developer, after writing 200 lines of rules Claude ignored</div>
+    <div class="quote-cite">— a developer, after writing 200 lines of rules the agent ignored</div>
     <div class="issue-row">
       <div class="issue"><span class="num">#18660</span><span>CLAUDE.md instructions are read but not reliably followed</span></div>
       <div class="issue"><span class="num">#15443</span><span>Claude ignores explicit instructions while claiming to understand them</span></div>
