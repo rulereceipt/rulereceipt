@@ -287,6 +287,11 @@
   .price-card .amount small { font-family: var(--font-sans); font-size: 0.85rem; color: var(--paper-dim); font-weight: 400; text-transform: none; }
   .price-card p { color: var(--paper-dim); font-size: 0.95rem; margin: 0; }
 
+  .faq-list { display: grid; gap: 26px; max-width: 640px; }
+  .faq-item h3 { font-family: var(--font-sans); font-weight: 600; font-size: 1.02rem; margin: 0 0 8px; color: var(--paper); }
+  .faq-item p { color: var(--paper-dim); margin: 0; font-size: 0.95rem; }
+  .faq-item code { font-family: var(--font-mono); background: var(--bg-deep); padding: 1px 6px; border-radius: 4px; font-size: 0.88em; }
+
   footer { padding: 54px 0 68px; text-align: center; border-top: 1px solid var(--panel-line); }
   footer .cmd-repeat { font-family: var(--font-mono); font-size: 1rem; color: var(--paper); margin-bottom: 10px; }
   footer .fine { color: var(--paper-dim); font-size: 0.85rem; }
@@ -392,6 +397,39 @@
       <div class="pricing">
         <div class="price-card accent"><div>Now, through the free window</div><div class="amount">Free</div><p>Unlimited checks. No card, no signup friction. This is how we find out if it's actually useful.</p></div>
         <div class="price-card"><div>After that</div><div class="amount">Credits <small>· pay per check</small></div><p>Buy a pack, use it whenever, nothing recurring. Announced clearly, in advance — never a silent switch.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap">
+      <h2>Questions</h2>
+      <p class="band-sub">Straight answers, including where the answer is "not yet."</p>
+      <div class="faq-list">
+        <div class="faq-item">
+          <h3>Does this work with Cursor or other AI agents?</h3>
+          <p>Not yet. v1 reads Claude Code sessions specifically. AGENTS.md as the rules format is already cross-tool, and support for other agents is the natural next step — but it isn't built yet, so it isn't claimed here.</p>
+        </div>
+        <div class="faq-item">
+          <h3>Do I need my own Anthropic API key?</h3>
+          <p>For the rules that need judgment, yes — the same key your Claude Code setup already uses. Rules that can be checked by plain pattern matching don't need it at all, and cost nothing to run.</p>
+        </div>
+        <div class="faq-item">
+          <h3>Does this touch my CLAUDE.md or Claude Code settings?</h3>
+          <p>Read-only. It reads CLAUDE.md/AGENTS.md and your session transcript, and writes nothing back. No hooks get installed, no settings get modified — not automatically, not ever, without you explicitly asking.</p>
+        </div>
+        <div class="faq-item">
+          <h3>What exactly counts as one credit?</h3>
+          <p>One run of <code>rulereceipt check</code> — regardless of how many rules it checks. Not metered per rule, per token, or per API call.</p>
+        </div>
+        <div class="faq-item">
+          <h3>Will it always be free?</h3>
+          <p>No — free while we're validating, through a clearly announced date, then credits. If you're already using it before that date, you'll hear about the switch in advance, not find out by hitting a paywall.</p>
+        </div>
+        <div class="faq-item">
+          <h3>What if I disagree with a result?</h3>
+          <p>Every PASS/FAIL/UNCLEAR comes with a quoted line of evidence specifically so you can check it yourself, not just trust it. It's Claude's judgment on the harder rules — not infallible, which is exactly why the evidence is shown, not hidden.</p>
+        </div>
       </div>
     </div>
   </section>
