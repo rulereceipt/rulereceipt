@@ -23,7 +23,7 @@ function encodeProjectPath(cwd: string): string {
   return cwd.replace(/\//g, "-");
 }
 
-function findLatestSessionFile(cwd: string): string | null {
+export function findLatestSessionFile(cwd: string): string | null {
   const projectDir = join(homedir(), ".claude", "projects", encodeProjectPath(cwd));
   let entries: string[];
   try {
