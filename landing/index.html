@@ -3,126 +3,110 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>RuleReceipt — proof your AI agent followed the rules</title>
-<meta name="description" content="RuleReceipt checks a Claude Code session against your CLAUDE.md rules and shows exactly what passed, what didn't, and why — with evidence, not a guess. Runs locally. Nothing stored, nothing sent anywhere." />
+<title>RuleReceipt — a lie detector for your AI agent</title>
+<meta name="description" content="RuleReceipt traces a Claude Code session against your CLAUDE.md rules and shows exactly where it held the line and where it didn't — with evidence. Runs locally. Nothing stored, nothing sent anywhere." />
 <style>
   :root {
-    --paper: #EEEDE1;
-    --paper-raised: #F8F7EF;
-    --ink: #1C2B21;
-    --ink-soft: #48594C;
-    --ink-green: #2B5741;
-    --ink-green-strong: #1D4531;
-    --brass: #9C7A3C;
-    --brass-soft: #C8A868;
-    --rule: #D7D3C0;
-    --rule-strong: #B9B49C;
-    --bad: #8A3324;
-    --font-serif: Georgia, 'Iowan Old Style', 'Palatino Linotype', 'Times New Roman', serif;
+    --bg: #0E1220;
+    --bg-deep: #090C16;
+    --panel: #151B2E;
+    --panel-line: #232B45;
+    --panel-line-strong: #333F63;
+    --paper: #EDEDE3;
+    --paper-dim: #9FA6BE;
+    --amber: #FF9E43;
+    --amber-dim: #C97C36;
+    --cyan: #5FD9D6;
+    --red: #FF5F52;
+    --font-display: 'Arial Narrow', 'Helvetica Neue Condensed', Impact, var(--font-sans);
     --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
   }
 
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      --paper: #131C16;
-      --paper-raised: #1B2721;
-      --ink: #E7E4D4;
-      --ink-soft: #A9B3A6;
-      --ink-green: #7FB396;
-      --ink-green-strong: #9AC7AC;
-      --brass: #D4AD63;
-      --brass-soft: #E4C685;
-      --rule: #2C382F;
-      --rule-strong: #3C4A3E;
-      --bad: #D97A63;
-    }
-  }
-
-  :root[data-theme="dark"] {
-    --paper: #131C16;
-    --paper-raised: #1B2721;
-    --ink: #E7E4D4;
-    --ink-soft: #A9B3A6;
-    --ink-green: #7FB396;
-    --ink-green-strong: #9AC7AC;
-    --brass: #D4AD63;
-    --brass-soft: #E4C685;
-    --rule: #2C382F;
-    --rule-strong: #3C4A3E;
-    --bad: #D97A63;
-  }
+  /* This design commits to one instrument-panel world in both themes —
+     dark by nature (a CRT readout), so no light-mode swap; background and
+     colors are painted explicitly regardless of host theme. */
 
   * { box-sizing: border-box; }
 
   body {
     margin: 0;
-    background: var(--paper);
-    color: var(--ink);
+    background: var(--bg);
+    background-image:
+      radial-gradient(1100px 500px at 50% -8%, rgba(255,158,67,0.08), transparent 60%),
+      repeating-linear-gradient(180deg, rgba(255,255,255,0.012) 0px, rgba(255,255,255,0.012) 1px, transparent 1px, transparent 3px);
+    color: var(--paper);
     font-family: var(--font-sans);
     font-size: 17px;
     line-height: 1.55;
     -webkit-font-smoothing: antialiased;
   }
 
-  a { color: var(--ink-green-strong); }
+  a { color: var(--cyan); }
 
   .wrap { max-width: 760px; margin: 0 auto; padding: 0 24px; }
-  .wrap-wide { max-width: 980px; margin: 0 auto; padding: 0 24px; }
+  .wrap-wide { max-width: 1000px; margin: 0 auto; padding: 0 24px; }
 
   header.top {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 28px 0 0;
+    padding: 26px 0 0;
   }
   .wordmark {
-    font-family: var(--font-serif);
-    font-weight: 700;
-    font-size: 1.15rem;
-    letter-spacing: 0.01em;
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 1.2rem;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
     display: flex;
-    align-items: baseline;
+    align-items: center;
     gap: 8px;
   }
-  .wordmark .dot { color: var(--brass); }
+  .wordmark .led {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--amber);
+    box-shadow: 0 0 10px 2px rgba(255,158,67,0.7);
+    animation: blink 2.4s ease-in-out infinite;
+  }
+  @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
   .top-cta {
     font-family: var(--font-mono);
-    font-size: 0.8rem;
-    color: var(--ink-soft);
-    border: 1px solid var(--rule-strong);
+    font-size: 0.76rem;
+    color: var(--paper-dim);
+    border: 1px solid var(--panel-line-strong);
     padding: 6px 12px;
-    border-radius: 3px;
+    border-radius: 2px;
   }
 
   /* ---------- hero ---------- */
-  .hero { padding: 64px 0 32px; text-align: center; }
+  .hero { padding: 58px 0 8px; text-align: center; }
   .eyebrow {
     font-family: var(--font-mono);
-    font-size: 0.78rem;
-    letter-spacing: 0.08em;
+    font-size: 0.76rem;
+    letter-spacing: 0.1em;
     text-transform: uppercase;
-    color: var(--brass);
+    color: var(--cyan);
     margin-bottom: 18px;
   }
   h1 {
-    font-family: var(--font-serif);
-    font-weight: 700;
-    font-size: clamp(2.1rem, 5vw, 3.1rem);
-    line-height: 1.12;
+    font-family: var(--font-display);
+    font-weight: 800;
+    text-transform: uppercase;
+    font-size: clamp(2.2rem, 6vw, 3.6rem);
+    line-height: 1.04;
+    letter-spacing: 0.01em;
     margin: 0 0 22px;
     text-wrap: balance;
-    color: var(--ink);
+    color: var(--paper);
   }
-  h1 em {
-    font-style: normal;
-    color: var(--ink-green-strong);
-  }
+  h1 span { color: var(--amber); }
   .sub {
-    font-size: 1.14rem;
-    color: var(--ink-soft);
+    font-size: 1.1rem;
+    color: var(--paper-dim);
     max-width: 560px;
-    margin: 0 auto 34px;
+    margin: 0 auto 30px;
     text-wrap: balance;
   }
 
@@ -132,232 +116,154 @@
     gap: 12px;
     font-family: var(--font-mono);
     font-size: 0.95rem;
-    background: var(--paper-raised);
-    border: 1px solid var(--rule-strong);
+    background: var(--panel);
+    border: 1px solid var(--panel-line-strong);
     padding: 14px 20px;
-    border-radius: 4px;
+    border-radius: 2px;
   }
-  .install .prompt { color: var(--brass); }
-  .install .cmd { color: var(--ink); }
+  .install .prompt { color: var(--amber); }
+  .install .cmd { color: var(--paper); }
 
-  /* ---------- receipt ---------- */
-  .receipt-stage { padding: 20px 0 56px; display: flex; justify-content: center; }
-  .receipt {
-    position: relative;
-    width: min(100%, 420px);
-    background: var(--paper-raised);
-    border: 1px solid var(--rule);
-    padding: 30px 26px 34px;
+  /* ---------- trace canvas ---------- */
+  .trace-stage {
+    max-width: 900px;
+    margin: 40px auto 0;
+    padding: 0 24px;
+  }
+  .trace-panel {
+    background: var(--panel);
+    border: 1px solid var(--panel-line-strong);
+    border-radius: 3px;
+    padding: 18px 18px 8px;
+  }
+  .trace-panel .label-row {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: var(--paper-dim);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  canvas#trace { display: block; width: 100%; height: 190px; }
+
+  /* ---------- readout (evidence panel) ---------- */
+  .readout-stage { padding: 34px 0 40px; display: flex; justify-content: center; }
+  .readout {
+    width: min(100%, 460px);
+    background: var(--panel);
+    border: 1px solid var(--panel-line-strong);
+    border-radius: 3px;
     font-family: var(--font-mono);
     font-size: 0.82rem;
-    color: var(--ink-soft);
-    box-shadow: 0 18px 40px -24px rgba(0,0,0,0.35);
+    color: var(--paper-dim);
   }
-  .receipt::before, .receipt::after {
-    content: "";
-    position: absolute;
-    left: 0; right: 0;
-    height: 13px;
-    background-image: radial-gradient(circle at 8px 8px, var(--paper) 7px, transparent 7.5px);
-    background-size: 16px 16px;
-    background-repeat: repeat-x;
-  }
-  .receipt::before { top: -7px; }
-  .receipt::after  { bottom: -7px; transform: scaleY(-1); }
-
-  .stamp {
-    position: absolute;
-    top: 22px; right: 22px;
-    width: 62px; height: 62px;
-    border: 2px solid var(--brass);
-    border-radius: 50%;
-    color: var(--brass);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-family: var(--font-serif);
-    font-size: 0.62rem;
-    letter-spacing: 0.04em;
-    text-align: center;
+  .readout .r-top {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--panel-line);
+    font-size: 0.72rem;
     text-transform: uppercase;
-    transform: rotate(-9deg);
-    opacity: 0.85;
-    line-height: 1.15;
+    letter-spacing: 0.06em;
+    color: var(--paper-dim);
   }
+  .readout .r-top .live { color: var(--amber); display:flex; align-items:center; gap:6px; }
+  .readout .r-top .live .led { width:6px;height:6px;border-radius:50%;background:var(--amber); animation: blink 2.4s ease-in-out infinite; }
+  .r-body-wrap { padding: 16px 18px 18px; }
 
-  .r-head {
-    font-family: var(--font-sans);
-    color: var(--ink);
-    font-weight: 600;
-    font-size: 0.78rem;
-    letter-spacing: 0.03em;
-    text-transform: uppercase;
-    margin-bottom: 2px;
-  }
-  .r-sub { color: var(--ink-soft); font-size: 0.76rem; margin-bottom: 16px; }
-  .r-rule { border-top: 1px dashed var(--rule-strong); margin: 14px 0; }
   .r-line { display: flex; gap: 10px; margin-bottom: 10px; align-items: baseline; }
   .r-mark { width: 14px; flex: none; font-weight: 700; }
-  .r-mark.pass { color: var(--ink-green-strong); }
-  .r-mark.fail { color: var(--bad); }
-  .r-mark.unclear { color: var(--brass); }
-  .r-body { color: var(--ink); }
-  .r-evidence {
-    margin: 4px 0 0 24px;
-    color: var(--ink-soft);
-    font-size: 0.76rem;
-  }
+  .r-mark.pass { color: var(--cyan); }
+  .r-mark.fail { color: var(--red); }
+  .r-mark.unclear { color: var(--amber); }
+  .r-body { color: var(--paper); }
+  .r-evidence { margin: 4px 0 0 24px; color: var(--paper-dim); font-size: 0.76rem; }
+  .r-rule { border-top: 1px dashed var(--panel-line); margin: 14px 0; }
   .r-foot {
-    margin-top: 18px;
-    padding-top: 14px;
-    border-top: 1px dashed var(--rule-strong);
+    padding: 12px 18px;
+    border-top: 1px solid var(--panel-line);
     font-size: 0.72rem;
-    color: var(--ink-soft);
+    color: var(--paper-dim);
     display: flex;
     justify-content: space-between;
     font-variant-numeric: tabular-nums;
   }
 
   /* ---------- pull quote ---------- */
-  .quote-block {
-    padding: 12px 0 60px;
-    text-align: center;
-  }
+  .quote-block { padding: 10px 0 56px; text-align: center; }
   blockquote {
     margin: 0 auto;
     max-width: 620px;
-    font-family: var(--font-serif);
-    font-size: clamp(1.5rem, 3.6vw, 2.05rem);
-    line-height: 1.32;
-    color: var(--ink);
+    font-family: var(--font-display);
+    font-weight: 800;
+    text-transform: uppercase;
+    font-size: clamp(1.35rem, 3.4vw, 1.9rem);
+    line-height: 1.28;
+    color: var(--paper);
     text-wrap: balance;
+    letter-spacing: 0.01em;
   }
-  blockquote::before { content: "\201C"; color: var(--brass); }
-  blockquote::after { content: "\201D"; color: var(--brass); }
-  .quote-cite {
-    font-family: var(--font-mono);
-    font-size: 0.78rem;
-    color: var(--ink-soft);
-    margin-top: 16px;
-  }
+  blockquote span { color: var(--amber); }
+  .quote-cite { font-family: var(--font-mono); font-size: 0.76rem; color: var(--paper-dim); margin-top: 16px; }
 
-  .issue-row {
-    max-width: 620px;
-    margin: 26px auto 0;
-    text-align: left;
-    display: grid;
-    gap: 10px;
-  }
-  .issue {
-    font-family: var(--font-mono);
-    font-size: 0.82rem;
-    color: var(--ink-soft);
-    display: flex;
-    gap: 10px;
-  }
-  .issue .num { color: var(--brass); flex: none; }
+  .issue-row { max-width: 620px; margin: 26px auto 0; text-align: left; display: grid; gap: 10px; }
+  .issue { font-family: var(--font-mono); font-size: 0.8rem; color: var(--paper-dim); display: flex; gap: 10px; }
+  .issue .num { color: var(--cyan); flex: none; }
 
   /* ---------- sections ---------- */
-  section.band { padding: 56px 0; border-top: 1px solid var(--rule); }
+  section.band { padding: 54px 0; border-top: 1px solid var(--panel-line); }
   h2 {
-    font-family: var(--font-serif);
-    font-size: 1.7rem;
+    font-family: var(--font-display);
+    text-transform: uppercase;
+    font-weight: 800;
+    font-size: 1.6rem;
+    letter-spacing: 0.01em;
     margin: 0 0 8px;
     text-wrap: balance;
   }
-  .band-sub { color: var(--ink-soft); margin: 0 0 36px; max-width: 540px; }
+  .band-sub { color: var(--paper-dim); margin: 0 0 34px; max-width: 540px; }
 
-  .steps {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 30px;
-  }
-  .step .n {
-    font-family: var(--font-mono);
-    color: var(--brass);
-    font-size: 0.85rem;
-    margin-bottom: 10px;
-  }
-  .step h3 {
-    font-family: var(--font-sans);
-    font-size: 1.05rem;
-    margin: 0 0 8px;
-  }
-  .step p { color: var(--ink-soft); margin: 0; font-size: 0.95rem; }
+  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; }
+  .step .n { font-family: var(--font-mono); color: var(--cyan); font-size: 0.85rem; margin-bottom: 10px; }
+  .step h3 { font-family: var(--font-sans); font-weight: 600; font-size: 1.02rem; margin: 0 0 8px; color: var(--paper); }
+  .step p { color: var(--paper-dim); margin: 0; font-size: 0.94rem; }
 
-  .trust-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 1px;
-    background: var(--rule);
-    border: 1px solid var(--rule);
-  }
-  .trust-cell {
-    background: var(--paper);
-    padding: 28px 24px;
-  }
-  .trust-cell h3 {
-    font-family: var(--font-sans);
-    font-size: 1rem;
-    margin: 0 0 10px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  .trust-cell h3 .mark { color: var(--ink-green-strong); }
-  .trust-cell p { margin: 0; color: var(--ink-soft); font-size: 0.92rem; }
+  .trust-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--panel-line); border: 1px solid var(--panel-line); }
+  .trust-cell { background: var(--bg-deep); padding: 26px 22px; }
+  .trust-cell h3 { font-family: var(--font-sans); font-weight: 600; font-size: 0.98rem; margin: 0 0 10px; color: var(--paper); display:flex; align-items:center; gap:8px; }
+  .trust-cell h3 .mark { color: var(--cyan); }
+  .trust-cell p { margin: 0; color: var(--paper-dim); font-size: 0.9rem; }
 
   .security-note {
-    background: var(--paper-raised);
-    border: 1px solid var(--rule-strong);
-    border-left: 3px solid var(--brass);
-    padding: 22px 26px;
-    font-size: 0.95rem;
-    color: var(--ink-soft);
+    background: var(--panel);
+    border: 1px solid var(--panel-line-strong);
+    border-left: 3px solid var(--amber);
+    padding: 20px 24px;
+    font-size: 0.94rem;
+    color: var(--paper-dim);
+    border-radius: 2px;
   }
-  .security-note strong { color: var(--ink); }
+  .security-note strong { color: var(--paper); }
+  .security-note code { color: var(--amber); }
 
-  .pricing {
-    display: flex;
-    gap: 24px;
-    flex-wrap: wrap;
-  }
-  .price-card {
-    flex: 1 1 220px;
-    background: var(--paper-raised);
-    border: 1px solid var(--rule);
-    padding: 26px 24px;
-  }
-  .price-card .amount {
-    font-family: var(--font-serif);
-    font-size: 2rem;
-    color: var(--ink);
-    margin: 4px 0 10px;
-  }
-  .price-card .amount small {
-    font-family: var(--font-sans);
-    font-size: 0.9rem;
-    color: var(--ink-soft);
-    font-weight: 400;
-  }
-  .price-card p { color: var(--ink-soft); font-size: 0.9rem; margin: 0; }
-  .price-card.accent { border-color: var(--brass); }
+  .pricing { display: flex; gap: 22px; flex-wrap: wrap; }
+  .price-card { flex: 1 1 220px; background: var(--panel); border: 1px solid var(--panel-line-strong); padding: 24px 22px; border-radius: 2px; }
+  .price-card.accent { border-color: var(--amber); }
+  .price-card .amount { font-family: var(--font-display); font-weight: 800; font-size: 1.9rem; color: var(--paper); margin: 4px 0 10px; text-transform: uppercase; }
+  .price-card .amount small { font-family: var(--font-sans); font-size: 0.85rem; color: var(--paper-dim); font-weight: 400; text-transform: none; }
+  .price-card p { color: var(--paper-dim); font-size: 0.9rem; margin: 0; }
 
-  footer {
-    padding: 56px 0 70px;
-    text-align: center;
-    border-top: 1px solid var(--rule);
-  }
-  footer .cmd-repeat {
-    font-family: var(--font-mono);
-    font-size: 1rem;
-    color: var(--ink);
-    margin-bottom: 10px;
-  }
-  footer .fine { color: var(--ink-soft); font-size: 0.85rem; }
+  footer { padding: 54px 0 68px; text-align: center; border-top: 1px solid var(--panel-line); }
+  footer .cmd-repeat { font-family: var(--font-mono); font-size: 1rem; color: var(--paper); margin-bottom: 10px; }
+  footer .fine { color: var(--paper-dim); font-size: 0.85rem; }
 
   @media (max-width: 720px) {
     .steps, .trust-grid { grid-template-columns: 1fr; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .led { animation: none !important; }
   }
 </style>
 </head>
@@ -365,58 +271,60 @@
 
   <div class="wrap">
     <header class="top">
-      <div class="wordmark">Rule<span class="dot">•</span>Receipt</div>
-      <div class="top-cta">launching 31 Aug</div>
+      <div class="wordmark"><span class="led"></span> RuleReceipt</div>
+      <div class="top-cta">launching 31 aug</div>
     </header>
 
     <div class="hero">
-      <div class="eyebrow">for Claude Code &amp; CLAUDE.md</div>
-      <h1>Proof your AI agent<br>did what <em>you</em> told it to.</h1>
-      <p class="sub">RuleReceipt checks a Claude Code session against your CLAUDE.md rules and shows exactly what passed, what didn't, and why — with evidence, not a guess.</p>
+      <div class="eyebrow">for AI coding agents</div>
+      <h1>A lie detector<br>for your <span>AI agent</span></h1>
+      <p class="sub">RuleReceipt traces a coding agent's session against your own rules — AGENTS.md, CLAUDE.md, whatever you wrote — and shows exactly where it held the line. Starting with Claude Code, more agents next.</p>
       <div class="install">
         <span class="prompt">$</span>
         <span class="cmd">npx rulereceipt check</span>
       </div>
     </div>
+
+    <div class="trace-stage">
+      <div class="trace-panel">
+        <div class="label-row"><span>signal — rule adherence</span><span id="trace-status">reading session…</span></div>
+        <canvas id="trace"></canvas>
+      </div>
+    </div>
   </div>
 
   <div class="wrap">
-    <div class="receipt-stage">
-      <div class="receipt">
-        <div class="stamp">verified<br>by evidence</div>
-        <div class="r-head">RuleReceipt</div>
-        <div class="r-sub">session 2026&#8209;08&#8209;16 · 11 rules checked</div>
-        <div class="r-rule"></div>
-
-        <div class="r-line">
-          <span class="r-mark pass">✓</span>
-          <span class="r-body">Rule 7 — Tests must be able to fail</span>
+    <div class="readout-stage">
+      <div class="readout">
+        <div class="r-top">
+          <span>session 2026-08-16 · 11 rules</span>
+          <span class="live"><span class="led"></span>local only</span>
         </div>
-
-        <div class="r-line">
-          <span class="r-mark fail">✕</span>
-          <span class="r-body">Rule 4 — Surface bad news first</span>
+        <div class="r-body-wrap">
+          <div class="r-line">
+            <span class="r-mark pass">✓</span>
+            <span class="r-body">Rule 7 — Tests must be able to fail</span>
+          </div>
+          <div class="r-line">
+            <span class="r-mark fail">✕</span>
+            <span class="r-body">Rule 4 — Surface bad news first</span>
+          </div>
+          <div class="r-evidence">evidence: reply led with passing tests, the one broken test was mentioned last</div>
+          <div class="r-rule"></div>
+          <div class="r-line">
+            <span class="r-mark unclear">?</span>
+            <span class="r-body">Rule 11 — Fails closed on error</span>
+          </div>
+          <div class="r-evidence">evidence: no error occurred this session, nothing to verify against</div>
         </div>
-        <div class="r-evidence">evidence: reply led with passing tests,<br>the one broken test was mentioned last</div>
-
-        <div class="r-line" style="margin-top:12px">
-          <span class="r-mark unclear">?</span>
-          <span class="r-body">Rule 11 — Fails closed on error</span>
-        </div>
-        <div class="r-evidence">evidence: no error occurred this session,<br>nothing to verify against</div>
-
-        <div class="r-foot">
-          <span>8 pass · 2 fail · 1 unclear</span>
-          <span>local only</span>
-        </div>
+        <div class="r-foot"><span>8 pass · 2 fail · 1 unclear</span><span>0 bytes sent</span></div>
       </div>
     </div>
   </div>
 
   <div class="quote-block">
-    <blockquote>CLAUDE.md is a wish list, not a contract.</blockquote>
+    <blockquote><span>&#8220;</span>CLAUDE.md is a wish list, not a contract.<span>&#8221;</span></blockquote>
     <div class="quote-cite">— a developer, after writing 200 lines of rules Claude ignored</div>
-
     <div class="issue-row">
       <div class="issue"><span class="num">#18660</span><span>CLAUDE.md instructions are read but not reliably followed</span></div>
       <div class="issue"><span class="num">#15443</span><span>Claude ignores explicit instructions while claiming to understand them</span></div>
@@ -425,24 +333,12 @@
 
   <section class="band">
     <div class="wrap-wide">
-      <h2>How it checks</h2>
+      <h2>How it traces</h2>
       <p class="band-sub">Three steps, nothing hidden.</p>
       <div class="steps">
-        <div class="step">
-          <div class="n">01</div>
-          <h3>Reads your rules</h3>
-          <p>CLAUDE.md and AGENTS.md, parsed into individual, checkable rules.</p>
-        </div>
-        <div class="step">
-          <div class="n">02</div>
-          <h3>Reads the session</h3>
-          <p>Your most recent local Claude Code transcript — nothing else, nothing sent anywhere yet.</p>
-        </div>
-        <div class="step">
-          <div class="n">03</div>
-          <h3>Checks each rule</h3>
-          <p>Pattern-matched where it can be. Judged by your own Claude account where it has to be. Every result comes with a quoted line of evidence.</p>
-        </div>
+        <div class="step"><div class="n">01</div><h3>Reads your rules</h3><p>AGENTS.md or CLAUDE.md, parsed into individual, checkable rules.</p></div>
+        <div class="step"><div class="n">02</div><h3>Reads the session</h3><p>Your most recent local agent transcript — Claude Code today, more agents coming — nothing else, nothing sent anywhere yet.</p></div>
+        <div class="step"><div class="n">03</div><h3>Checks each rule</h3><p>Pattern-matched where it can be. Judged by your own Claude account where it has to be. Every result comes with a quoted line of evidence.</p></div>
       </div>
     </div>
   </section>
@@ -452,23 +348,12 @@
       <h2>What we don't do</h2>
       <p class="band-sub">The privacy story, stated plainly, not buried in a policy page.</p>
       <div class="trust-grid">
-        <div class="trust-cell">
-          <h3><span class="mark">—</span> Nothing leaves your machine</h3>
-          <p>Runs locally. The only network call is your own Claude API key talking to Anthropic — the same as normal Claude Code use.</p>
-        </div>
-        <div class="trust-cell">
-          <h3><span class="mark">—</span> We don't save your data</h3>
-          <p>There is no server of ours in the path. Nothing you check is stored, logged, or seen by us, anywhere.</p>
-        </div>
-        <div class="trust-cell">
-          <h3><span class="mark">—</span> We never touch settings.json</h3>
-          <p>Read-only access to CLAUDE.md and your session transcript. No hooks installed, ever, without you explicitly asking.</p>
-        </div>
+        <div class="trust-cell"><h3><span class="mark">—</span> Nothing leaves your machine</h3><p>Runs locally. The only network call is your own Claude API key talking to Anthropic — same as normal Claude Code use.</p></div>
+        <div class="trust-cell"><h3><span class="mark">—</span> We don't save your data</h3><p>There is no server of ours in the path. Nothing you check is stored, logged, or seen by us, anywhere.</p></div>
+        <div class="trust-cell"><h3><span class="mark">—</span> We never touch settings.json</h3><p>Read-only access to CLAUDE.md and your session transcript. No hooks installed, ever, without you explicitly asking.</p></div>
       </div>
       <div style="height:20px"></div>
-      <div class="security-note">
-        <strong>Worth saying directly, given the year it's been:</strong> malicious npm packages have specifically targeted Claude Code's hook system — planting code in <code>.claude/settings.json</code> that runs automatically on every session. RuleReceipt does none of that. It runs only when you type the command. Nothing automatic, nothing silent.
-      </div>
+      <div class="security-note"><strong>Worth saying directly, given the year it's been:</strong> malicious npm packages have specifically targeted Claude Code's hook system — planting code in <code>.claude/settings.json</code> that runs automatically on every session. RuleReceipt does none of that. It runs only when you type the command. Nothing automatic, nothing silent.</div>
     </div>
   </section>
 
@@ -477,16 +362,8 @@
       <h2>Pricing</h2>
       <p class="band-sub">Free while we're early. After that, pay for what you use — no subscription.</p>
       <div class="pricing">
-        <div class="price-card accent">
-          <div>Now, through the free window</div>
-          <div class="amount">Free</div>
-          <p>Unlimited checks. No card, no signup friction. This is how we find out if it's actually useful.</p>
-        </div>
-        <div class="price-card">
-          <div>After that</div>
-          <div class="amount">Credits <small>· pay per check</small></div>
-          <p>Buy a pack, use it whenever, nothing recurring. Announced clearly, in advance — never a silent switch.</p>
-        </div>
+        <div class="price-card accent"><div>Now, through the free window</div><div class="amount">Free</div><p>Unlimited checks. No card, no signup friction. This is how we find out if it's actually useful.</p></div>
+        <div class="price-card"><div>After that</div><div class="amount">Credits <small>· pay per check</small></div><p>Buy a pack, use it whenever, nothing recurring. Announced clearly, in advance — never a silent switch.</p></div>
       </div>
     </div>
   </section>
@@ -497,6 +374,105 @@
       <div class="fine">Launching 31 August 2026 · runs on your machine, not ours</div>
     </div>
   </footer>
+
+<script>
+(function () {
+  var canvas = document.getElementById('trace');
+  var statusEl = document.getElementById('trace-status');
+  var ctx = canvas.getContext('2d');
+  var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function size() {
+    var rect = canvas.getBoundingClientRect();
+    var dpr = window.devicePixelRatio || 1;
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { w: rect.width, h: rect.height };
+  }
+
+  // Fixed "session" shape: mostly steady, one sharp drop (a FAIL), one
+  // wobble (UNCLEAR), settling flat at the end (verified).
+  function traceY(x, w, h) {
+    var mid = h * 0.5;
+    var t = x / w;
+    var y = mid;
+    y += Math.sin(t * 46) * 3;
+    if (t > 0.30 && t < 0.40) { // the fail spike
+      var k = (t - 0.30) / 0.10;
+      y += Math.sin(k * Math.PI) * (h * 0.34);
+    }
+    if (t > 0.58 && t < 0.68) { // the unclear wobble
+      var k2 = (t - 0.58) / 0.10;
+      y += Math.sin(k2 * Math.PI * 3) * (h * 0.10);
+    }
+    return y;
+  }
+
+  var progress = 0;
+  var dims = size();
+
+  function draw() {
+    var w = dims.w, h = dims.h;
+    ctx.clearRect(0, 0, w, h);
+
+    // baseline grid
+    ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+    ctx.lineWidth = 1;
+    for (var gy = 0; gy <= h; gy += h / 4) {
+      ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(w, gy); ctx.stroke();
+    }
+
+    var endX = reduced ? w : w * progress;
+
+    ctx.beginPath();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = '#5FD9D6';
+    ctx.shadowColor = 'rgba(95,217,214,0.55)';
+    ctx.shadowBlur = 6;
+    var step = 2;
+    for (var x = 0; x <= endX; x += step) {
+      var y = traceY(x, w, h);
+      var t = x / w;
+      // recolor the fail-spike segment amber/red
+      if (t > 0.30 && t < 0.40) {
+        ctx.strokeStyle = '#FF5F52';
+        ctx.shadowColor = 'rgba(255,95,82,0.6)';
+      } else if (t > 0.58 && t < 0.68) {
+        ctx.strokeStyle = '#FF9E43';
+        ctx.shadowColor = 'rgba(255,158,67,0.55)';
+      } else {
+        ctx.strokeStyle = '#5FD9D6';
+        ctx.shadowColor = 'rgba(95,217,214,0.5)';
+      }
+      if (x === 0) { ctx.moveTo(x, y); } else { ctx.lineTo(x, y); }
+    }
+    ctx.stroke();
+
+    // leading dot
+    if (!reduced && progress < 1) {
+      var lx = endX, ly = traceY(lx, w, h);
+      ctx.beginPath();
+      ctx.fillStyle = '#FF9E43';
+      ctx.shadowColor = 'rgba(255,158,67,0.9)';
+      ctx.shadowBlur = 10;
+      ctx.arc(lx, ly, 3.2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.shadowBlur = 0;
+
+    if (!reduced && progress < 1) {
+      progress += 0.006;
+      requestAnimationFrame(draw);
+    } else {
+      statusEl.textContent = '8 pass · 2 fail · 1 unclear';
+    }
+  }
+
+  window.addEventListener('resize', function () { dims = size(); });
+  draw();
+})();
+</script>
 
 </body>
 </html>
