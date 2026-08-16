@@ -81,7 +81,7 @@
 
   .top-cta {
     font-family: var(--font-mono);
-    font-size: 0.76rem;
+    font-size: 0.72rem;
     color: var(--paper-dim);
     border: 1px solid var(--panel-line-strong);
     padding: 6px 12px;
@@ -92,7 +92,7 @@
   .hero { padding: 58px 0 8px; text-align: center; }
   .eyebrow {
     font-family: var(--font-mono);
-    font-size: 0.76rem;
+    font-size: 0.72rem;
     letter-spacing: 0.1em;
     text-transform: uppercase;
     color: var(--cyan);
@@ -148,7 +148,7 @@
     display: flex;
     justify-content: space-between;
     font-family: var(--font-mono);
-    font-size: 0.7rem;
+    font-size: 0.72rem;
     color: var(--paper-dim);
     letter-spacing: 0.05em;
     text-transform: uppercase;
@@ -164,7 +164,7 @@
     border: 1px solid var(--panel-line-strong);
     border-radius: 3px;
     font-family: var(--font-mono);
-    font-size: 0.82rem;
+    font-size: 0.85rem;
     color: var(--paper-dim);
   }
   .readout .r-top {
@@ -186,7 +186,7 @@
   .r-mark.fail { color: var(--red); }
   .r-mark.unclear { color: var(--amber); }
   .r-body { color: var(--paper); }
-  .r-evidence { margin: 4px 0 0 24px; color: var(--paper-dim); font-size: 0.76rem; }
+  .r-evidence { margin: 4px 0 0 24px; color: var(--paper-dim); font-size: 0.72rem; }
   .r-rule { border-top: 1px dashed var(--panel-line); margin: 14px 0; }
   .r-foot {
     padding: 12px 18px;
@@ -213,11 +213,30 @@
     letter-spacing: 0.01em;
   }
   blockquote span { color: var(--amber); }
-  .quote-cite { font-family: var(--font-mono); font-size: 0.76rem; color: var(--paper-dim); margin-top: 16px; }
+  .quote-cite { font-family: var(--font-mono); font-size: 0.72rem; color: var(--paper-dim); margin-top: 16px; }
 
-  .issue-row { max-width: 620px; margin: 26px auto 0; text-align: left; display: grid; gap: 10px; }
-  .issue { font-family: var(--font-mono); font-size: 0.8rem; color: var(--paper-dim); display: flex; gap: 10px; }
+  .evidence-card {
+    max-width: 620px;
+    margin: 30px auto 0;
+    text-align: left;
+    background: var(--panel);
+    border: 1px solid var(--panel-line-strong);
+    border-radius: 3px;
+    padding: 22px 26px 26px;
+  }
+  .evidence-label {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--paper-dim);
+    margin-bottom: 14px;
+  }
+  .issue-row { display: grid; gap: 10px; }
+  .issue { font-family: var(--font-mono); font-size: 0.85rem; color: var(--paper-dim); display: flex; gap: 10px; }
   .issue .num { color: var(--cyan); flex: none; }
+  .evidence-divider { border-top: 1px solid var(--panel-line); margin: 18px 0; }
+  .founder-note { color: var(--paper-dim); font-size: 0.95rem; margin: 0; }
 
   /* ---------- sections ---------- */
   section.band { padding: 54px 0; border-top: 1px solid var(--panel-line); }
@@ -235,20 +254,20 @@
   .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; }
   .step .n { font-family: var(--font-mono); color: var(--cyan); font-size: 0.85rem; margin-bottom: 10px; }
   .step h3 { font-family: var(--font-sans); font-weight: 600; font-size: 1.02rem; margin: 0 0 8px; color: var(--paper); }
-  .step p { color: var(--paper-dim); margin: 0; font-size: 0.94rem; }
+  .step p { color: var(--paper-dim); margin: 0; font-size: 0.95rem; }
 
   .trust-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--panel-line); border: 1px solid var(--panel-line); }
   .trust-cell { background: var(--bg-deep); padding: 26px 22px; }
-  .trust-cell h3 { font-family: var(--font-sans); font-weight: 600; font-size: 0.98rem; margin: 0 0 10px; color: var(--paper); display:flex; align-items:center; gap:8px; }
+  .trust-cell h3 { font-family: var(--font-sans); font-weight: 600; font-size: 1.02rem; margin: 0 0 10px; color: var(--paper); display:flex; align-items:center; gap:8px; }
   .trust-cell h3 .mark { color: var(--cyan); }
-  .trust-cell p { margin: 0; color: var(--paper-dim); font-size: 0.9rem; }
+  .trust-cell p { margin: 0; color: var(--paper-dim); font-size: 0.95rem; }
 
   .security-note {
     background: var(--panel);
     border: 1px solid var(--panel-line-strong);
     border-left: 3px solid var(--amber);
     padding: 20px 24px;
-    font-size: 0.94rem;
+    font-size: 0.95rem;
     color: var(--paper-dim);
     border-radius: 2px;
   }
@@ -260,7 +279,7 @@
   .price-card.accent { border-color: var(--amber); }
   .price-card .amount { font-family: var(--font-display); font-weight: 800; font-size: 1.9rem; color: var(--paper); margin: 4px 0 10px; text-transform: uppercase; }
   .price-card .amount small { font-family: var(--font-sans); font-size: 0.85rem; color: var(--paper-dim); font-weight: 400; text-transform: none; }
-  .price-card p { color: var(--paper-dim); font-size: 0.9rem; margin: 0; }
+  .price-card p { color: var(--paper-dim); font-size: 0.95rem; margin: 0; }
 
   footer { padding: 54px 0 68px; text-align: center; border-top: 1px solid var(--panel-line); }
   footer .cmd-repeat { font-family: var(--font-mono); font-size: 1rem; color: var(--paper); margin-bottom: 10px; }
@@ -333,9 +352,15 @@
   <div class="quote-block">
     <blockquote><span>&#8220;</span>CLAUDE.md is a wish list, not a contract.<span>&#8221;</span></blockquote>
     <div class="quote-cite">— a developer, after writing 200 lines of rules the agent ignored</div>
-    <div class="issue-row">
-      <div class="issue"><span class="num">#18660</span><span>CLAUDE.md instructions are read but not reliably followed</span></div>
-      <div class="issue"><span class="num">#15443</span><span>Claude ignores explicit instructions while claiming to understand them</span></div>
+    <div class="evidence-card">
+      <div class="evidence-label">Documented, not guessed</div>
+      <div class="issue-row">
+        <div class="issue"><span class="num">#18660</span><span>CLAUDE.md instructions are read but not reliably followed</span></div>
+        <div class="issue"><span class="num">#15443</span><span>Claude ignores explicit instructions while claiming to understand them</span></div>
+        <div class="issue"><span class="num">#24318</span><span>Claude ignores explicit user instructions and acts without approval</span></div>
+      </div>
+      <div class="evidence-divider"></div>
+      <p class="founder-note">I built this after hitting the same wall myself — running Claude Code daily, writing rules into CLAUDE.md, and having no way to tell whether they were actually followed or just quietly skipped. Vibe coding with it is genuinely good. Trusting it to follow my own rules, without checking, wasn't.</p>
     </div>
   </div>
 
