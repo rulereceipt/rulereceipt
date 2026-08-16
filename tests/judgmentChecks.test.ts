@@ -59,7 +59,7 @@ describe("runJudgmentChecks — API interaction (mocked, no live API key availab
             content: [
               {
                 type: "tool_use",
-                input: { results: [{ ruleId: "4", status: "FAIL", evidence: "led with good news, not bad" }] },
+                input: { results: [{ ruleId: "global:4", status: "FAIL", evidence: "led with good news, not bad" }] },
               },
             ],
           }),
@@ -98,13 +98,52 @@ describe("runJudgmentChecks — API interaction (mocked, no live API key availab
     expect(results[0].status).toBe("UNCLEAR");
   });
 
+  // real bug found while testing: a project-level rule can reuse the same
+  // number as a global one — matching by bare ruleId would silently
+  // attach the wrong result to the wrong rule
+  it("does NOT confuse two rules that share the same numeric id but different sources", async () => {
+    const globalRule: JudgmentClassification = {
+      kind: "judgment",
+      rule: { id: "1", title: "Global one", text: "global text", source: "global" },
+    };
+    const projectRule: JudgmentClassification = {
+      kind: "judgment",
+      rule: { id: "1", title: "Project one", text: "project text", source: "project" },
+    };
+    vi.doMock("@anthropic-ai/sdk", () => ({
+      default: class MockAnthropic {
+        messages = {
+          create: vi.fn().mockResolvedValue({
+            content: [
+              {
+                type: "tool_use",
+                input: {
+                  results: [
+                    { ruleId: "global:1", status: "PASS", evidence: "global evidence" },
+                    { ruleId: "project:1", status: "FAIL", evidence: "project evidence" },
+                  ],
+                },
+              },
+            ],
+          }),
+        };
+      },
+    }));
+    const { runJudgmentChecks } = await import("../src/checks/judgmentChecks.js");
+    const results = await runJudgmentChecks([globalRule, projectRule], []);
+    const global = results.find((r) => r.ruleSource === "global");
+    const project = results.find((r) => r.ruleSource === "project");
+    expect(global?.status).toBe("PASS");
+    expect(project?.status).toBe("FAIL");
+  });
+
   // proves this test can fail: an invalid status value must not be trusted as-is
   it("does NOT accept a malformed status value as valid (sanity check)", async () => {
     vi.doMock("@anthropic-ai/sdk", () => ({
       default: class MockAnthropic {
         messages = {
           create: vi.fn().mockResolvedValue({
-            content: [{ type: "tool_use", input: { results: [{ ruleId: "4", status: "MAYBE", evidence: "x" }] } }],
+            content: [{ type: "tool_use", input: { results: [{ ruleId: "global:4", status: "MAYBE", evidence: "x" }] } }],
           }),
         };
       },

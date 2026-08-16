@@ -43,6 +43,7 @@ export function runDeterministicChecks(
           return {
             ruleId: rule.id,
             ruleTitle: rule.title,
+            ruleSource: rule.source,
             status: "FAIL",
             evidence: `found banned pattern "${pattern}" in a ${event.kind === "tool_use" ? event.toolName + " call" : event.kind}: ${haystack.slice(0, 160)}`,
           };
@@ -52,6 +53,7 @@ export function runDeterministicChecks(
     return {
       ruleId: rule.id,
       ruleTitle: rule.title,
+      ruleSource: rule.source,
       status: "PASS",
       evidence: `no occurrence of ${patterns.map((p) => `"${p}"`).join(" or ")} found in this session`,
     };

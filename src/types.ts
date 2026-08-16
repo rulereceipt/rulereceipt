@@ -38,6 +38,7 @@ export type CheckStatus = "PASS" | "FAIL" | "UNCLEAR";
 export interface CheckResult {
   ruleId: string;
   ruleTitle: string;
+  ruleSource: "global" | "project";
   status: CheckStatus;
   evidence: string;
 }

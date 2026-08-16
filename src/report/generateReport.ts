@@ -26,6 +26,17 @@ export function computeTranscriptHash(sessionFilePath: string | null): string | 
   }
 }
 
+/**
+ * Global and project-level CLAUDE.md can legitimately reuse the same
+ * rule number (real, tested case) — only label the source when there's
+ * an actual collision, so the common case stays clean ("Rule 1"), and
+ * the rare case stays correct ("Rule 1 (global)" / "Rule 1 (project)").
+ */
+function ruleLabel(r: CheckResult, results: CheckResult[]): string {
+  const collides = results.filter((other) => other.ruleId === r.ruleId).length > 1;
+  return collides ? `Rule ${r.ruleId} (${r.ruleSource}) — ${r.ruleTitle}` : `Rule ${r.ruleId} — ${r.ruleTitle}`;
+}
+
 function summaryLine(results: CheckResult[]): string {
   const pass = results.filter((r) => r.status === "PASS").length;
   const fail = results.filter((r) => r.status === "FAIL").length;
@@ -38,7 +49,7 @@ export function generateReport(results: CheckResult[], meta: ReportMeta): string
   lines.push(`RuleReceipt · ${meta.ruleCount} rules checked`);
   lines.push("─".repeat(40));
   for (const r of results) {
-    lines.push(`${MARK[r.status]} ${r.status.padEnd(7)} Rule ${r.ruleId} — ${r.ruleTitle}`);
+    lines.push(`${MARK[r.status]} ${r.status.padEnd(7)} ${ruleLabel(r, results)}`);
     if (r.evidence) lines.push(`  evidence: ${r.evidence}`);
   }
   lines.push("─".repeat(40));
@@ -59,7 +70,7 @@ export function generateMarkdownReport(results: CheckResult[], meta: ReportMeta)
   lines.push("|---|---|---|");
   for (const r of results) {
     const evidence = (r.evidence || "").replace(/\|/g, "\\|");
-    lines.push(`| ${MARK[r.status]} ${r.status} | Rule ${r.ruleId} — ${r.ruleTitle} | ${evidence} |`);
+    lines.push(`| ${MARK[r.status]} ${r.status} | ${ruleLabel(r, results)} | ${evidence} |`);
   }
   lines.push("");
   const hash = computeTranscriptHash(meta.sessionFilePath);

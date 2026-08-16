@@ -6,9 +6,9 @@ import { generateReport, generateMarkdownReport, computeTranscriptHash } from ".
 import type { CheckResult } from "../src/types.js";
 
 const results: CheckResult[] = [
-  { ruleId: "1", ruleTitle: "Evidence or it didn't happen", status: "PASS", evidence: "showed real output" },
-  { ruleId: "4", ruleTitle: "Surface bad news first", status: "FAIL", evidence: "led with good news" },
-  { ruleId: "9", ruleTitle: "Unanswered questions carry forward", status: "UNCLEAR", evidence: "no prior question in scope" },
+  { ruleId: "1", ruleTitle: "Evidence or it didn't happen", ruleSource: "global", status: "PASS", evidence: "showed real output" },
+  { ruleId: "4", ruleTitle: "Surface bad news first", ruleSource: "global", status: "FAIL", evidence: "led with good news" },
+  { ruleId: "9", ruleTitle: "Unanswered questions carry forward", ruleSource: "global", status: "UNCLEAR", evidence: "no prior question in scope" },
 ];
 
 describe("computeTranscriptHash", () => {
@@ -52,6 +52,24 @@ describe("generateReport (terminal)", () => {
     const output = generateReport(results, { sessionFilePath: null, ruleCount: 3 });
     expect(output).toContain("demo data");
   });
+
+  // real bug found while testing: a project-level CLAUDE.md can reuse the
+  // same rule number as the global one — the report must disambiguate,
+  // not silently show two indistinguishable "Rule 1" lines
+  it("disambiguates by source when two rules share the same ID", () => {
+    const colliding: CheckResult[] = [
+      { ruleId: "1", ruleTitle: "Global rule one", ruleSource: "global", status: "PASS", evidence: "a" },
+      { ruleId: "1", ruleTitle: "Project rule one", ruleSource: "project", status: "FAIL", evidence: "b" },
+    ];
+    const output = generateReport(colliding, { sessionFilePath: null, ruleCount: 2 });
+    expect(output).toContain("Rule 1 (global)");
+    expect(output).toContain("Rule 1 (project)");
+  });
+
+  it("does NOT add a source label when there's no collision (common case stays clean)", () => {
+    const output = generateReport(results, { sessionFilePath: null, ruleCount: 3 });
+    expect(output).not.toContain("(global)");
+  });
 });
 
 describe("generateMarkdownReport", () => {
@@ -61,14 +79,14 @@ describe("generateMarkdownReport", () => {
   });
 
   it("escapes pipe characters in evidence so the table doesn't break", () => {
-    const withPipe: CheckResult[] = [{ ruleId: "1", ruleTitle: "x", status: "PASS", evidence: "a | b" }];
+    const withPipe: CheckResult[] = [{ ruleId: "1", ruleTitle: "x", ruleSource: "global", status: "PASS", evidence: "a | b" }];
     const output = generateMarkdownReport(withPipe, { sessionFilePath: null, ruleCount: 1 });
     expect(output).toContain("a \\| b");
   });
 
   // proves this test can fail: an unescaped pipe WOULD break the table
   it("FAILS if pipe escaping is removed (sanity check on the test itself)", () => {
-    const withPipe: CheckResult[] = [{ ruleId: "1", ruleTitle: "x", status: "PASS", evidence: "a | b" }];
+    const withPipe: CheckResult[] = [{ ruleId: "1", ruleTitle: "x", ruleSource: "global", status: "PASS", evidence: "a | b" }];
     const output = generateMarkdownReport(withPipe, { sessionFilePath: null, ruleCount: 1 });
     expect(output).not.toContain("| a | b |"); // the raw unescaped form
   });
