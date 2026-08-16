@@ -7,25 +7,27 @@
 <meta name="description" content="RuleReceipt checks a Claude Code session against your own rules and shows precisely what was followed, what wasn't, and why — with evidence. Runs locally. Nothing stored, nothing sent anywhere." />
 <style>
   :root {
-    --bg: #0E1220;
-    --bg-deep: #090C16;
-    --panel: #151B2E;
-    --panel-line: #232B45;
-    --panel-line-strong: #333F63;
-    --paper: #EDEDE3;
-    --paper-dim: #9FA6BE;
-    --amber: #FF9E43;
-    --amber-dim: #C97C36;
-    --cyan: #5FD9D6;
-    --red: #FF5F52;
-    --font-display: 'Arial Narrow', 'Helvetica Neue Condensed', Impact, var(--font-sans);
+    --bg: #FAFAF7;
+    --bg-deep: #F1F0EA;
+    --panel: #FFFFFF;
+    --panel-line: #E7E5DC;
+    --panel-line-strong: #D3D0C3;
+    --paper: #17191C;
+    --paper-dim: #6B6F76;
+    --amber: #DD6A1F;
+    --amber-dim: #B85818;
+    --cyan: #17805F;
+    --red: #C2402C;
+    --font-display: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
   }
 
-  /* This design commits to one instrument-panel world in both themes —
-     dark by nature (a CRT readout), so no light-mode swap; background and
-     colors are painted explicitly regardless of host theme. */
+  /* Light, restrained, one accent color — no dark "instrument panel"
+     costume. Still committed to one deliberate look (light) rather than
+     a light/dark toggle, since the whole point here is calm and clean,
+     not a technical-instrument aesthetic. Background and colors painted
+     explicitly regardless of host theme. */
 
   * { box-sizing: border-box; }
 
@@ -66,7 +68,6 @@
   .wordmark .led {
     width: 8px; height: 8px; border-radius: 50%;
     background: var(--amber);
-    box-shadow: 0 0 10px 2px rgba(255,158,67,0.7);
     animation: blink 2.4s ease-in-out infinite;
   }
   @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
@@ -168,8 +169,8 @@
     letter-spacing: 0.06em;
     color: var(--paper-dim);
   }
-  .readout .r-top .live { color: var(--amber); display:flex; align-items:center; gap:6px; }
-  .readout .r-top .live .led { width:6px;height:6px;border-radius:50%;background:var(--amber); animation: blink 2.4s ease-in-out infinite; }
+  .readout .r-top .live { color: var(--amber-dim); display:flex; align-items:center; gap:6px; }
+  .readout .r-top .live .led { width:6px;height:6px;border-radius:50%;background:var(--amber); }
   .r-body-wrap { padding: 16px 18px 18px; }
 
   .r-line { display: flex; gap: 10px; margin-bottom: 10px; align-items: baseline; }
@@ -417,7 +418,7 @@
     ctx.clearRect(0, 0, w, h);
 
     // baseline grid
-    ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+    ctx.strokeStyle = 'rgba(23,25,28,0.06)';
     ctx.lineWidth = 1;
     for (var gy = 0; gy <= h; gy += h / 4) {
       ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(w, gy); ctx.stroke();
@@ -427,23 +428,18 @@
 
     ctx.beginPath();
     ctx.lineWidth = 2;
-    ctx.strokeStyle = '#5FD9D6';
-    ctx.shadowColor = 'rgba(95,217,214,0.55)';
-    ctx.shadowBlur = 6;
+    ctx.strokeStyle = '#17805F';
     var step = 2;
     for (var x = 0; x <= endX; x += step) {
       var y = traceY(x, w, h);
       var t = x / w;
-      // recolor the fail-spike segment amber/red
+      // recolor the fail-spike segment red, unclear segment amber
       if (t > 0.30 && t < 0.40) {
-        ctx.strokeStyle = '#FF5F52';
-        ctx.shadowColor = 'rgba(255,95,82,0.6)';
+        ctx.strokeStyle = '#C2402C';
       } else if (t > 0.58 && t < 0.68) {
-        ctx.strokeStyle = '#FF9E43';
-        ctx.shadowColor = 'rgba(255,158,67,0.55)';
+        ctx.strokeStyle = '#DD6A1F';
       } else {
-        ctx.strokeStyle = '#5FD9D6';
-        ctx.shadowColor = 'rgba(95,217,214,0.5)';
+        ctx.strokeStyle = '#17805F';
       }
       if (x === 0) { ctx.moveTo(x, y); } else { ctx.lineTo(x, y); }
     }
@@ -453,13 +449,10 @@
     if (!reduced && progress < 1) {
       var lx = endX, ly = traceY(lx, w, h);
       ctx.beginPath();
-      ctx.fillStyle = '#FF9E43';
-      ctx.shadowColor = 'rgba(255,158,67,0.9)';
-      ctx.shadowBlur = 10;
+      ctx.fillStyle = '#DD6A1F';
       ctx.arc(lx, ly, 3.2, 0, Math.PI * 2);
       ctx.fill();
     }
-    ctx.shadowBlur = 0;
 
     if (!reduced && progress < 1) {
       progress += 0.006;
