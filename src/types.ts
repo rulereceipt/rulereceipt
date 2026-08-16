@@ -3,15 +3,35 @@ export interface Rule {
   title: string;
   text: string;
   source: "global" | "project";
-  kind?: "deterministic" | "judgment";
 }
 
-export interface TranscriptEvent {
-  role: "user" | "assistant" | "tool";
-  toolName?: string;
-  content: string;
-  timestamp?: string;
+export interface TranscriptTextEvent {
+  role: "user" | "assistant";
+  kind: "text";
+  text: string;
+  timestamp: string;
 }
+
+export interface TranscriptToolUseEvent {
+  role: "assistant";
+  kind: "tool_use";
+  toolName: string;
+  input: unknown;
+  timestamp: string;
+}
+
+export interface TranscriptToolResultEvent {
+  role: "user";
+  kind: "tool_result";
+  content: string;
+  isError: boolean;
+  timestamp: string;
+}
+
+export type TranscriptEvent =
+  | TranscriptTextEvent
+  | TranscriptToolUseEvent
+  | TranscriptToolResultEvent;
 
 export type CheckStatus = "PASS" | "FAIL" | "UNCLEAR";
 
