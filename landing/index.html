@@ -84,8 +84,8 @@
     font-size: 0.72rem;
     color: var(--paper-dim);
     border: 1px solid var(--panel-line-strong);
-    padding: 6px 12px;
-    border-radius: 2px;
+    padding: 7px 14px;
+    border-radius: 999px;
   }
 
   /* ---------- hero ---------- */
@@ -127,7 +127,7 @@
     background: var(--panel);
     border: 1px solid var(--panel-line-strong);
     padding: 14px 20px;
-    border-radius: 2px;
+    border-radius: 14px;
   }
   .install .prompt { color: var(--amber); }
   .install .cmd { color: var(--paper); }
@@ -141,8 +141,9 @@
   .trace-panel {
     background: var(--panel);
     border: 1px solid var(--panel-line-strong);
-    border-radius: 3px;
+    border-radius: 16px;
     padding: 18px 18px 8px;
+    box-shadow: 0 1px 2px rgba(23,25,28,0.04), 0 12px 28px -18px rgba(23,25,28,0.18);
   }
   .trace-panel .label-row {
     display: flex;
@@ -162,10 +163,12 @@
     width: min(100%, 460px);
     background: var(--panel);
     border: 1px solid var(--panel-line-strong);
-    border-radius: 3px;
+    border-radius: 16px;
     font-family: var(--font-mono);
     font-size: 0.85rem;
     color: var(--paper-dim);
+    box-shadow: 0 1px 2px rgba(23,25,28,0.04), 0 12px 28px -18px rgba(23,25,28,0.18);
+    overflow: hidden;
   }
   .readout .r-top {
     display: flex; justify-content: space-between; align-items: center;
@@ -221,8 +224,9 @@
     text-align: left;
     background: var(--panel);
     border: 1px solid var(--panel-line-strong);
-    border-radius: 3px;
+    border-radius: 16px;
     padding: 22px 26px 26px;
+    box-shadow: 0 1px 2px rgba(23,25,28,0.04), 0 12px 28px -18px rgba(23,25,28,0.18);
   }
   .evidence-label {
     font-family: var(--font-mono);
@@ -256,7 +260,7 @@
   .step h3 { font-family: var(--font-sans); font-weight: 600; font-size: 1.02rem; margin: 0 0 8px; color: var(--paper); }
   .step p { color: var(--paper-dim); margin: 0; font-size: 0.95rem; }
 
-  .trust-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--panel-line); border: 1px solid var(--panel-line); }
+  .trust-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--panel-line); border: 1px solid var(--panel-line); border-radius: 16px; overflow: hidden; }
   .trust-cell { background: var(--bg-deep); padding: 26px 22px; }
   .trust-cell h3 { font-family: var(--font-sans); font-weight: 600; font-size: 1.02rem; margin: 0 0 10px; color: var(--paper); display:flex; align-items:center; gap:8px; }
   .trust-cell h3 .mark { color: var(--cyan); }
@@ -269,13 +273,13 @@
     padding: 20px 24px;
     font-size: 0.95rem;
     color: var(--paper-dim);
-    border-radius: 2px;
+    border-radius: 14px;
   }
   .security-note strong { color: var(--paper); }
   .security-note code { color: var(--amber); }
 
   .pricing { display: flex; gap: 22px; flex-wrap: wrap; }
-  .price-card { flex: 1 1 220px; background: var(--panel); border: 1px solid var(--panel-line-strong); padding: 24px 22px; border-radius: 2px; }
+  .price-card { flex: 1 1 220px; background: var(--panel); border: 1px solid var(--panel-line-strong); padding: 24px 22px; border-radius: 16px; box-shadow: 0 1px 2px rgba(23,25,28,0.04), 0 12px 28px -18px rgba(23,25,28,0.18); }
   .price-card.accent { border-color: var(--amber); }
   .price-card .amount { font-family: var(--font-display); font-weight: 800; font-size: 1.9rem; color: var(--paper); margin: 4px 0 10px; text-transform: uppercase; }
   .price-card .amount small { font-family: var(--font-sans); font-size: 0.85rem; color: var(--paper-dim); font-weight: 400; text-transform: none; }
