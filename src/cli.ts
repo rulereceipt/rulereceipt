@@ -12,9 +12,9 @@ import { generateReport, generateMarkdownReport } from "./report/generateReport.
 import type { Rule, CheckResult } from "./types.js";
 
 const DEMO_RESULTS: CheckResult[] = [
-  { ruleId: "7", ruleTitle: "Tests must be able to fail", status: "PASS", evidence: "sabotage-and-revert shown before the green run" },
-  { ruleId: "4", ruleTitle: "Surface bad news first", status: "FAIL", evidence: "reply led with passing tests, the one broken test was mentioned last" },
-  { ruleId: "11", ruleTitle: "Fails closed on error", status: "UNCLEAR", evidence: "no error occurred this session, nothing to verify against" },
+  { ruleId: "7", ruleTitle: "Tests must be able to fail", ruleSource: "global", status: "PASS", evidence: "sabotage-and-revert shown before the green run" },
+  { ruleId: "4", ruleTitle: "Surface bad news first", ruleSource: "global", status: "FAIL", evidence: "reply led with passing tests, the one broken test was mentioned last" },
+  { ruleId: "11", ruleTitle: "Fails closed on error", ruleSource: "global", status: "UNCLEAR", evidence: "no error occurred this session, nothing to verify against" },
 ];
 
 function loadRules(cwd: string): Rule[] {
