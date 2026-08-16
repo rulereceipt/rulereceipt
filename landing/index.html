@@ -488,6 +488,28 @@
       ctx.fill();
     }
 
+    // narrate what the trace shows, not just draw a line — labels appear
+    // once the trace has actually passed each point, so it reads as a
+    // story unfolding, not a static chart with a legend bolted on
+    ctx.font = '11px ui-monospace, SFMono-Regular, Menlo, monospace';
+    ctx.textAlign = 'center';
+    if (reduced || endX > w * 0.36) {
+      var fx = w * 0.35, fy = traceY(fx, w, h);
+      ctx.fillStyle = '#C2402C';
+      ctx.fillText('Rule 4 missed', fx, fy + 26);
+    }
+    if (reduced || endX > w * 0.635) {
+      var ux = w * 0.63, uy = traceY(ux, w, h);
+      ctx.fillStyle = '#B85818';
+      ctx.fillText('Rule 11 unclear', ux, uy - 14);
+    }
+    if (reduced || progress >= 1) {
+      ctx.fillStyle = '#17805F';
+      ctx.textAlign = 'right';
+      ctx.fillText('holding steady', w - 4, traceY(w, w, h) - 14);
+    }
+    ctx.textAlign = 'left';
+
     if (!reduced && progress < 1) {
       progress += 0.006;
       requestAnimationFrame(draw);
