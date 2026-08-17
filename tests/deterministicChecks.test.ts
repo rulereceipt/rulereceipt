@@ -52,6 +52,30 @@ describe("runDeterministicChecks", () => {
     expect(result.status).toBe("PASS");
   });
 
+  // Real bug found while building a security-focused CLAUDE.md template:
+  // a pattern ending in punctuation (like a URL scheme) could never match
+  // a real occurrence, because the old trailing word-boundary check
+  // unconditionally required "not followed by a word character" — but a
+  // real URL always has a domain (word characters) immediately after
+  // "http://". Confirmed false-negative by hand before writing this fix.
+  it("matches a pattern ending in punctuation even when real text follows immediately (http:// bug)", () => {
+    const urlRule: DeterministicClassification = {
+      kind: "deterministic",
+      rule: { id: "11", title: "No plain HTTP", text: "Never use `http://`.", source: "project" },
+      patterns: ["http://"],
+    };
+    const events = [toolUse("Write", { content: 'const url = "http://api.example.com/data";' })];
+    const [result] = runDeterministicChecks([urlRule], events);
+    expect(result.status).toBe("FAIL");
+  });
+
+  it("still applies the word-boundary check when the pattern ends in a word character (regression guard)", () => {
+    // --force must still NOT match inside --force-with-lease, same as before
+    const events = [toolUse("Bash", { command: "git push --force-with-lease origin main" })];
+    const [result] = runDeterministicChecks([rule], events);
+    expect(result.status).toBe("PASS");
+  });
+
   // Security audit flagged that an extreme pattern length might crash
   // regex construction. Direct empirical test (not theory): even a
   // 200,000-char pattern must not crash the whole check, and must stay

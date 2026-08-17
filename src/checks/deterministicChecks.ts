@@ -20,9 +20,23 @@ function escapeRegex(literal: string): string {
  * pattern like "git push --force" would false-positive on the SAFER
  * "git push --force-with-lease" (caught by an actual failing test before
  * this fix, not assumed).
+ *
+ * The trailing boundary only applies when the pattern itself ends in a
+ * word character — that's the only case where appending more word
+ * characters could form a genuinely different, longer token (like
+ * "--force" extending into "--force-with-lease"). A pattern that already
+ * ends in punctuation (e.g. "http://", ".env") can't be turned into a
+ * different token that way, and real occurrences of it (a real URL, a
+ * real filename) always have more characters immediately after — a real
+ * bug found by testing this against an actual "http://example.com"
+ * string: the old unconditional boundary made "http://" unmatchable
+ * against any real URL, ever.
  */
 function matchesPattern(haystack: string, pattern: string): boolean {
-  const regex = new RegExp(escapeRegex(pattern) + "(?![\\w-])");
+  const lastChar = pattern[pattern.length - 1];
+  const needsTrailingBoundary = /[\w-]/.test(lastChar);
+  const suffix = needsTrailingBoundary ? "(?![\\w-])" : "";
+  const regex = new RegExp(escapeRegex(pattern) + suffix);
   return regex.test(haystack);
 }
 
