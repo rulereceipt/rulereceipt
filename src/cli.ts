@@ -12,6 +12,7 @@ import { classifyRules } from "./checks/classify.js";
 import { runDeterministicChecks } from "./checks/deterministicChecks.js";
 import { runJudgmentChecks } from "./checks/judgmentChecks.js";
 import { generateReport, generateMarkdownReport } from "./report/generateReport.js";
+import { verifySessionHash } from "./verifyHash.js";
 import type { Rule, CheckResult } from "./types.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -135,6 +136,29 @@ program
   .option("--markdown", "output as markdown")
   .action((opts) => {
     runDemo(Boolean(opts.markdown));
+  });
+
+program
+  .command("verify <sessionFile> <hash>")
+  .description(
+    "Spot-check that a session file matches a hash someone gave you in a report — not needed for routine trust, useful for a dispute or incident review"
+  )
+  .action((sessionFile: string, hash: string) => {
+    const result = verifySessionHash(sessionFile, hash);
+    if (result.fullHash === null) {
+      console.log(`Could not read that session file: ${sessionFile}`);
+      process.exitCode = 1;
+      return;
+    }
+    if (result.match) {
+      console.log("✓ MATCH — this file's real hash matches what you checked against.");
+      console.log(`  full hash: sha256:${result.fullHash}`);
+    } else {
+      console.log("✕ MISMATCH — this file does NOT match the hash you checked against.");
+      console.log(`  this file's real hash: sha256:${result.fullHash}`);
+      console.log(`  checked against:       ${result.checkedAgainst}`);
+      process.exitCode = 1;
+    }
   });
 
 program.parse();
