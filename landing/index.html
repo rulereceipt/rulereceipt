@@ -217,10 +217,9 @@
     margin: 0 auto;
     max-width: 620px;
     font-family: var(--font-display);
-    font-weight: 800;
-    text-transform: uppercase;
-    font-size: clamp(1.35rem, 3.4vw, 1.9rem);
-    line-height: 1.28;
+    font-weight: 600;
+    font-size: clamp(1.25rem, 3vw, 1.7rem);
+    line-height: 1.32;
     color: var(--paper);
     text-wrap: balance;
     letter-spacing: 0.01em;
@@ -384,17 +383,9 @@
     display: block;
   }
 
-  .faq-list {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    grid-template-rows: repeat(4, auto);
-    grid-auto-flow: column;
-    gap: 10px 24px;
-    align-items: start;
-  }
-  @media (max-width: 720px) {
-    .faq-list { grid-template-columns: 1fr; grid-template-rows: none; grid-auto-flow: row; }
-  }
+  .faq-columns { display: flex; gap: 24px; align-items: flex-start; }
+  .faq-list { display: grid; gap: 10px; flex: 1 1 0; min-width: 0; }
+  @media (max-width: 720px) { .faq-columns { flex-direction: column; } }
   .faq-item {
     border: 1px solid var(--panel-line);
     border-radius: 12px;
@@ -497,8 +488,8 @@
   </div>
 
   <div class="quote-block">
-    <blockquote><span>&#8220;</span>I read your rules, I understand your rules, I don't follow your rules.<span>&#8221;</span></blockquote>
-    <div class="quote-cite">— a developer, summarizing the exact problem in a real GitHub bug report</div>
+    <blockquote>It reads the rules. It doesn't always follow them.</blockquote>
+    <div class="quote-cite">the exact problem behind every real example below</div>
     <div class="evidence-card">
       <div class="evidence-label">Not unique to Claude — a structural limit of how LLMs process long instructions, documented, not guessed</div>
       <div class="issue-row">
@@ -510,8 +501,6 @@
       <div class="evidence-divider"></div>
       <div class="evidence-label">Sometimes the cost isn't a bug report — it's real data</div>
       <p style="color:var(--paper-dim); font-size:0.92rem; margin:0 0 16px;">A developer told Claude explicitly: <em>"Don't deploy. No cp to /opt/proxypilot, no service restarts."</em> Claude ran a <code>cp</code> command over the live production directory anyway, corrupting the database — then deleted it entirely trying to "fix" the corruption. Recoverable only because a daily backup happened to exist. <a href="https://tim-schipper.nl/en/blog/the-day-claude-deleted-my-database" target="_blank" rel="noopener">Read the full account &rarr;</a></p>
-      <div class="evidence-divider"></div>
-      <p class="founder-note">I built this after hitting the same wall myself — running Claude Code daily, writing rules into CLAUDE.md, and having no way to tell whether they were actually followed or just quietly skipped. Vibe coding with it is genuinely good. Trusting it to follow my own rules, without checking, wasn't.</p>
     </div>
   </div>
 
@@ -607,39 +596,43 @@
     <div class="wrap-wide">
       <h2>Questions</h2>
       <p class="band-sub">Straight answers, including where the answer is "not yet."</p>
-      <div class="faq-list">
-        <details class="faq-item">
-          <summary>Does this work with Cursor or other AI agents?</summary>
-          <p>Not yet. v1 reads Claude Code sessions specifically. AGENTS.md as the rules format is already cross-tool, and support for other agents is the natural next step — but it isn't built yet, so it isn't claimed here.</p>
-        </details>
-        <details class="faq-item">
-          <summary>Do I need my own Anthropic API key?</summary>
-          <p>For the rules that need judgment, yes — the same key your Claude Code setup already uses. Rules that can be checked by plain pattern matching don't need it at all, and cost nothing to run.</p>
-        </details>
-        <details class="faq-item">
-          <summary>Does this touch my CLAUDE.md or Claude Code settings?</summary>
-          <p>Read-only. It reads CLAUDE.md/AGENTS.md and your session transcript, and writes nothing back. No hooks get installed, no settings get modified — not automatically, not ever, without you explicitly asking.</p>
-        </details>
-        <details class="faq-item">
-          <summary>What exactly counts as one credit?</summary>
-          <p>One run of <code>rulereceipt check</code> — regardless of how many rules it checks. Not metered per rule, per token, or per API call.</p>
-        </details>
-        <details class="faq-item">
-          <summary>Will it always be free?</summary>
-          <p>Free during early access, no date attached. When that changes, you'll hear about it in advance — not find out by hitting a paywall.</p>
-        </details>
-        <details class="faq-item">
-          <summary>What if I disagree with a result?</summary>
-          <p>Every PASS/FAIL/UNCLEAR comes with a quoted line of evidence specifically so you can check it yourself, not just trust it. It's Claude's judgment on the harder rules — not infallible, which is exactly why the evidence is shown, not hidden.</p>
-        </details>
-        <details class="faq-item">
-          <summary>Can my team or manager use this too?</summary>
-          <p>Yes — same tool, no team plan needed for this. A developer runs it after a session and shares the report directly (a markdown output is built for pasting into a PR or Slack). It's how an engineering lead sees whether the team's agent-assisted work actually followed standards, without a new dashboard to roll out.</p>
-        </details>
-        <details class="faq-item">
-          <summary>Can this help with a vendor security review or DPA?</summary>
-          <p>It can give you real evidence for the "how do you develop securely" questions — not certify you compliant. We put together a <a href="/templates/security-focused-CLAUDE.md">starting-point rule set</a> covering common asks (secrets, PII, input validation, auth checks); use it as a base and adjust it to what your actual reviewer asks for.</p>
-        </details>
+      <div class="faq-columns">
+        <div class="faq-list">
+          <details class="faq-item">
+            <summary>Does this work with Cursor or other AI agents?</summary>
+            <p>Not yet. v1 reads Claude Code sessions specifically. AGENTS.md as the rules format is already cross-tool, and support for other agents is the natural next step — but it isn't built yet, so it isn't claimed here.</p>
+          </details>
+          <details class="faq-item">
+            <summary>Do I need my own Anthropic API key?</summary>
+            <p>For the rules that need judgment, yes — the same key your Claude Code setup already uses. Rules that can be checked by plain pattern matching don't need it at all, and cost nothing to run.</p>
+          </details>
+          <details class="faq-item">
+            <summary>Does this touch my CLAUDE.md or Claude Code settings?</summary>
+            <p>Read-only. It reads CLAUDE.md/AGENTS.md and your session transcript, and writes nothing back. No hooks get installed, no settings get modified — not automatically, not ever, without you explicitly asking.</p>
+          </details>
+          <details class="faq-item">
+            <summary>What exactly counts as one credit?</summary>
+            <p>One run of <code>rulereceipt check</code> — regardless of how many rules it checks. Not metered per rule, per token, or per API call.</p>
+          </details>
+        </div>
+        <div class="faq-list">
+          <details class="faq-item">
+            <summary>Will it always be free?</summary>
+            <p>Free during early access, no date attached. When that changes, you'll hear about it in advance — not find out by hitting a paywall.</p>
+          </details>
+          <details class="faq-item">
+            <summary>What if I disagree with a result?</summary>
+            <p>Every PASS/FAIL/UNCLEAR comes with a quoted line of evidence specifically so you can check it yourself, not just trust it. It's Claude's judgment on the harder rules — not infallible, which is exactly why the evidence is shown, not hidden.</p>
+          </details>
+          <details class="faq-item">
+            <summary>Can my team or manager use this too?</summary>
+            <p>Yes — same tool, no team plan needed for this. A developer runs it after a session and shares the report directly (a markdown output is built for pasting into a PR or Slack). It's how an engineering lead sees whether the team's agent-assisted work actually followed standards, without a new dashboard to roll out.</p>
+          </details>
+          <details class="faq-item">
+            <summary>Can this help with a vendor security review or DPA?</summary>
+            <p>It can give you real evidence for the "how do you develop securely" questions — not certify you compliant. We put together a <a href="/templates/security-focused-CLAUDE.md">starting-point rule set</a> covering common asks (secrets, PII, input validation, auth checks); use it as a base and adjust it to what your actual reviewer asks for.</p>
+          </details>
+        </div>
       </div>
     </div>
   </section>
@@ -647,15 +640,12 @@
   <footer>
     <div class="wrap">
       <div class="cmd-repeat">npx rulereceipt check</div>
-      <div class="fine">Free during early access · runs on your machine, not ours</div>
+      <div class="fine">Your machine. Your rules. Your receipt.</div>
       <div class="fine" style="margin-top:14px">
         <a href="/privacy.html">Privacy</a> · <a href="/terms.html">Terms</a> · source-available
       </div>
       <div class="fine" style="margin-top:10px">
         <a href="https://x.com/rulereceipt" target="_blank" rel="noopener">X / Twitter</a> · <a href="https://www.linkedin.com/company/rulereceipt" target="_blank" rel="noopener">LinkedIn</a> · <a href="mailto:hello@rulereceipt.dev">hello@rulereceipt.dev</a>
-      </div>
-      <div class="fine" style="margin-top:10px; max-width:480px; margin-left:auto; margin-right:auto;">
-        RuleReceipt is an independent, third-party tool. It is not affiliated with, endorsed by, or sponsored by Anthropic.
       </div>
     </div>
   </footer>
