@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+<script>
+    !function(t,e){var o,n,p,r;e.__SV||(window.posthog && window.posthog.__loaded)||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}p||((p=t.createElement("script")).type="text/javascript",p.crossOrigin="anonymous",p.async=!0,p.src=s.api_host.replace(".i.posthog.com","-assets.i.posthog.com")+"/static/array.js",p.onerror=function(){p=null},(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r));var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+".people (stub)"},o="Sn Cn init Hn Un Gn Yi zn Kn qn capture Vn kn calculateEventProperties es register register_once register_for_session unregister unregister_for_session os Bn ss getFeatureFlag getFeatureFlagPayload getFeatureFlagResult getAllFeatureFlags isFeatureEnabled reloadFeatureFlags updateFlags updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures on onFeatureFlags onSurveysLoaded onSessionId getSurveys getActiveMatchingSurveys renderSurvey displaySurvey cancelPendingSurvey canRenderSurvey canRenderSurveyAsync ls identify setPersonProperties unsetPersonProperties group resetGroups setPersonPropertiesForFlags resetPersonPropertiesForFlags setGroupPropertiesForFlags resetGroupPropertiesForFlags reset us shutdown setIdentity clearIdentity get_distinct_id getGroups get_session_id get_session_replay_url alias set_config startSessionRecording stopSessionRecording sessionRecordingStarted captureException addExceptionStep captureLog startExceptionAutocapture stopExceptionAutocapture loadToolbar get_property getSessionProperty rs Xn createPersonProfile setInternalOrTestUser ns $n vs opt_in_capturing opt_out_capturing has_opted_in_capturing has_opted_out_capturing get_explicit_consent_status is_capturing clear_opt_in_out_capturing Jn debug tr At getPageViewId captureTraceFeedback captureTraceMetric Ln".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
+    posthog.init('phc_A4TBtMr58tNcGFEnoC82pPqzrKxXRGw84B8RVd8JK2nW', {
+        api_host: 'https://us.i.posthog.com',
+        defaults: '2026-05-30',
+        person_profiles: 'identified_only',
+    })
+</script>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>RuleReceipt — Usage stats</title>
+<link rel="canonical" href="https://rulereceipt.dev/stats.html" />
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23FAFAF7'/%3E%3Cpath d='M9 8h14v17l-3-2-3 2-3-2-3 2-2-2z' fill='none' stroke='%2317191C' stroke-width='1.6'/%3E%3Cpath d='M12 14h8M12 18h6' stroke='%2317805F' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E" />
+<meta name="robots" content="noindex" />
+<style>
+  :root {
+    --bg: #FAFAF7;
+    --panel: #FFFFFF;
+    --panel-line: #E7E5DC;
+    --panel-line-strong: #D3D0C3;
+    --paper: #17191C;
+    --paper-dim: #6B6F76;
+    --amber: #DD6A1F;
+    --cyan: #17805F;
+    --red: #C2402C;
+    --font-display: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--paper);
+    font-family: var(--font-display);
+    font-size: 17px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 0 24px 80px; }
+  a { color: var(--cyan); }
+  header.top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 26px 0 0;
+  }
+  .wordmark {
+    font-weight: 800;
+    font-size: 1.05rem;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: var(--paper);
+    text-decoration: none;
+  }
+  h1 {
+    font-size: clamp(1.7rem, 4.5vw, 2.3rem);
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.01em;
+    margin: 40px 0 10px;
+    text-wrap: balance;
+  }
+  .sub {
+    color: var(--paper-dim);
+    font-size: 0.95rem;
+    max-width: 52ch;
+    margin-bottom: 40px;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+  }
+  @media (max-width: 520px) { .grid { grid-template-columns: 1fr; } }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--panel-line);
+    border-radius: 14px;
+    padding: 22px 24px;
+  }
+  .card .label {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--paper-dim);
+    margin-bottom: 10px;
+  }
+  .card .value {
+    font-family: var(--font-mono);
+    font-size: 2.4rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+  .card.pass .value { color: var(--cyan); }
+  .card.fail .value { color: var(--red); }
+  .card.unclear .value { color: var(--amber); }
+  .note {
+    margin-top: 32px;
+    padding: 16px 18px;
+    border: 1px solid var(--panel-line);
+    border-radius: 10px;
+    background: var(--panel);
+    color: var(--paper-dim);
+    font-size: 0.88rem;
+  }
+  .note code {
+    font-family: var(--font-mono);
+    background: var(--bg);
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
+  .state {
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    color: var(--paper-dim);
+    margin-bottom: 18px;
+  }
+  .back { display: inline-block; margin-top: 40px; font-size: 0.88rem; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="top">
+      <a class="wordmark" href="/">RuleReceipt</a>
+    </header>
+
+    <h1>Usage stats</h1>
+    <p class="sub">Aggregate counts from everyone who has opted in with <code>rulereceipt check --share</code>. Nothing here is rule text, file paths, or session content — just totals.</p>
+
+    <div id="state" class="state">Loading…</div>
+    <div id="grid" class="grid" style="display:none;">
+      <div class="card">
+        <div class="label">Total runs shared</div>
+        <div class="value" id="v-runs">—</div>
+      </div>
+      <div class="card pass">
+        <div class="label">Pass</div>
+        <div class="value" id="v-pass">—</div>
+      </div>
+      <div class="card fail">
+        <div class="label">Fail</div>
+        <div class="value" id="v-fail">—</div>
+      </div>
+      <div class="card unclear">
+        <div class="label">Unclear</div>
+        <div class="value" id="v-unclear">—</div>
+      </div>
+    </div>
+
+    <div class="note">
+      This counter only moves when someone runs <code>rulereceipt check --share</code> — an opt-in flag, off by default. Running plain <code>rulereceipt check</code> sends nothing here or anywhere else. See <a href="/privacy.html">Privacy</a>.
+    </div>
+
+    <a class="back" href="/">&larr; Back to RuleReceipt</a>
+  </div>
+
+  <script>
+    fetch('/api/share')
+      .then(function (r) {
+        if (!r.ok) throw new Error('status ' + r.status);
+        return r.json();
+      })
+      .then(function (d) {
+        document.getElementById('v-runs').textContent = d.total_runs.toLocaleString();
+        document.getElementById('v-pass').textContent = d.total_pass.toLocaleString();
+        document.getElementById('v-fail').textContent = d.total_fail.toLocaleString();
+        document.getElementById('v-unclear').textContent = d.total_unclear.toLocaleString();
+        document.getElementById('state').style.display = 'none';
+        document.getElementById('grid').style.display = 'grid';
+      })
+      .catch(function (err) {
+        document.getElementById('state').textContent = 'Could not load stats right now (' + err.message + '). Try refreshing.';
+      });
+  </script>
+</body>
+</html>

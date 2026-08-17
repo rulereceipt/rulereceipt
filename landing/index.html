@@ -389,12 +389,14 @@
       <h2>What we don't do</h2>
       <p class="band-sub">The privacy story, stated plainly, not buried in a policy page.</p>
       <div class="trust-grid">
-        <div class="trust-cell"><h3><span class="mark">—</span> Nothing leaves your machine</h3><p>Runs locally. The only network call is your own Claude API key talking to Anthropic — same as normal Claude Code use.</p></div>
+        <div class="trust-cell"><h3><span class="mark">—</span> Nothing leaves your machine by default</h3><p>Runs locally. The only network call by default is your own Claude API key talking to Anthropic — same as normal Claude Code use. An opt-in <code>--share</code> flag sends aggregate pass/fail/unclear counts only, never rule text or session content — off unless you type it.</p></div>
         <div class="trust-cell"><h3><span class="mark">—</span> We don't save your data</h3><p>There is no server of ours in the path. Nothing you check is stored, logged, or seen by us, anywhere.</p></div>
         <div class="trust-cell"><h3><span class="mark">—</span> We never touch settings.json</h3><p>Read-only access to CLAUDE.md and your session transcript. No hooks installed, ever, without you explicitly asking.</p></div>
       </div>
       <div style="height:20px"></div>
       <div class="security-note"><strong>Worth saying directly, given the year it's been:</strong> malicious npm packages have specifically targeted Claude Code's hook system — planting code in <code>.claude/settings.json</code> that runs automatically on every session. RuleReceipt does none of that. It runs only when you type the command. Nothing automatic, nothing silent.</div>
+      <div style="height:14px"></div>
+      <div class="security-note"><strong>This isn't hypothetical.</strong> In July 2026, independent researchers found that a competing terminal coding agent was packaging entire codebases — including files never explicitly opened — into archives and uploading them to the vendor's cloud storage, with reports that the opt-out setting didn't reliably stop it. That's exactly the blind spot this tool exists to close: not "trust the agent," but see, with evidence, what it actually did.</div>
     </div>
   </section>
 
