@@ -295,9 +295,84 @@
   .price-card .amount small { font-family: var(--font-sans); font-size: 0.85rem; color: var(--paper-dim); font-weight: 400; text-transform: none; }
   .price-card p { color: var(--paper-dim); font-size: 0.95rem; margin: 0; }
 
-  .faq-list { display: grid; gap: 26px; max-width: 640px; }
-  .faq-item h3 { font-family: var(--font-sans); font-weight: 600; font-size: 1.02rem; margin: 0 0 8px; color: var(--paper); }
-  .faq-item p { color: var(--paper-dim); margin: 0; font-size: 0.95rem; }
+  .quote-marquee-wrap {
+    overflow: hidden;
+    -webkit-mask-image: linear-gradient(90deg, transparent, black 6%, black 94%, transparent);
+    mask-image: linear-gradient(90deg, transparent, black 6%, black 94%, transparent);
+    margin-top: 34px;
+  }
+  .quote-marquee {
+    display: flex;
+    gap: 18px;
+    width: max-content;
+    animation: marquee-scroll 42s linear infinite;
+  }
+  .quote-marquee-wrap:hover .quote-marquee { animation-play-state: paused; }
+  @keyframes marquee-scroll {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .quote-marquee { animation: none; overflow-x: auto; }
+  }
+  .quote-card {
+    flex: 0 0 340px;
+    background: var(--panel);
+    border: 1px solid var(--panel-line);
+    border-radius: 14px;
+    padding: 22px 24px;
+    text-decoration: none;
+    color: inherit;
+    display: block;
+    transition: border-color 0.15s ease;
+  }
+  .quote-card:hover { border-color: var(--panel-line-strong); }
+  .quote-card p {
+    font-size: 0.98rem;
+    color: var(--paper);
+    margin: 0 0 14px;
+    line-height: 1.5;
+  }
+  .quote-card span {
+    font-family: var(--font-mono);
+    font-size: 0.76rem;
+    color: var(--paper-dim);
+    line-height: 1.4;
+    display: block;
+  }
+
+  .faq-list { display: grid; gap: 10px; max-width: 640px; }
+  .faq-item {
+    border: 1px solid var(--panel-line);
+    border-radius: 12px;
+    background: var(--panel);
+    padding: 4px 20px;
+  }
+  .faq-item summary {
+    font-family: var(--font-sans);
+    font-weight: 600;
+    font-size: 1.02rem;
+    color: var(--paper);
+    padding: 16px 0;
+    cursor: pointer;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .faq-item summary::-webkit-details-marker { display: none; }
+  .faq-item summary::after {
+    content: "+";
+    font-family: var(--font-mono);
+    font-weight: 400;
+    font-size: 1.3rem;
+    color: var(--paper-dim);
+    flex-shrink: 0;
+    transition: transform 0.15s ease;
+  }
+  .faq-item[open] summary::after { content: "\2212"; }
+  .faq-item p { color: var(--paper-dim); margin: 0 0 18px; font-size: 0.95rem; }
   .faq-item code { font-family: var(--font-mono); background: var(--bg-deep); padding: 1px 6px; border-radius: 4px; font-size: 0.88em; }
 
   footer { padding: 54px 0 68px; text-align: center; border-top: 1px solid var(--panel-line); }
@@ -384,6 +459,50 @@
     </div>
   </div>
 
+  <section class="band" style="padding-top:0;">
+    <div class="wrap-wide">
+      <h2 style="text-align:center;">Developers already saying this, in public</h2>
+      <p class="band-sub" style="text-align:center;">Real quotes, real links — click through and read the full thing yourself.</p>
+    </div>
+    <div class="quote-marquee-wrap">
+      <div class="quote-marquee">
+        <a class="quote-card" href="https://github.com/anthropics/claude-code/issues/15443" target="_blank" rel="noopener">
+          <p>"I took shortcuts... I read the words but didn't actually follow them."</p>
+          <span>— Claude, quoted in mattmizell's bug report, after overwriting production code despite the rule being stated 3 times</span>
+        </a>
+        <a class="quote-card" href="https://github.com/anthropics/claude-code/issues/18660" target="_blank" rel="noopener">
+          <p>"I rely on documented rules being followed as my QA process... CLAUDE.md isn't a nice-to-have — it's how I maintain engineering standards without being an engineer."</p>
+          <span>— Jason L. Williams, who built an 82,000-line app through Claude Code alone</span>
+        </a>
+        <a class="quote-card" href="https://github.com/anthropics/claude-code/issues/24318" target="_blank" rel="noopener">
+          <p>"Claude interpreted this as a go-ahead signal and immediately started executing... The user had only been asked 'shall I proceed?' and never answered yes."</p>
+          <span>— from a bug report on Claude treating frustration as approval</span>
+        </a>
+        <a class="quote-card" href="https://dev.to/minatoplanb/i-wrote-200-lines-of-rules-for-claude-code-it-ignored-them-all-4639" target="_blank" rel="noopener">
+          <p>"CLAUDE.md is a wish list, not a contract."</p>
+          <span>— minatoplanb, after 200 lines of rules, each tied to a real past incident</span>
+        </a>
+        <a class="quote-card" href="https://dev.to/mikeadolan/i-wrote-500-lines-of-rules-for-claude-code-heres-how-i-made-it-actually-follow-them-3c8" target="_blank" rel="noopener">
+          <p>"Rules in a text file are suggestions, and the AI decides whether to follow them based on how important they seem relative to the current task."</p>
+          <span>— Mike Adolan, after growing a CLAUDE.md from 50 to 500+ lines</span>
+        </a>
+        <!-- duplicated for seamless loop -->
+        <a class="quote-card" href="https://github.com/anthropics/claude-code/issues/15443" target="_blank" rel="noopener" aria-hidden="true">
+          <p>"I took shortcuts... I read the words but didn't actually follow them."</p>
+          <span>— Claude, quoted in mattmizell's bug report, after overwriting production code despite the rule being stated 3 times</span>
+        </a>
+        <a class="quote-card" href="https://github.com/anthropics/claude-code/issues/18660" target="_blank" rel="noopener" aria-hidden="true">
+          <p>"I rely on documented rules being followed as my QA process... CLAUDE.md isn't a nice-to-have — it's how I maintain engineering standards without being an engineer."</p>
+          <span>— Jason L. Williams, who built an 82,000-line app through Claude Code alone</span>
+        </a>
+        <a class="quote-card" href="https://github.com/anthropics/claude-code/issues/24318" target="_blank" rel="noopener" aria-hidden="true">
+          <p>"Claude interpreted this as a go-ahead signal and immediately started executing... The user had only been asked 'shall I proceed?' and never answered yes."</p>
+          <span>— from a bug report on Claude treating frustration as approval</span>
+        </a>
+      </div>
+    </div>
+  </section>
+
   <section class="band">
     <div class="wrap-wide">
       <h2>What we don't do</h2>
@@ -397,6 +516,16 @@
       <div class="security-note"><strong>Worth saying directly, given the year it's been:</strong> malicious npm packages have specifically targeted Claude Code's hook system — planting code in <code>.claude/settings.json</code> that runs automatically on every session. RuleReceipt does none of that. It runs only when you type the command. Nothing automatic, nothing silent.</div>
       <div style="height:14px"></div>
       <div class="security-note"><strong>This isn't hypothetical.</strong> In July 2026, independent researchers found that a competing terminal coding agent was packaging entire codebases — including files never explicitly opened — into archives and uploading them to the vendor's cloud storage, with reports that the opt-out setting didn't reliably stop it. That's exactly the blind spot this tool exists to close: not "trust the agent," but see, with evidence, what it actually did.</div>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap">
+      <h2>Signing a deal with a bigger company?</h2>
+      <p class="band-sub">Vendor security reviews and DPAs ask how you actually develop — this gives you a real answer, not "we think so."</p>
+      <p style="color:var(--paper-dim); font-size:0.95rem; max-width:60ch; margin-bottom:20px;">If a chunk of your codebase is AI-assisted, a security questionnaire asking about secrets handling, input validation, or auth checks is really asking "does your process actually enforce this" — and most teams are answering from memory, not evidence. We put together a starting-point rule set covering what these reviews commonly ask about (secrets, PII, input validation, auth checks, encryption in transit, and more) — drop it in as your CLAUDE.md and every session gets checked against it automatically.</p>
+      <p style="color:var(--paper-dim); font-size:0.9rem; max-width:60ch;">Honest caveat: this is a starting point we built, not a certified compliance framework — read it, adjust it for what your specific reviewer actually asks, don't treat it as a checkbox.</p>
+      <div style="margin-top:20px;"><a href="/templates/security-focused-CLAUDE.md" style="font-family:var(--font-mono); font-size:0.85rem; border:1px solid var(--panel-line-strong); padding:10px 18px; border-radius:8px; display:inline-block;">view the template &rarr;</a></div>
     </div>
   </section>
 
@@ -416,34 +545,38 @@
       <h2>Questions</h2>
       <p class="band-sub">Straight answers, including where the answer is "not yet."</p>
       <div class="faq-list">
-        <div class="faq-item">
-          <h3>Does this work with Cursor or other AI agents?</h3>
+        <details class="faq-item">
+          <summary>Does this work with Cursor or other AI agents?</summary>
           <p>Not yet. v1 reads Claude Code sessions specifically. AGENTS.md as the rules format is already cross-tool, and support for other agents is the natural next step — but it isn't built yet, so it isn't claimed here.</p>
-        </div>
-        <div class="faq-item">
-          <h3>Do I need my own Anthropic API key?</h3>
+        </details>
+        <details class="faq-item">
+          <summary>Do I need my own Anthropic API key?</summary>
           <p>For the rules that need judgment, yes — the same key your Claude Code setup already uses. Rules that can be checked by plain pattern matching don't need it at all, and cost nothing to run.</p>
-        </div>
-        <div class="faq-item">
-          <h3>Does this touch my CLAUDE.md or Claude Code settings?</h3>
+        </details>
+        <details class="faq-item">
+          <summary>Does this touch my CLAUDE.md or Claude Code settings?</summary>
           <p>Read-only. It reads CLAUDE.md/AGENTS.md and your session transcript, and writes nothing back. No hooks get installed, no settings get modified — not automatically, not ever, without you explicitly asking.</p>
-        </div>
-        <div class="faq-item">
-          <h3>What exactly counts as one credit?</h3>
+        </details>
+        <details class="faq-item">
+          <summary>What exactly counts as one credit?</summary>
           <p>One run of <code>rulereceipt check</code> — regardless of how many rules it checks. Not metered per rule, per token, or per API call.</p>
-        </div>
-        <div class="faq-item">
-          <h3>Will it always be free?</h3>
-          <p>No — free while we're validating, through a clearly announced date, then credits. If you're already using it before that date, you'll hear about the switch in advance, not find out by hitting a paywall.</p>
-        </div>
-        <div class="faq-item">
-          <h3>What if I disagree with a result?</h3>
+        </details>
+        <details class="faq-item">
+          <summary>Will it always be free?</summary>
+          <p>Free during early access, no date attached. When that changes, you'll hear about it in advance — not find out by hitting a paywall.</p>
+        </details>
+        <details class="faq-item">
+          <summary>What if I disagree with a result?</summary>
           <p>Every PASS/FAIL/UNCLEAR comes with a quoted line of evidence specifically so you can check it yourself, not just trust it. It's Claude's judgment on the harder rules — not infallible, which is exactly why the evidence is shown, not hidden.</p>
-        </div>
-        <div class="faq-item">
-          <h3>Can my team or manager use this too?</h3>
+        </details>
+        <details class="faq-item">
+          <summary>Can my team or manager use this too?</summary>
           <p>Yes — same tool, no team plan needed for this. A developer runs it after a session and shares the report directly (a markdown output is built for pasting into a PR or Slack). It's how an engineering lead sees whether the team's agent-assisted work actually followed standards, without a new dashboard to roll out.</p>
-        </div>
+        </details>
+        <details class="faq-item">
+          <summary>Can this help with a vendor security review or DPA?</summary>
+          <p>It can give you real evidence for the "how do you develop securely" questions — not certify you compliant. We put together a <a href="/templates/security-focused-CLAUDE.md">starting-point rule set</a> covering common asks (secrets, PII, input validation, auth checks); use it as a base and adjust it to what your actual reviewer asks for.</p>
+        </details>
       </div>
     </div>
   </section>
