@@ -10,6 +10,23 @@ export interface ReportMeta {
 const MARK: Record<CheckResult["status"], string> = { PASS: "✓", FAIL: "✕", UNCLEAR: "?" };
 
 /**
+ * A CLAUDE.md rule title, or evidence text pulled from session content, is
+ * untrusted — a malicious/compromised CLAUDE.md (e.g. from a cloned repo)
+ * could embed raw ANSI escape codes to spoof what the terminal displays
+ * (fake colors, cursor tricks, hidden lines), directly undermining a tool
+ * whose whole point is a trustworthy terminal report. Strip C0/C1 control
+ * characters (keep \n — real multi-line evidence stays readable) before
+ * anything untrusted reaches the terminal. Found by security audit.
+ */
+function stripControlChars(s: string): string {
+  return s.replace(/[\x00-\x09\x0B-\x1F\x7F-\x9F]/g, "");
+}
+
+function sanitize(r: CheckResult): CheckResult {
+  return { ...r, ruleTitle: stripControlChars(r.ruleTitle), evidence: stripControlChars(r.evidence) };
+}
+
+/**
  * SHA-256 of the raw session file bytes — not a derived/normalized
  * representation, so anyone with the same file can trivially reproduce
  * the exact same hash and confirm the report matches a real, unaltered
@@ -45,15 +62,16 @@ function summaryLine(results: CheckResult[]): string {
 }
 
 export function generateReport(results: CheckResult[], meta: ReportMeta): string {
+  const clean = results.map(sanitize);
   const lines: string[] = [];
   lines.push(`RuleReceipt · ${meta.ruleCount} rules checked`);
   lines.push("─".repeat(40));
-  for (const r of results) {
-    lines.push(`${MARK[r.status]} ${r.status.padEnd(7)} ${ruleLabel(r, results)}`);
+  for (const r of clean) {
+    lines.push(`${MARK[r.status]} ${r.status.padEnd(7)} ${ruleLabel(r, clean)}`);
     if (r.evidence) lines.push(`  evidence: ${r.evidence}`);
   }
   lines.push("─".repeat(40));
-  lines.push(summaryLine(results));
+  lines.push(summaryLine(clean));
 
   const hash = computeTranscriptHash(meta.sessionFilePath);
   lines.push(hash ? `verify: sha256:${hash.slice(0, 16)}...` : "verify: no session file (demo data)");
@@ -63,14 +81,15 @@ export function generateReport(results: CheckResult[], meta: ReportMeta): string
 }
 
 export function generateMarkdownReport(results: CheckResult[], meta: ReportMeta): string {
+  const clean = results.map(sanitize);
   const lines: string[] = [];
-  lines.push(`**RuleReceipt** · ${meta.ruleCount} rules checked · ${summaryLine(results)}`);
+  lines.push(`**RuleReceipt** · ${meta.ruleCount} rules checked · ${summaryLine(clean)}`);
   lines.push("");
   lines.push("| Status | Rule | Evidence |");
   lines.push("|---|---|---|");
-  for (const r of results) {
+  for (const r of clean) {
     const evidence = (r.evidence || "").replace(/\|/g, "\\|");
-    lines.push(`| ${MARK[r.status]} ${r.status} | ${ruleLabel(r, results)} | ${evidence} |`);
+    lines.push(`| ${MARK[r.status]} ${r.status} | ${ruleLabel(r, clean)} | ${evidence} |`);
   }
   lines.push("");
   const hash = computeTranscriptHash(meta.sessionFilePath);

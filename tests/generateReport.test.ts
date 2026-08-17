@@ -70,6 +70,35 @@ describe("generateReport (terminal)", () => {
     const output = generateReport(results, { sessionFilePath: null, ruleCount: 3 });
     expect(output).not.toContain("(global)");
   });
+
+  // security audit finding: a malicious/compromised CLAUDE.md could embed
+  // raw ANSI escape codes in a rule title to spoof what the terminal shows
+  // (fake colors, cursor tricks). \x1b (ESC) must never reach the output.
+  it("strips ANSI escape codes from rule titles before printing", () => {
+    const hostile: CheckResult[] = [
+      { ruleId: "1", ruleTitle: "\x1b[31mFAKE RED\x1b[0m Injected", ruleSource: "global", status: "PASS", evidence: "clean" },
+    ];
+    const output = generateReport(hostile, { sessionFilePath: null, ruleCount: 1 });
+    expect(output).not.toContain("\x1b");
+    expect(output).toContain("Injected");
+  });
+
+  it("strips ANSI escape codes from evidence text too, not just titles", () => {
+    const hostile: CheckResult[] = [
+      { ruleId: "1", ruleTitle: "clean title", ruleSource: "global", status: "PASS", evidence: "\x1b[2K\x1b[1Ghidden cursor trick" },
+    ];
+    const output = generateReport(hostile, { sessionFilePath: null, ruleCount: 1 });
+    expect(output).not.toContain("\x1b");
+    expect(output).toContain("hidden cursor trick");
+  });
+
+  it("keeps real newlines in multi-line evidence (only control chars are stripped, not \\n)", () => {
+    const multiline: CheckResult[] = [
+      { ruleId: "1", ruleTitle: "clean", ruleSource: "global", status: "PASS", evidence: "line one\nline two" },
+    ];
+    const output = generateReport(multiline, { sessionFilePath: null, ruleCount: 1 });
+    expect(output).toContain("line one\nline two");
+  });
 });
 
 describe("generateMarkdownReport", () => {

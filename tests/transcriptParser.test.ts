@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readLatestTranscript } from "../src/parsers/transcriptParser.js";
+import { readLatestTranscript, parseLine } from "../src/parsers/transcriptParser.js";
 
 // Uses this actual project directory's real Claude Code session history —
 // the same session data RuleReceipt will read in real use.
@@ -37,5 +37,41 @@ describe("readLatestTranscript against a real project's session history", () => 
     const events = readLatestTranscript(REAL_CWD);
     // @ts-expect-error - intentionally checking an invalid role never appears
     expect(events.some((e) => e.role === "system-that-does-not-exist")).toBe(false);
+  });
+});
+
+describe("parseLine against malformed but JSON-valid lines (real bug found by audit)", () => {
+  // Before the fix: JSON.parse("null") succeeds (null is valid JSON), then
+  // `obj.timestamp` threw TypeError, uncaught, crashing the entire `check`
+  // command on one bad line. Reverting the type guard reproduces this —
+  // confirmed by hand before writing the fix, not assumed.
+  it("does not throw on a line that is the JSON value null", () => {
+    expect(() => parseLine("null")).not.toThrow();
+    expect(parseLine("null")).toEqual([]);
+  });
+
+  it("does not throw on a line that is a bare JSON number", () => {
+    expect(() => parseLine("42")).not.toThrow();
+    expect(parseLine("42")).toEqual([]);
+  });
+
+  it("does not throw on a line that is a bare JSON string", () => {
+    expect(() => parseLine('"just a string"')).not.toThrow();
+    expect(parseLine('"just a string"')).toEqual([]);
+  });
+
+  it("does not throw on a line that is a JSON array", () => {
+    expect(() => parseLine("[1,2,3]")).not.toThrow();
+    expect(parseLine("[1,2,3]")).toEqual([]);
+  });
+
+  it("still parses a real assistant text event correctly (guard doesn't break the happy path)", () => {
+    const line = JSON.stringify({
+      type: "assistant",
+      timestamp: "2026-01-01T00:00:00Z",
+      message: { content: [{ type: "text", text: "hello" }] },
+    });
+    const events = parseLine(line);
+    expect(events).toEqual([{ role: "assistant", kind: "text", text: "hello", timestamp: "2026-01-01T00:00:00Z" }]);
   });
 });

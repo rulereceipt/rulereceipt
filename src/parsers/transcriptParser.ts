@@ -60,13 +60,21 @@ function extractToolResultText(content: unknown): string {
   return "";
 }
 
-function parseLine(line: string): TranscriptEvent[] {
-  let obj: Record<string, unknown>;
+export function parseLine(line: string): TranscriptEvent[] {
+  let parsed: unknown;
   try {
-    obj = JSON.parse(line);
+    parsed = JSON.parse(line);
   } catch {
     return [];
   }
+
+  // JSON.parse accepts any valid JSON value, not just objects — "null",
+  // "42", "\"a string\"" all parse without throwing. A transcript line is
+  // only ever meaningful as an object; anything else is skipped, not a crash.
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    return [];
+  }
+  const obj = parsed as Record<string, unknown>;
 
   const timestamp = typeof obj.timestamp === "string" ? obj.timestamp : "";
   const events: TranscriptEvent[] = [];
@@ -124,7 +132,13 @@ export function readLatestTranscript(cwd: string): TranscriptEvent[] {
   const events: TranscriptEvent[] = [];
   for (const line of raw.split("\n")) {
     if (!line.trim()) continue;
-    events.push(...parseLine(line));
+    try {
+      events.push(...parseLine(line));
+    } catch {
+      // One malformed/unexpected line must not crash the whole check —
+      // skip it and keep going, same fail-closed principle as everywhere else.
+      continue;
+    }
   }
   return events;
 }

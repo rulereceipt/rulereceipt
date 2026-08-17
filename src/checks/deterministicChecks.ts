@@ -36,26 +36,39 @@ export function runDeterministicChecks(
   events: TranscriptEvent[]
 ): CheckResult[] {
   return classifications.map(({ rule, patterns }) => {
-    for (const event of events) {
-      const haystack = eventSearchText(event);
-      for (const pattern of patterns) {
-        if (matchesPattern(haystack, pattern)) {
-          return {
-            ruleId: rule.id,
-            ruleTitle: rule.title,
-            ruleSource: rule.source,
-            status: "FAIL",
-            evidence: `found banned pattern "${pattern}" in a ${event.kind === "tool_use" ? event.toolName + " call" : event.kind}: ${haystack.slice(0, 160)}`,
-          };
+    try {
+      for (const event of events) {
+        const haystack = eventSearchText(event);
+        for (const pattern of patterns) {
+          if (matchesPattern(haystack, pattern)) {
+            return {
+              ruleId: rule.id,
+              ruleTitle: rule.title,
+              ruleSource: rule.source,
+              status: "FAIL",
+              evidence: `found banned pattern "${pattern}" in a ${event.kind === "tool_use" ? event.toolName + " call" : event.kind}: ${haystack.slice(0, 160)}`,
+            };
+          }
         }
       }
+      return {
+        ruleId: rule.id,
+        ruleTitle: rule.title,
+        ruleSource: rule.source,
+        status: "PASS",
+        evidence: `no occurrence of ${patterns.map((p) => `"${p}"`).join(" or ")} found in this session`,
+      };
+    } catch (err) {
+      // A pathological pattern (e.g. extremely long) can make `new RegExp`
+      // throw. One bad rule must fail closed to UNCLEAR, not crash the
+      // whole report — same principle as the judgment-check error path.
+      return {
+        ruleId: rule.id,
+        ruleTitle: rule.title,
+        ruleSource: rule.source,
+        status: "UNCLEAR",
+        evidence: `could not check this rule's pattern: ${err instanceof Error ? err.message : String(err)}`,
+      };
     }
-    return {
-      ruleId: rule.id,
-      ruleTitle: rule.title,
-      ruleSource: rule.source,
-      status: "PASS",
-      evidence: `no occurrence of ${patterns.map((p) => `"${p}"`).join(" or ")} found in this session`,
-    };
   });
 }

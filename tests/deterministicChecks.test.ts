@@ -51,4 +51,23 @@ describe("runDeterministicChecks", () => {
     const [result] = runDeterministicChecks([rule], events);
     expect(result.status).toBe("PASS");
   });
+
+  // Security audit flagged that an extreme pattern length might crash
+  // regex construction. Direct empirical test (not theory): even a
+  // 200,000-char pattern must not crash the whole check, and must stay
+  // fast — regardless of whether it throws or not, a bad pattern must
+  // never take down every other rule in the report.
+  it("does not crash and stays fast on a pathologically long rule pattern", () => {
+    const hugePattern = "a".repeat(200_000);
+    const hugeRule: DeterministicClassification = {
+      kind: "deterministic",
+      rule: { id: "99", title: "Extreme pattern", text: `Never do \`${hugePattern}\`.`, source: "project" },
+      patterns: [hugePattern],
+    };
+    const start = Date.now();
+    const [result] = runDeterministicChecks([hugeRule], [toolUse("Bash", { command: "echo hi" })]);
+    const elapsedMs = Date.now() - start;
+    expect(["PASS", "UNCLEAR"]).toContain(result.status);
+    expect(elapsedMs).toBeLessThan(1000);
+  });
 });
