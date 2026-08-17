@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>RuleReceipt — About</title>
+<link rel="canonical" href="https://rulereceipt.dev/about.html" />
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23FAFAF7'/%3E%3Cpath d='M9 8h14v17l-3-2-3 2-3-2-3 2-2-2z' fill='none' stroke='%2317191C' stroke-width='1.6'/%3E%3Cpath d='M12 14h8M12 18h6' stroke='%2317805F' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E" />
+<style>
+  :root {
+    --bg: #FAFAF7;
+    --panel: #FFFFFF;
+    --panel-line: #E7E5DC;
+    --panel-line-strong: #D3D0C3;
+    --paper: #17191C;
+    --paper-dim: #6B6F76;
+    --amber: #DD6A1F;
+    --cyan: #17805F;
+    --font-display: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--paper);
+    font-family: var(--font-display);
+    font-size: 17px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 640px; margin: 0 auto; padding: 0 24px 100px; }
+  a { color: var(--cyan); }
+  header.top { display: flex; align-items: center; justify-content: space-between; padding: 26px 0 0; }
+  .wordmark { font-weight: 800; font-size: 1.05rem; letter-spacing: 0.02em; text-transform: uppercase; color: var(--paper); text-decoration: none; }
+  .back { display: inline-block; margin-bottom: 30px; font-size: 0.88rem; }
+
+  .avatar-frame {
+    width: 168px;
+    height: 168px;
+    margin: 50px auto 28px;
+    border-radius: 28px;
+    border: 1px solid var(--panel-line-strong);
+    background: var(--panel);
+    box-shadow: 0 1px 2px rgba(23,25,28,0.04), 0 20px 40px -24px rgba(23,25,28,0.18);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 18px;
+  }
+  .avatar-frame svg { width: 100%; height: 100%; image-rendering: pixelated; }
+
+  h1 { font-size: 1.8rem; font-weight: 800; text-align: center; margin: 0 0 6px; }
+  .role { text-align: center; color: var(--paper-dim); font-family: var(--font-mono); font-size: 0.85rem; margin-bottom: 46px; }
+
+  .story { color: var(--paper-dim); font-size: 1.02rem; }
+  .story p { margin: 0 0 20px; }
+  .placeholder {
+    border: 1px dashed var(--panel-line-strong);
+    border-radius: 12px;
+    padding: 18px 20px;
+    color: var(--paper-dim);
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    background: var(--panel);
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="top">
+      <a class="wordmark" href="/">RuleReceipt</a>
+      <a class="back" href="/" style="margin:0;">&larr; back</a>
+    </header>
+
+    <div class="avatar-frame">
+      <!-- 10x10 blocky pixel-art avatar, 12px per cell -->
+      <svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+        <!-- hair -->
+        <rect x="24" y="0" width="72" height="12" fill="#3A2A20"/>
+        <rect x="12" y="12" width="96" height="12" fill="#3A2A20"/>
+        <rect x="12" y="24" width="24" height="12" fill="#3A2A20"/>
+        <rect x="84" y="24" width="24" height="12" fill="#3A2A20"/>
+        <rect x="0" y="36" width="24" height="12" fill="#3A2A20"/>
+        <rect x="96" y="36" width="24" height="12" fill="#3A2A20"/>
+        <rect x="0" y="48" width="12" height="48" fill="#3A2A20"/>
+        <rect x="108" y="48" width="12" height="48" fill="#3A2A20"/>
+        <rect x="0" y="96" width="12" height="12" fill="#241a14"/>
+        <rect x="108" y="96" width="12" height="12" fill="#241a14"/>
+
+        <!-- face -->
+        <rect x="24" y="24" width="60" height="12" fill="#E8B48C"/>
+        <rect x="12" y="36" width="84" height="60" fill="#E8B48C"/>
+
+        <!-- eyes -->
+        <rect x="36" y="48" width="12" height="12" fill="#17191C"/>
+        <rect x="72" y="48" width="12" height="12" fill="#17191C"/>
+
+        <!-- mouth -->
+        <rect x="36" y="72" width="48" height="12" fill="#C2402C" opacity="0.75"/>
+
+        <!-- collar / shoulders (brand teal) -->
+        <rect x="24" y="96" width="72" height="12" fill="#17805F"/>
+        <rect x="12" y="108" width="96" height="12" fill="#17805F"/>
+      </svg>
+    </div>
+
+    <h1>[Your name]</h1>
+    <div class="role">builder, RuleReceipt</div>
+
+    <div class="story">
+      <p>I run Claude Code daily. I write rules into CLAUDE.md. And for a long time, I had no real way to know whether they were actually followed — or just quietly skipped.</p>
+      <p>The things that actually scare a developer aren't bugs. They're the quiet ones: a rule you were sure was followed, until it wasn't. A production database gone because an agent "took a shortcut." A public repo, a forgotten <code>.env</code>, client data exposed — and nobody finds out until it's too late.</p>
+      <p>Vibe coding with Claude Code is genuinely good. Trusting it to follow my own rules, without checking, wasn't. So I built the thing that checks — evidence, not a guess.</p>
+    </div>
+  </div>
+</body>
+</html>
