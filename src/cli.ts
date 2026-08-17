@@ -13,6 +13,11 @@ import { runDeterministicChecks } from "./checks/deterministicChecks.js";
 import { runJudgmentChecks } from "./checks/judgmentChecks.js";
 import { generateReport, generateMarkdownReport } from "./report/generateReport.js";
 import { verifySessionHash } from "./verifyHash.js";
+import { saveEmailConfig, loadEmailConfig, detectSmtpHost } from "./emailConfig.js";
+import { sendReportEmail } from "./sendReport.js";
+import { appendHistory, readHistorySince } from "./history.js";
+import { generateDigest } from "./digest.js";
+import { enableSchedule, disableSchedule, scheduleStatus, type Cadence } from "./schedule.js";
 import type { Rule, CheckResult } from "./types.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -65,7 +70,23 @@ function loadRules(cwd: string): Rule[] {
   return rules;
 }
 
-async function runCheck(markdown: boolean, share: boolean) {
+async function emailResults(reportText: string): Promise<void> {
+  const config = loadEmailConfig();
+  if (!config) {
+    console.log(
+      "\n(--email skipped: no config found. Run `rulereceipt config` first to set your manager's email and your own sending credentials.)"
+    );
+    return;
+  }
+  const result = await sendReportEmail(config, reportText);
+  if (result.sent) {
+    console.log(`\n(sent to ${config.managerEmail} from your own ${config.senderEmail} — no server of ours involved)`);
+  } else {
+    console.log(`\n(--email failed to send: ${result.error} — report above is unaffected)`);
+  }
+}
+
+async function runCheck(markdown: boolean, share: boolean, email: boolean, emailAlways: boolean) {
   const cwd = process.cwd();
   const rules = loadRules(cwd);
 
@@ -96,10 +117,23 @@ async function runCheck(markdown: boolean, share: boolean) {
   const results = [...deterministicResults, ...judgmentResults];
 
   const meta = { sessionFilePath, ruleCount: rules.length };
-  console.log(markdown ? generateMarkdownReport(results, meta) : generateReport(results, meta));
+  const reportText = markdown ? generateMarkdownReport(results, meta) : generateReport(results, meta);
+  console.log(reportText);
+
+  appendHistory(results, sessionFilePath);
 
   if (share) {
     await shareResults(results);
+  }
+  if (email) {
+    const hasFail = results.some((r) => r.status === "FAIL");
+    if (hasFail || emailAlways) {
+      await emailResults(reportText);
+    } else {
+      console.log(
+        "\n(--email: nothing failed, so nothing was sent — a manager doesn't need an email for every clean run. Use --email-always to send regardless.)"
+      );
+    }
   }
 }
 
@@ -123,8 +157,13 @@ program
     "--share",
     "opt-in: send anonymous pass/fail/unclear counts only (no rule text, no file paths, no session content). Off by default — no network call happens without this flag."
   )
+  .option(
+    "--email",
+    "opt-in: send this report directly from your own email (configured via `rulereceipt config`) to your configured manager email — but only when something actually failed. A manager doesn't need an email for every clean run. RuleReceipt's servers are never involved — sends straight from your machine via your own SMTP credentials."
+  )
+  .option("--email-always", "used with --email: send every time, even when nothing failed")
   .action((opts) => {
-    runCheck(Boolean(opts.markdown), Boolean(opts.share)).catch((err) => {
+    runCheck(Boolean(opts.markdown), Boolean(opts.share), Boolean(opts.email), Boolean(opts.emailAlways)).catch((err) => {
       console.error("Something went wrong:", err instanceof Error ? err.message : err);
       process.exitCode = 1;
     });
@@ -136,6 +175,77 @@ program
   .option("--markdown", "output as markdown")
   .action((opts) => {
     runDemo(Boolean(opts.markdown));
+  });
+
+program
+  .command("config")
+  .description("Set up your manager's email and your own sending credentials, for use with `check --email`. Stored locally only, at ~/.rulereceipt/config.json — never sent to any RuleReceipt server.")
+  .requiredOption("--manager-email <email>", "the email address that gets sent the report")
+  .requiredOption("--sender-email <email>", "your own email address (Gmail or Outlook/Hotmail/Live) that will send it")
+  .requiredOption("--sender-app-password <password>", "an app password for your sender email — NOT your regular login password (Gmail/Outlook both let you generate one for exactly this)")
+  .action((opts) => {
+    const smtp = detectSmtpHost(opts.senderEmail);
+    if (!smtp) {
+      console.error(
+        `Don't recognize the email provider for ${opts.senderEmail} — currently supports Gmail and Outlook/Hotmail/Live only.`
+      );
+      process.exitCode = 1;
+      return;
+    }
+    saveEmailConfig({
+      managerEmail: opts.managerEmail,
+      senderEmail: opts.senderEmail,
+      senderAppPassword: opts.senderAppPassword,
+    });
+    console.log(`Saved. \`rulereceipt check --email\` will now send reports to ${opts.managerEmail} from ${opts.senderEmail}.`);
+    console.log("Stored locally at ~/.rulereceipt/config.json (owner-read-only) — never sent anywhere by us.");
+  });
+
+const PERIOD_MS: Record<Cadence, number> = {
+  weekly: 7 * 24 * 60 * 60 * 1000,
+  monthly: 30 * 24 * 60 * 60 * 1000,
+};
+
+program
+  .command("digest")
+  .description(
+    "A non-technical summary of recent check runs (counts only, no rule text) — for a manager who doesn't have time to read 30 individual reports."
+  )
+  .option("--period <weekly|monthly>", "how far back to summarize", "weekly")
+  .option("--email", "also send this digest to your configured manager email")
+  .option("--enable <weekly|monthly>", "opt-in: schedule this to run automatically on that cadence, via your own crontab — nothing runs until you set this")
+  .option("--disable", "remove the scheduled digest, if one was enabled")
+  .option("--status", "show whether a digest is currently scheduled")
+  .action(async (opts) => {
+    if (opts.status) {
+      const status = scheduleStatus();
+      console.log(status ? `A ${status} digest is currently scheduled.` : "No digest is currently scheduled.");
+      return;
+    }
+    if (opts.disable) {
+      disableSchedule();
+      console.log("Scheduled digest removed.");
+      return;
+    }
+    if (opts.enable) {
+      if (opts.enable !== "weekly" && opts.enable !== "monthly") {
+        console.error('--enable must be "weekly" or "monthly"');
+        process.exitCode = 1;
+        return;
+      }
+      enableSchedule(opts.enable as Cadence);
+      console.log(`Digest scheduled ${opts.enable} — added to your crontab, tagged so it can be cleanly removed with --disable.`);
+      return;
+    }
+
+    const period: Cadence = opts.period === "monthly" ? "monthly" : "weekly";
+    const entries = readHistorySince(Date.now() - PERIOD_MS[period]);
+    const digestText = generateDigest(entries, period);
+    console.log(digestText);
+
+    if (opts.email) {
+      await emailResults(digestText);
+    }
   });
 
 program
