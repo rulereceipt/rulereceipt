@@ -702,23 +702,34 @@
 
     var endX = reduced ? w : w * progress;
 
-    ctx.beginPath();
+    // Canvas applies strokeStyle to the WHOLE current path at stroke()
+    // time, not per-segment — a single path with strokeStyle changed
+    // mid-loop renders entirely in whichever color was set last, so the
+    // red/amber zones never actually show once the animation settles.
+    // Each color zone gets its own path + stroke() call instead, joined
+    // at the boundary so the line still reads as continuous.
     ctx.lineWidth = 2;
-    ctx.strokeStyle = '#17805F';
     var step = 2;
+    var segColor = null;
+    var prevX = 0, prevY = traceY(0, w, h);
+    ctx.beginPath();
+    ctx.moveTo(prevX, prevY);
     for (var x = 0; x <= endX; x += step) {
       var y = traceY(x, w, h);
       var t = x / w;
-      // recolor the fail-spike segment red, unclear segment amber
-      if (t > 0.30 && t < 0.40) {
-        ctx.strokeStyle = '#C2402C';
-      } else if (t > 0.58 && t < 0.68) {
-        ctx.strokeStyle = '#DD6A1F';
-      } else {
-        ctx.strokeStyle = '#17805F';
+      var color = (t > 0.30 && t < 0.40) ? '#C2402C' : (t > 0.58 && t < 0.68) ? '#DD6A1F' : '#17805F';
+      if (segColor === null) segColor = color;
+      if (color !== segColor) {
+        ctx.strokeStyle = segColor;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(prevX, prevY);
+        segColor = color;
       }
-      if (x === 0) { ctx.moveTo(x, y); } else { ctx.lineTo(x, y); }
+      ctx.lineTo(x, y);
+      prevX = x; prevY = y;
     }
+    ctx.strokeStyle = segColor || '#17805F';
     ctx.stroke();
 
     // leading dot
