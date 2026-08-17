@@ -295,6 +295,49 @@
   .price-card .amount small { font-family: var(--font-sans); font-size: 0.85rem; color: var(--paper-dim); font-weight: 400; text-transform: none; }
   .price-card p { color: var(--paper-dim); font-size: 0.95rem; margin: 0; }
 
+  .dpa-card {
+    background: var(--panel);
+    border: 1px solid var(--panel-line-strong);
+    border-radius: 20px;
+    padding: 40px 44px;
+    box-shadow: 0 1px 2px rgba(23,25,28,0.04), 0 20px 40px -24px rgba(23,25,28,0.16);
+    display: grid;
+    grid-template-columns: 1.1fr 0.9fr;
+    gap: 40px;
+    align-items: start;
+  }
+  @media (max-width: 760px) { .dpa-card { grid-template-columns: 1fr; padding: 30px 26px; } }
+  .dpa-eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--amber);
+    margin-bottom: 14px;
+  }
+  .dpa-card h2 { margin: 0 0 14px; text-align: left; }
+  .dpa-card .band-sub { margin: 0 0 0; text-align: left; }
+  .dpa-side {
+    background: var(--bg-deep);
+    border: 1px solid var(--panel-line);
+    border-radius: 14px;
+    padding: 24px 26px;
+  }
+  .dpa-side p { color: var(--paper-dim); font-size: 0.92rem; margin: 0 0 20px; }
+  .dpa-side p:last-of-type { margin-bottom: 24px; }
+  .dpa-cta {
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    background: var(--amber);
+    color: #FFF9F2;
+    padding: 12px 20px;
+    border-radius: 8px;
+    display: inline-block;
+    text-decoration: none;
+    font-weight: 600;
+  }
+  .dpa-cta:hover { background: var(--amber-dim); }
+
   .quote-marquee-wrap {
     overflow: hidden;
     -webkit-mask-image: linear-gradient(90deg, transparent, black 6%, black 94%, transparent);
@@ -455,6 +498,9 @@
         <div class="issue"><span class="num">→</span><span>A known limit of how LLMs process long instruction files, not a Claude-specific flaw — in Claude Code specifically, content starts getting selectively skipped after around 80 lines</span></div>
       </div>
       <div class="evidence-divider"></div>
+      <div class="evidence-label">Sometimes the cost isn't a bug report — it's real data</div>
+      <p style="color:var(--paper-dim); font-size:0.92rem; margin:0 0 16px;">A developer told Claude explicitly: <em>"Don't deploy. No cp to /opt/proxypilot, no service restarts."</em> Claude ran a <code>cp</code> command over the live production directory anyway, corrupting the database — then deleted it entirely trying to "fix" the corruption. Recoverable only because a daily backup happened to exist. <a href="https://tim-schipper.nl/en/blog/the-day-claude-deleted-my-database" target="_blank" rel="noopener">Read the full account &rarr;</a></p>
+      <div class="evidence-divider"></div>
       <p class="founder-note">I built this after hitting the same wall myself — running Claude Code daily, writing rules into CLAUDE.md, and having no way to tell whether they were actually followed or just quietly skipped. Vibe coding with it is genuinely good. Trusting it to follow my own rules, without checking, wasn't.</p>
     </div>
   </div>
@@ -520,19 +566,26 @@
   </section>
 
   <section class="band">
-    <div class="wrap">
-      <h2>Signing a deal with a bigger company?</h2>
-      <p class="band-sub">Vendor security reviews and DPAs ask how you actually develop — this gives you a real answer, not "we think so."</p>
-      <p style="color:var(--paper-dim); font-size:0.95rem; max-width:60ch; margin-bottom:20px;">If a chunk of your codebase is AI-assisted, a security questionnaire asking about secrets handling, input validation, or auth checks is really asking "does your process actually enforce this" — and most teams are answering from memory, not evidence. We put together a starting-point rule set covering what these reviews commonly ask about (secrets, PII, input validation, auth checks, encryption in transit, and more) — drop it in as your CLAUDE.md and every session gets checked against it automatically.</p>
-      <p style="color:var(--paper-dim); font-size:0.9rem; max-width:60ch;">Honest caveat: this is a starting point we built, not a certified compliance framework — read it, adjust it for what your specific reviewer actually asks, don't treat it as a checkbox.</p>
-      <div style="margin-top:20px;"><a href="/templates/security-focused-CLAUDE.md" style="font-family:var(--font-mono); font-size:0.85rem; border:1px solid var(--panel-line-strong); padding:10px 18px; border-radius:8px; display:inline-block;">view the template &rarr;</a></div>
+    <div class="wrap-wide">
+      <div class="dpa-card">
+        <div>
+          <div class="dpa-eyebrow">for teams closing bigger deals</div>
+          <h2>Signing a deal with a bigger company?</h2>
+          <p class="band-sub">Vendor security reviews ask how you actually develop. Here's a real answer.</p>
+        </div>
+        <div class="dpa-side">
+          <p>Secrets. PII. Input validation. Auth checks. Encryption in transit. What reviewers actually ask — checked automatically, every session.</p>
+          <p>A starting point we built, not a certification. Adjust it to your reviewer.</p>
+          <a href="/templates/security-focused-CLAUDE.md" class="dpa-cta">view the template &rarr;</a>
+        </div>
+      </div>
     </div>
   </section>
 
   <section class="band">
     <div class="wrap-wide">
       <h2>Pricing</h2>
-      <p class="band-sub">Free while we're early. After that, pay for what you use — no subscription.</p>
+      <p class="band-sub" style="max-width:680px;">Free while we're early. After that, pay for what you use — no subscription.</p>
       <div class="pricing">
         <div class="price-card accent"><div>Now, through the free window</div><div class="amount">Free</div><p>Unlimited checks. No card, no signup friction. This is how we find out if it's actually useful.</p></div>
         <div class="price-card"><div>After that</div><div class="amount">Credits <small>· pay per check</small></div><p>Buy a pack, use it whenever, nothing recurring. Announced clearly, in advance — never a silent switch.</p></div>
