@@ -26,7 +26,15 @@ import type { Rule } from "../types.js";
  *     digit string).
  *  4. Bullets with no preceding header at all belong to implicit section
  *     "S0".
- *  5. Last resort: a file with none of the above (freeform prose, no
+ *  5. Setext-style headers ("Title\n===" for H1, "Title\n---" for H2) —
+ *     a real, if less common, Markdown convention. Normalized to the ATX
+ *     form ("# Title") before the main pass below, so they flow through
+ *     the same numbered/plain-header detectors rather than needing a
+ *     separate code path. Only fires when the line above the underline
+ *     is real title text (non-blank, not already a header/bullet/rule
+ *     line) — a bare "---" on its own (a thematic-break divider) is left
+ *     alone, since a real underline is always glued directly under text.
+ *  6. Last resort: a file with none of the above (freeform prose, no
  *     headers, no bullets, no bold-rule markers) is split one rule per
  *     blank-line-separated paragraph, so a genuinely unstructured file
  *     still yields checkable rules instead of silently returning nothing.
@@ -35,6 +43,33 @@ const NUMBERED_HEADER = /^#{1,6}\s+(\d+)\.\s+(.+)$/;
 const BOLD_RULE_HEADER = /^\*\*Rule\s+(\d+)\s*[-–—:]\s*(.+?)\*\*\s*$/i;
 const PLAIN_HEADER = /^#{1,6}\s+(.+)$/;
 const BULLET_ITEM = /^\s*[-*+]\s+(.+)$/;
+const SETEXT_H1_UNDERLINE = /^=+\s*$/;
+const SETEXT_H2_UNDERLINE = /^-{2,}\s*$/;
+
+function normalizeSetextHeaders(lines: string[]): string[] {
+  const out = [...lines];
+  for (let i = 0; i < out.length - 1; i++) {
+    const title = out[i];
+    if (title.trim() === "") continue;
+    if (
+      NUMBERED_HEADER.test(title) ||
+      BOLD_RULE_HEADER.test(title) ||
+      PLAIN_HEADER.test(title) ||
+      BULLET_ITEM.test(title)
+    ) {
+      continue;
+    }
+    const underline = out[i + 1];
+    if (SETEXT_H1_UNDERLINE.test(underline)) {
+      out[i] = `# ${title.trim()}`;
+      out[i + 1] = "";
+    } else if (SETEXT_H2_UNDERLINE.test(underline)) {
+      out[i] = `## ${title.trim()}`;
+      out[i + 1] = "";
+    }
+  }
+  return out;
+}
 
 export function parseClaudeMd(filePath: string, source: "global" | "project"): Rule[] {
   let raw: string;
@@ -44,7 +79,7 @@ export function parseClaudeMd(filePath: string, source: "global" | "project"): R
     return [];
   }
 
-  const lines = raw.split("\n");
+  const lines = normalizeSetextHeaders(raw.split("\n"));
   const rules: Rule[] = [];
 
   // `current` accumulates a numbered-header rule, a bold-rule-header rule,

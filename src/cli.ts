@@ -13,7 +13,7 @@ import { runDeterministicChecks } from "./checks/deterministicChecks.js";
 import { runJudgmentChecks } from "./checks/judgmentChecks.js";
 import { generateReport, generateMarkdownReport } from "./report/generateReport.js";
 import { verifySessionHash } from "./verifyHash.js";
-import { saveEmailConfig, loadEmailConfig, detectSmtpHost } from "./emailConfig.js";
+import { saveEmailConfig, loadEmailConfig, detectSmtpHost, isValidEmail } from "./emailConfig.js";
 import { sendReportEmail } from "./sendReport.js";
 import { appendHistory, readHistorySince } from "./history.js";
 import { generateDigest } from "./digest.js";
@@ -184,6 +184,16 @@ program
   .requiredOption("--sender-email <email>", "your own email address (Gmail or Outlook/Hotmail/Live) that will send it")
   .requiredOption("--sender-app-password <password>", "an app password for your sender email — NOT your regular login password (Gmail/Outlook both let you generate one for exactly this)")
   .action((opts) => {
+    if (!isValidEmail(opts.managerEmail)) {
+      console.error(`"${opts.managerEmail}" doesn't look like a valid email address.`);
+      process.exitCode = 1;
+      return;
+    }
+    if (!isValidEmail(opts.senderEmail)) {
+      console.error(`"${opts.senderEmail}" doesn't look like a valid email address.`);
+      process.exitCode = 1;
+      return;
+    }
     const smtp = detectSmtpHost(opts.senderEmail);
     if (!smtp) {
       console.error(

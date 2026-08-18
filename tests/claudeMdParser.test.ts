@@ -151,6 +151,42 @@ describe("parseClaudeMd against freeform prose with no markdown structure at all
   });
 });
 
+// Setext headers ("Title\n===" / "Title\n---") are a real, if less common,
+// Markdown convention — supported by normalizing to ATX form before parsing.
+describe("parseClaudeMd against setext-style headers (underline, not #)", () => {
+  const FILE = join(FIXTURES, "setext-headers.md");
+
+  it("finds 3 rules: 2 bullets under the H2 section, 1 prose rule under the other", () => {
+    const rules = parseClaudeMd(FILE, "project");
+    expect(rules.length).toBe(3);
+  });
+
+  it("drops the H1 setext title itself (no content directly under it before the next header)", () => {
+    const rules = parseClaudeMd(FILE, "project");
+    expect(rules.find((r) => r.title === "Project Rules")).toBeUndefined();
+  });
+
+  it("splits bullets under the setext H2 'Code Style' section into their own rules", () => {
+    const rules = parseClaudeMd(FILE, "project");
+    expect(rules.find((r) => r.text === "Use 2-space indentation")).toBeDefined();
+    expect(rules.find((r) => r.text === "No semicolons")).toBeDefined();
+  });
+
+  it("captures prose under the setext H2 'Deployment' section as one rule", () => {
+    const rules = parseClaudeMd(FILE, "project");
+    const deployRule = rules.find((r) => r.title === "Deployment");
+    expect(deployRule?.text).toContain("staging first");
+    expect(deployRule?.text).toContain("on-call engineer");
+  });
+
+  it("does NOT treat a bullet list's own dashes as a setext underline", () => {
+    // "- Use 2-space indentation" / "- No semicolons" must stay bullets,
+    // not get misread as an underline for some preceding title line
+    const rules = parseClaudeMd(FILE, "project");
+    expect(rules.some((r) => r.title.startsWith("-"))).toBe(false);
+  });
+});
+
 describe("parseClaudeMd against a file mixing numbered-header rules and plain-header sections", () => {
   const FILE = join(FIXTURES, "mixed-numbered-and-plain.md");
 

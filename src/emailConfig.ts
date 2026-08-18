@@ -49,6 +49,18 @@ export function loadEmailConfig(): EmailConfig | null {
 }
 
 /**
+ * Deliberately permissive — this only needs to catch obvious typos
+ * ("bob@", "bob@gmail", "bob gmail.com") before they get saved to disk
+ * and silently fail later at actual SMTP send time. Not a full RFC 5322
+ * validator; that would reject real addresses this doesn't need to.
+ */
+const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export function isValidEmail(email: string): boolean {
+  return EMAIL_SHAPE.test(email.trim());
+}
+
+/**
  * SMTP host auto-detected from the sender's email domain — covers the
  * common providers without asking a dev to know their own SMTP
  * settings. Falls back to null (caller must ask for an explicit host)
