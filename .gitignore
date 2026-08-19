@@ -4,3 +4,17 @@ dist/
 .env
 .DS_Store
 tests/fixtures/real-sessions/
+
+# internal-only docs — never pushed to GitHub (business/planning content,
+# and CLAUDE.md/CHANGELOG.md reference real account identities)
+/ACCOUNTS.md
+/BRAND.md
+/CHANGELOG.md
+/CLAUDE.md
+/COMPANY.md
+/INFRA.md
+/NOTICE.md
+/OUTREACH.md
+/OUTREACH_EMAILS.md
+/README.md
+/TASKS.md
