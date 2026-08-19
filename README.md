@@ -87,4 +87,4 @@ npx tsx src/cli.ts demo
 
 ## Contact
 
-Questions, bugs, or anything else — developer@rulereceipt.dev.
+Questions, bugs, or anything else — hello@rulereceipt.dev.
