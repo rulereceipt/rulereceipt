@@ -605,6 +605,10 @@
             <p>Not yet. v1 reads Claude Code sessions specifically. AGENTS.md as the rules format is already cross-tool, and support for other agents is the natural next step — but it isn't built yet, so it isn't claimed here.</p>
           </details>
           <details class="faq-item">
+            <summary>Does this work if my team runs Claude Code through AWS Bedrock or Google Vertex, not the Anthropic API directly?</summary>
+            <p>Yes, no extra setup. RuleReceipt only reads the session transcript Claude Code already writes to your disk — that storage is the same regardless of which backend serves the actual model calls (Anthropic API, AWS Bedrock, Google Vertex, Microsoft Foundry). If your org already routes through one of those, this just works.</p>
+          </details>
+          <details class="faq-item">
             <summary>Do I need my own Anthropic API key?</summary>
             <p>For the rules that need judgment, yes — the same key your Claude Code setup already uses. Rules that can be checked by plain pattern matching don't need it at all, and cost nothing to run.</p>
           </details>
