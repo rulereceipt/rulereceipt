@@ -141,6 +141,48 @@
   }
   .install .prompt { color: var(--amber); }
   .install .cmd { color: var(--paper); }
+
+  /* ---------- signup ---------- */
+  .signup-stage { padding: 10px 0 68px; }
+  .signup-card {
+    max-width: 560px;
+    margin: 0 auto;
+    background: var(--panel);
+    border: 1px solid var(--panel-line-strong);
+    border-radius: 14px;
+    padding: 28px 30px;
+    text-align: center;
+  }
+  .signup-card h3 { margin: 0 0 6px; font-size: 1.05rem; }
+  .signup-card p { margin: 0 0 18px; color: var(--paper-dim); font-size: 0.9rem; }
+  .signup-form { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  .signup-form input[type="email"] {
+    flex: 1 1 260px;
+    font-family: var(--font-sans);
+    font-size: 0.95rem;
+    padding: 11px 14px;
+    border: 1px solid var(--panel-line-strong);
+    border-radius: 10px;
+    background: var(--bg);
+    color: var(--paper);
+  }
+  .signup-form input[type="email"]:focus { outline: 2px solid var(--amber); outline-offset: 1px; }
+  .signup-form button {
+    font-family: var(--font-sans);
+    font-size: 0.95rem;
+    font-weight: 600;
+    padding: 11px 20px;
+    border: none;
+    border-radius: 10px;
+    background: var(--paper);
+    color: var(--panel);
+    cursor: pointer;
+  }
+  .signup-form button:hover { background: var(--amber-dim); }
+  .signup-form button:disabled { opacity: 0.6; cursor: default; }
+  .signup-note { margin-top: 12px; font-size: 0.82rem; color: var(--paper-dim); min-height: 1.2em; }
+  .signup-note.ok { color: var(--cyan); }
+  .signup-note.err { color: var(--red); }
   .install[data-copy], footer .cmd-repeat[data-copy] {
     cursor: pointer;
     transition: border-color 0.15s, background 0.15s;
@@ -650,6 +692,20 @@
     </div>
   </section>
 
+  <div class="wrap">
+    <div class="signup-stage">
+      <div class="signup-card">
+        <h3>Get notified before pricing changes</h3>
+        <p>No account needed to use the tool — this is only if you want a heads-up before the free period ends. No spam, one email when it matters.</p>
+        <form class="signup-form" id="signup-form">
+          <input type="email" id="signup-email" placeholder="you@example.com" required>
+          <button type="submit">Notify me</button>
+        </form>
+        <div class="signup-note" id="signup-note"></div>
+      </div>
+    </div>
+  </div>
+
   <footer>
     <div class="wrap">
       <div class="cmd-repeat" id="copy-footer" data-copy="npx rulereceipt check" data-loc="footer" role="button" tabindex="0" title="Click to copy">npx rulereceipt check</div>
@@ -805,6 +861,47 @@
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); doCopy(); }
     });
   });
+</script>
+
+<script>
+  var signupForm = document.getElementById('signup-form');
+  if (signupForm) {
+    signupForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var emailInput = document.getElementById('signup-email');
+      var note = document.getElementById('signup-note');
+      var button = signupForm.querySelector('button');
+      var email = emailInput.value.trim();
+
+      button.disabled = true;
+      note.textContent = '';
+      note.className = 'signup-note';
+
+      fetch('/api/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email }),
+      })
+        .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
+        .then(function (result) {
+          button.disabled = false;
+          if (!result.ok) {
+            note.textContent = result.data.error || 'Something went wrong. Try again.';
+            note.className = 'signup-note err';
+            return;
+          }
+          if (window.posthog) posthog.capture('email_signup');
+          note.textContent = result.data.already_registered ? "You're already on the list." : "You're on the list.";
+          note.className = 'signup-note ok';
+          emailInput.value = '';
+        })
+        .catch(function () {
+          button.disabled = false;
+          note.textContent = 'Could not reach the server. Try again.';
+          note.className = 'signup-note err';
+        });
+    });
+  }
 </script>
 
 </body>
