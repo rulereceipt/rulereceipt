@@ -1,9 +1,11 @@
 import { describe, it, expect } from "vitest";
+import { dirname } from "node:path";
 import { readLatestTranscript, parseLine } from "../src/parsers/transcriptParser.js";
 
 // Uses this actual project directory's real Claude Code session history —
-// the same session data RuleReceipt will read in real use.
-const REAL_CWD = "/Users/dev/project";
+// the same session data RuleReceipt will read in real use. Computed rather
+// than hardcoded so no local username/path ever lands in tracked source.
+const REAL_CWD = dirname(process.cwd());
 
 describe("readLatestTranscript against a real project's session history", () => {
   it("returns a non-empty list of events for a project with real history", () => {
