@@ -662,6 +662,10 @@
             <p>For the rules that need judgment, yes — the same key your Claude Code setup already uses. Rules that can be checked by plain pattern matching don't need it at all, and cost nothing to run.</p>
           </details>
           <details class="faq-item">
+            <summary>Why not just use an in-session Skill for this instead?</summary>
+            <p>Because it's grading its own homework. A Skill runs inside the same session that just did the work — same model, same context, same blind spots that caused it to miss a rule the first time. RuleReceipt is a separate process: it reads the transcript Claude Code already saved to disk, after the session ends, and hashes the exact bytes it checked. That's the difference between an agent self-reporting and an independent receipt.</p>
+          </details>
+          <details class="faq-item">
             <summary>Does this touch my CLAUDE.md or Claude Code settings?</summary>
             <p>Read-only. It reads CLAUDE.md/AGENTS.md and your session transcript, and writes nothing back. No hooks get installed, no settings get modified — not automatically, not ever, without you explicitly asking.</p>
           </details>
