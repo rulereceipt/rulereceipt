@@ -78,7 +78,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const normalized = email.trim().toLowerCase();
-  const added = await redis.sadd("rulereceipt:signups", normalized);
+  await redis.sadd("rulereceipt:signups", normalized);
 
-  res.status(200).json({ ok: true, already_registered: added === 0 });
+  // Uniform response regardless of whether this email was already present -
+  // returning that as a distinct signal turns this into an email-enumeration
+  // oracle (submit any address, learn if it's on the list).
+  res.status(200).json({ ok: true });
 }

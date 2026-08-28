@@ -895,7 +895,7 @@
             return;
           }
           if (window.posthog) posthog.capture('email_signup');
-          note.textContent = result.data.already_registered ? "You're already on the list." : "You're on the list.";
+          note.textContent = "You're on the list.";
           note.className = 'signup-note ok';
           emailInput.value = '';
         })
