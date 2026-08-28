@@ -141,6 +141,13 @@
   }
   .install .prompt { color: var(--amber); }
   .install .cmd { color: var(--paper); }
+  .install[data-copy], footer .cmd-repeat[data-copy] {
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .install[data-copy]:hover, footer .cmd-repeat[data-copy]:hover { border-color: var(--amber); }
+  footer .cmd-repeat[data-copy] { display: inline-block; border: 1px solid transparent; border-radius: 8px; padding: 4px 8px; }
+  footer .cmd-repeat[data-copy]:hover { background: var(--panel); }
 
   /* ---------- trace canvas ---------- */
   .trace-stage {
@@ -444,7 +451,7 @@
       <div class="eyebrow">for AI coding agents</div>
       <h1>See exactly what your<br><span>agent actually did</span></h1>
       <p class="sub">Your agent's session, checked against your own rules. What it followed. What it skipped.</p>
-      <div class="install">
+      <div class="install" id="copy-hero" data-copy="npx rulereceipt check" data-loc="hero" role="button" tabindex="0" title="Click to copy">
         <span class="prompt">$</span>
         <span class="cmd">npx rulereceipt check</span>
       </div>
@@ -645,7 +652,7 @@
 
   <footer>
     <div class="wrap">
-      <div class="cmd-repeat">npx rulereceipt check</div>
+      <div class="cmd-repeat" id="copy-footer" data-copy="npx rulereceipt check" data-loc="footer" role="button" tabindex="0" title="Click to copy">npx rulereceipt check</div>
       <div class="fine">Your machine. Your rules. Your receipt.</div>
       <div class="fine" style="margin-top:14px">
         <a href="/about.html">About</a> · <a href="/rulereceipt-onepager.pdf">One-pager (PDF)</a> · <a href="/privacy.html">Privacy</a> · <a href="/terms.html">Terms</a> · source-available
@@ -778,6 +785,26 @@
   window.addEventListener('resize', function () { dims = size(); });
   draw();
 })();
+</script>
+
+<script>
+  document.querySelectorAll('[data-copy]').forEach(function (el) {
+    function doCopy() {
+      var text = el.getAttribute('data-copy');
+      navigator.clipboard.writeText(text).catch(function () {});
+      if (window.posthog) posthog.capture('copy_install_command', { location: el.getAttribute('data-loc') });
+      var cmdSpan = el.querySelector('.cmd');
+      var target = cmdSpan || el;
+      var original = target.textContent;
+      target.textContent = 'copied!';
+      clearTimeout(el._copyTimer);
+      el._copyTimer = setTimeout(function () { target.textContent = original; }, 1400);
+    }
+    el.addEventListener('click', doCopy);
+    el.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); doCopy(); }
+    });
+  });
 </script>
 
 </body>
