@@ -24,44 +24,33 @@ function summarizeEvents(events: TranscriptEvent[]): string {
 }
 
 const RESULT_TOOL = {
-  name: "report_results",
-  description: "Report PASS/FAIL/UNCLEAR for each rule with a quoted line of evidence.",
+  name: "report_result",
+  description: "Report PASS/FAIL/UNCLEAR for this one rule with a quoted line of evidence.",
   input_schema: {
     type: "object" as const,
     properties: {
-      results: {
-        type: "array" as const,
-        items: {
-          type: "object" as const,
-          properties: {
-            ruleId: { type: "string" as const },
-            status: { type: "string" as const, enum: ["PASS", "FAIL", "UNCLEAR"] },
-            evidence: { type: "string" as const, description: "One short quoted or paraphrased line from the session as evidence." },
-          },
-          required: ["ruleId", "status", "evidence"],
-        },
-      },
+      status: { type: "string" as const, enum: ["PASS", "FAIL", "UNCLEAR"] },
+      evidence: { type: "string" as const, description: "One short quoted or paraphrased line from the session as evidence." },
     },
-    required: ["results"],
+    required: ["status", "evidence"],
   },
 };
 
-function unclearForAll(classifications: JudgmentClassification[], reason: string): CheckResult[] {
-  return classifications.map(({ rule }) => ({
-    ruleId: rule.id,
-    ruleTitle: rule.title,
-    ruleSource: rule.source,
-    status: "UNCLEAR" as const,
-    evidence: reason,
-  }));
+function unclear(rule: JudgmentClassification["rule"], reason: string): CheckResult {
+  return { ruleId: rule.id, ruleTitle: rule.title, ruleSource: rule.source, status: "UNCLEAR", evidence: reason };
 }
 
 /**
- * Judgment checks need actual understanding, not pattern matching — one
- * batched API call covering every judgment rule at once, using the
- * user's OWN Anthropic API key (never ours, never proxied). Fails
- * closed: any problem (no key, API error, malformed response) reports
- * every rule as UNCLEAR with a reason — never silently marks PASS.
+ * One isolated API call per judgment rule, not one batched call covering
+ * all of them. Deliberate, not an efficiency loss to accept: a rule
+ * judged in a fresh context, with no other rules' text in the same
+ * prompt, can't have its verdict colored by how the model just judged a
+ * neighboring rule. Costs more calls; buys a grader that can't drift
+ * across rules within a single run. Uses the user's OWN Anthropic API
+ * key (never ours, never proxied). Fails closed per rule: any problem
+ * (no key, API error, malformed response) reports that rule as UNCLEAR
+ * — never silently marks PASS, and one rule's failure never blocks the
+ * others since each call is independent.
  */
 export async function runJudgmentChecks(
   classifications: JudgmentClassification[],
@@ -71,64 +60,48 @@ export async function runJudgmentChecks(
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
-    return unclearForAll(
-      classifications,
-      "no ANTHROPIC_API_KEY set in your environment — set it to the same key Claude Code already uses to run judgment checks"
+    return classifications.map(({ rule }) =>
+      unclear(rule, "no ANTHROPIC_API_KEY set in your environment — set it to the same key Claude Code already uses to run judgment checks")
     );
   }
 
   const client = new Anthropic({ apiKey });
   const transcriptText = summarizeEvents(events);
-  // Composite key, not the raw rule.id — a project-level CLAUDE.md can
-  // reuse the same number as a global rule (real, tested case), and
-  // matching on bare id would silently attach the wrong evidence to the
-  // wrong rule. The model is asked to echo this exact key back.
-  const keyOf = (rule: JudgmentClassification["rule"]) => `${rule.source}:${rule.id}`;
-  const rulesText = classifications
-    .map(({ rule }) => `Rule key "${keyOf(rule)}" — ${rule.title}\n${rule.text}`)
-    .join("\n\n");
 
-  let response;
-  try {
-    response = await client.messages.create({
-      model: MODEL,
-      max_tokens: 2048,
-      tools: [RESULT_TOOL],
-      tool_choice: { type: "tool", name: "report_results" },
-      messages: [
-        {
-          role: "user",
-          content: `Here are rules from a CLAUDE.md/AGENTS.md file, and a transcript of a Claude Code session. For each rule, judge whether the session's behavior actually followed it. Report PASS if clearly followed, FAIL if clearly violated, UNCLEAR if the transcript doesn't give enough to judge either way — never guess PASS when you're not sure. In your results, set ruleId to the EXACT rule key shown (e.g. "global:1"), not just the number.\n\nRULES:\n${rulesText}\n\nSESSION TRANSCRIPT:\n${transcriptText}`,
-        },
-      ],
-    });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return unclearForAll(classifications, `API call failed (${message}) — could not run this check`);
-  }
+  return Promise.all(
+    classifications.map(async ({ rule }) => {
+      let response;
+      try {
+        response = await client.messages.create({
+          model: MODEL,
+          max_tokens: 512,
+          tools: [RESULT_TOOL],
+          tool_choice: { type: "tool", name: "report_result" },
+          messages: [
+            {
+              role: "user",
+              content: `Here is ONE rule from a CLAUDE.md/AGENTS.md file, and a transcript of a Claude Code session. Judge whether the session's behavior actually followed this rule. Report PASS if clearly followed, FAIL if clearly violated, UNCLEAR if the transcript doesn't give enough to judge either way — never guess PASS when you're not sure.\n\nRULE — ${rule.title}\n${rule.text}\n\nSESSION TRANSCRIPT:\n${transcriptText}`,
+            },
+          ],
+        });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        return unclear(rule, `API call failed (${message}) — could not run this check`);
+      }
 
-  const toolUseBlock = response.content.find(
-    (block): block is Anthropic.ToolUseBlock => block.type === "tool_use"
+      const toolUseBlock = response.content.find(
+        (block): block is Anthropic.ToolUseBlock => block.type === "tool_use"
+      );
+      if (!toolUseBlock) {
+        return unclear(rule, "model did not return a structured result — could not run this check");
+      }
+
+      const parsed = toolUseBlock.input as { status?: string; evidence?: string };
+      const status = parsed.status;
+      if (status === "PASS" || status === "FAIL" || status === "UNCLEAR") {
+        return { ruleId: rule.id, ruleTitle: rule.title, ruleSource: rule.source, status, evidence: parsed.evidence ?? "" };
+      }
+      return unclear(rule, "model response did not include a valid result for this rule");
+    })
   );
-  if (!toolUseBlock) {
-    return unclearForAll(classifications, "model did not return a structured result — could not run this check");
-  }
-
-  const parsed = toolUseBlock.input as { results?: Array<{ ruleId?: string; status?: string; evidence?: string }> };
-  const results = parsed.results ?? [];
-
-  return classifications.map(({ rule }) => {
-    const match = results.find((r) => r.ruleId === keyOf(rule));
-    const status = match?.status;
-    if (status === "PASS" || status === "FAIL" || status === "UNCLEAR") {
-      return { ruleId: rule.id, ruleTitle: rule.title, ruleSource: rule.source, status, evidence: match?.evidence ?? "" };
-    }
-    return {
-      ruleId: rule.id,
-      ruleTitle: rule.title,
-      ruleSource: rule.source,
-      status: "UNCLEAR",
-      evidence: "model response did not include a valid result for this rule",
-    };
-  });
 }

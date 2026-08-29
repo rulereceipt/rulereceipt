@@ -56,12 +56,7 @@ describe("runJudgmentChecks — API interaction (mocked, no live API key availab
       default: class MockAnthropic {
         messages = {
           create: vi.fn().mockResolvedValue({
-            content: [
-              {
-                type: "tool_use",
-                input: { results: [{ ruleId: "global:4", status: "FAIL", evidence: "led with good news, not bad" }] },
-              },
-            ],
+            content: [{ type: "tool_use", input: { status: "FAIL", evidence: "led with good news, not bad" } }],
           }),
         };
       },
@@ -98,9 +93,36 @@ describe("runJudgmentChecks — API interaction (mocked, no live API key availab
     expect(results[0].status).toBe("UNCLEAR");
   });
 
-  // real bug found while testing: a project-level rule can reuse the same
-  // number as a global one — matching by bare ruleId would silently
-  // attach the wrong result to the wrong rule
+  it("makes one isolated API call per rule, not one batched call for all rules", async () => {
+    const create = vi.fn().mockResolvedValue({
+      content: [{ type: "tool_use", input: { status: "PASS", evidence: "ok" } }],
+    });
+    vi.doMock("@anthropic-ai/sdk", () => ({
+      default: class MockAnthropic {
+        messages = { create };
+      },
+    }));
+    const secondRule: JudgmentClassification = {
+      kind: "judgment",
+      rule: { id: "9", title: "Second rule", text: "another rule text", source: "global" },
+    };
+    const { runJudgmentChecks } = await import("../src/checks/judgmentChecks.js");
+    await runJudgmentChecks([rule, secondRule], []);
+    expect(create).toHaveBeenCalledTimes(2);
+    // each call's prompt contains only its own rule's text, not the other rule's
+    const firstCallContent = create.mock.calls[0][0].messages[0].content;
+    const secondCallContent = create.mock.calls[1][0].messages[0].content;
+    expect(firstCallContent).toContain("Surface bad news first");
+    expect(firstCallContent).not.toContain("Second rule");
+    expect(secondCallContent).toContain("Second rule");
+    expect(secondCallContent).not.toContain("Surface bad news first");
+  });
+
+  // real bug the old batched design was exposed to: a project-level rule
+  // can reuse the same number as a global one. The per-rule-call design
+  // makes this structurally impossible (each result maps back to its own
+  // rule by closure, not by matching a key in a shared response) — this
+  // test locks that in as a regression check, not a live risk anymore.
   it("does NOT confuse two rules that share the same numeric id but different sources", async () => {
     const globalRule: JudgmentClassification = {
       kind: "judgment",
@@ -113,19 +135,10 @@ describe("runJudgmentChecks — API interaction (mocked, no live API key availab
     vi.doMock("@anthropic-ai/sdk", () => ({
       default: class MockAnthropic {
         messages = {
-          create: vi.fn().mockResolvedValue({
-            content: [
-              {
-                type: "tool_use",
-                input: {
-                  results: [
-                    { ruleId: "global:1", status: "PASS", evidence: "global evidence" },
-                    { ruleId: "project:1", status: "FAIL", evidence: "project evidence" },
-                  ],
-                },
-              },
-            ],
-          }),
+          create: vi
+            .fn()
+            .mockResolvedValueOnce({ content: [{ type: "tool_use", input: { status: "PASS", evidence: "global evidence" } }] })
+            .mockResolvedValueOnce({ content: [{ type: "tool_use", input: { status: "FAIL", evidence: "project evidence" } }] }),
         };
       },
     }));
@@ -142,9 +155,7 @@ describe("runJudgmentChecks — API interaction (mocked, no live API key availab
     vi.doMock("@anthropic-ai/sdk", () => ({
       default: class MockAnthropic {
         messages = {
-          create: vi.fn().mockResolvedValue({
-            content: [{ type: "tool_use", input: { results: [{ ruleId: "global:4", status: "MAYBE", evidence: "x" }] } }],
-          }),
+          create: vi.fn().mockResolvedValue({ content: [{ type: "tool_use", input: { status: "MAYBE", evidence: "x" } }] }),
         };
       },
     }));

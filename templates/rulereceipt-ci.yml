@@ -1,0 +1,28 @@
+name: RuleReceipt check
+
+# Copy this file to .github/workflows/rulereceipt-check.yml in your own repo.
+# Runs `rulereceipt check` against the agent session from your last commit
+# and fails the build on any FAIL result - rulereceipt already exits
+# non-zero on FAIL, this just wires that into CI.
+#
+# Requires: an ANTHROPIC_API_KEY secret if any of your CLAUDE.md/AGENTS.md
+# rules need judgment (not just pattern-matchable rules). Deterministic-only
+# checks work with zero secrets configured.
+
+on:
+  pull_request:
+
+jobs:
+  rulereceipt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Run rulereceipt check
+        run: npx rulereceipt check --markdown
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
