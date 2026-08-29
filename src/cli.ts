@@ -19,6 +19,7 @@ import { appendHistory, readHistorySince } from "./history.js";
 import { generateDigest } from "./digest.js";
 import { enableSchedule, disableSchedule, scheduleStatus, type Cadence } from "./schedule.js";
 import { findSplitBrainConflicts } from "./checks/splitBrain.js";
+import { runDoctor } from "./checks/doctor.js";
 import type { Rule, CheckResult } from "./types.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -213,6 +214,47 @@ async function runLint(markdown: boolean) {
     console.log(`  ${c.explanation}\n`);
   }
 }
+
+function runDoctorCommand() {
+  const cwd = process.cwd();
+  const result = runDoctor(cwd);
+
+  console.log(`Scanned ${result.filesScanned.length} locations, found ${result.filesFound.length}:`);
+  for (const f of result.filesFound) console.log(`  ${f}`);
+  console.log("");
+
+  if (result.hooks.length === 0) {
+    console.log("No hooks or folderOpen tasks found. Nothing runs automatically here.");
+    return;
+  }
+
+  console.log(`${result.hooks.length} hook${result.hooks.length === 1 ? "" : "s"}/auto-task${result.hooks.length === 1 ? "" : "s"} found:\n`);
+  for (const h of result.hooks) {
+    const isNew = result.newSinceLastRun.includes(h);
+    console.log(`${isNew ? "[NEW] " : "      "}${h.event} — ${h.command}`);
+    console.log(`       source: ${h.sourceFile}`);
+    if (h.flags.length > 0) {
+      console.log(`       ⚠ FLAGGED: ${h.flags.join(", ")}`);
+    }
+    console.log("");
+  }
+
+  if (result.newSinceLastRun.length > 0) {
+    console.log(`${result.newSinceLastRun.length} of these are new since the last time doctor ran here.`);
+  }
+}
+
+program
+  .command("doctor")
+  .description("List every Claude Code hook and VS Code auto-task on this machine/project, flag anything suspicious")
+  .action(() => {
+    try {
+      runDoctorCommand();
+    } catch (err) {
+      console.error("Something went wrong:", err instanceof Error ? err.message : err);
+      process.exitCode = 1;
+    }
+  });
 
 program
   .command("lint")
