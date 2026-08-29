@@ -88,7 +88,17 @@ async function emailResults(reportText: string): Promise<void> {
   }
 }
 
-async function runCheck(markdown: boolean, share: boolean, email: boolean, emailAlways: boolean) {
+function needsLlmResult(rule: Rule): CheckResult {
+  return {
+    ruleId: rule.id,
+    ruleTitle: rule.title,
+    ruleSource: rule.source,
+    status: "UNCLEAR",
+    evidence: "this rule needs judgment, not just pattern matching — run with --llm to grade it (opt-in: sends this rule's text and transcript excerpts to your own configured Anthropic key)",
+  };
+}
+
+async function runCheck(markdown: boolean, share: boolean, email: boolean, emailAlways: boolean, llm: boolean) {
   const cwd = process.cwd();
   const rules = loadRules(cwd);
 
@@ -115,7 +125,15 @@ async function runCheck(markdown: boolean, share: boolean, email: boolean, email
   const judgment = classifications.filter((c) => c.kind === "judgment");
 
   const deterministicResults = runDeterministicChecks(deterministic, events);
-  const judgmentResults = await runJudgmentChecks(judgment, events);
+  // Deterministic checks run by default, always, with no key — that's the
+  // actual "nothing leaves your machine" promise. Judgment rules only call
+  // out to an LLM with an explicit --llm on THIS run, never just because a
+  // key happens to be sitting in the environment (a Claude Code user very
+  // commonly has ANTHROPIC_API_KEY set for unrelated reasons — silently
+  // using it here would be sending transcript excerpts to a vendor without
+  // the user having asked THIS tool to do that, which is exactly the gap
+  // both independent reviews caught in the same session this was found).
+  const judgmentResults = llm ? await runJudgmentChecks(judgment, events) : judgment.map(({ rule }) => needsLlmResult(rule));
   const results = [...deterministicResults, ...judgmentResults];
 
   const meta = { sessionFilePath, ruleCount: rules.length };
@@ -164,14 +182,18 @@ program
     "opt-in: send this report directly from your own email (configured via `rulereceipt config`) to your configured manager email — but only when something actually failed. A manager doesn't need an email for every clean run. RuleReceipt's servers are never involved — sends straight from your machine via your own SMTP credentials."
   )
   .option("--email-always", "used with --email: send every time, even when nothing failed")
+  .option(
+    "--llm",
+    "opt-in: grade rules that need judgment (not just pattern matching) using your own Anthropic key. Without this flag, those rules report UNCLEAR and nothing is sent anywhere — deterministic checks always run with no key regardless."
+  )
   .action((opts) => {
-    runCheck(Boolean(opts.markdown), Boolean(opts.share), Boolean(opts.email), Boolean(opts.emailAlways)).catch((err) => {
+    runCheck(Boolean(opts.markdown), Boolean(opts.share), Boolean(opts.email), Boolean(opts.emailAlways), Boolean(opts.llm)).catch((err) => {
       console.error("Something went wrong:", err instanceof Error ? err.message : err);
       process.exitCode = 1;
     });
   });
 
-async function runLint(markdown: boolean) {
+async function runLint(markdown: boolean, llm: boolean) {
   const cwd = process.cwd();
   const claudeMdPath = join(cwd, "CLAUDE.md");
   const agentsMdPath = join(cwd, "AGENTS.md");
@@ -183,6 +205,15 @@ async function runLint(markdown: boolean) {
       "Split-brain check needs both a CLAUDE.md and an AGENTS.md in this directory to compare.\n" +
         `Found: ${existsSync(claudeMdPath) ? "CLAUDE.md" : "no CLAUDE.md"}, ${existsSync(agentsMdPath) ? "AGENTS.md" : "no AGENTS.md"}.`
     );
+    return;
+  }
+
+  // Same opt-in discipline as `check --llm`: detecting a real contradiction
+  // needs actual reading comprehension across two files, there's no
+  // deterministic substitute for that — but it still shouldn't fire just
+  // because a key happens to be present. Explicit --llm, every time.
+  if (!llm) {
+    console.log("Split-brain detection needs judgment across both files — run with --llm to check (opt-in: sends both rule sets to your own configured Anthropic key).");
     return;
   }
 
@@ -260,8 +291,9 @@ program
   .command("lint")
   .description("Find contradictions between this project's CLAUDE.md and AGENTS.md")
   .option("--markdown", "output as markdown, for pasting into a PR or issue comment")
+  .option("--llm", "opt-in: run the actual contradiction check using your own Anthropic key. Without this flag, nothing is sent anywhere.")
   .action((opts) => {
-    runLint(Boolean(opts.markdown)).catch((err) => {
+    runLint(Boolean(opts.markdown), Boolean(opts.llm)).catch((err) => {
       console.error("Something went wrong:", err instanceof Error ? err.message : err);
       process.exitCode = 1;
     });
