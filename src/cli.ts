@@ -18,6 +18,7 @@ import { sendReportEmail } from "./sendReport.js";
 import { appendHistory, readHistorySince } from "./history.js";
 import { generateDigest } from "./digest.js";
 import { enableSchedule, disableSchedule, scheduleStatus, type Cadence } from "./schedule.js";
+import { findSplitBrainConflicts } from "./checks/splitBrain.js";
 import type { Rule, CheckResult } from "./types.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -164,6 +165,61 @@ program
   .option("--email-always", "used with --email: send every time, even when nothing failed")
   .action((opts) => {
     runCheck(Boolean(opts.markdown), Boolean(opts.share), Boolean(opts.email), Boolean(opts.emailAlways)).catch((err) => {
+      console.error("Something went wrong:", err instanceof Error ? err.message : err);
+      process.exitCode = 1;
+    });
+  });
+
+async function runLint(markdown: boolean) {
+  const cwd = process.cwd();
+  const claudeMdPath = join(cwd, "CLAUDE.md");
+  const agentsMdPath = join(cwd, "AGENTS.md");
+  const claudeMdRules = parseClaudeMd(claudeMdPath, "project");
+  const agentsMdRules = parseClaudeMd(agentsMdPath, "project");
+
+  if (!existsSync(claudeMdPath) || !existsSync(agentsMdPath)) {
+    console.log(
+      "Split-brain check needs both a CLAUDE.md and an AGENTS.md in this directory to compare.\n" +
+        `Found: ${existsSync(claudeMdPath) ? "CLAUDE.md" : "no CLAUDE.md"}, ${existsSync(agentsMdPath) ? "AGENTS.md" : "no AGENTS.md"}.`
+    );
+    return;
+  }
+
+  const result = await findSplitBrainConflicts(claudeMdRules, agentsMdRules);
+
+  if (!result.ran) {
+    console.log(`Could not run the split-brain check: ${result.reason}`);
+    return;
+  }
+
+  if (result.conflicts.length === 0) {
+    console.log("No contradictions found between CLAUDE.md and AGENTS.md.");
+    return;
+  }
+
+  if (markdown) {
+    const lines = ["## CLAUDE.md vs AGENTS.md — contradictions found", ""];
+    for (const c of result.conflicts) {
+      lines.push(`- **CLAUDE.md: "${c.claudeMdRule.title}"** vs **AGENTS.md: "${c.agentsMdRule.title}"**`);
+      lines.push(`  ${c.explanation}`);
+    }
+    console.log(lines.join("\n"));
+    return;
+  }
+
+  console.log(`Found ${result.conflicts.length} contradiction${result.conflicts.length === 1 ? "" : "s"} between CLAUDE.md and AGENTS.md:\n`);
+  for (const c of result.conflicts) {
+    console.log(`- CLAUDE.md: "${c.claudeMdRule.title}"  vs  AGENTS.md: "${c.agentsMdRule.title}"`);
+    console.log(`  ${c.explanation}\n`);
+  }
+}
+
+program
+  .command("lint")
+  .description("Find contradictions between this project's CLAUDE.md and AGENTS.md")
+  .option("--markdown", "output as markdown, for pasting into a PR or issue comment")
+  .action((opts) => {
+    runLint(Boolean(opts.markdown)).catch((err) => {
       console.error("Something went wrong:", err instanceof Error ? err.message : err);
       process.exitCode = 1;
     });
