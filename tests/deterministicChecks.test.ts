@@ -11,6 +11,7 @@ const rule: DeterministicClassification = {
   kind: "deterministic",
   rule: { id: "5", title: "No force push", text: "Never run `git push --force`.", source: "project" },
   patterns: ["git push --force"],
+  polarity: "forbid",
 };
 
 describe("runDeterministicChecks", () => {
@@ -63,6 +64,7 @@ describe("runDeterministicChecks", () => {
       kind: "deterministic",
       rule: { id: "11", title: "No plain HTTP", text: "Never use `http://`.", source: "project" },
       patterns: ["http://"],
+      polarity: "forbid",
     };
     const events = [toolUse("Write", { content: 'const url = "http://api.example.com/data";' })];
     const [result] = runDeterministicChecks([urlRule], events);
@@ -81,12 +83,39 @@ describe("runDeterministicChecks", () => {
   // 200,000-char pattern must not crash the whole check, and must stay
   // fast — regardless of whether it throws or not, a bad pattern must
   // never take down every other rule in the report.
+  describe("require polarity (new: previously every deterministic rule was forbid-only)", () => {
+    const requireRule: DeterministicClassification = {
+      kind: "deterministic",
+      rule: { id: "20", title: "Must run tests", text: "Always run `npm test` before committing.", source: "project" },
+      patterns: ["npm test"],
+      polarity: "require",
+    };
+
+    it("PASSes when the required pattern actually appears", () => {
+      const events = [toolUse("Bash", { command: "npm test" })];
+      const [result] = runDeterministicChecks([requireRule], events);
+      expect(result.status).toBe("PASS");
+    });
+
+    it("reports UNCLEAR, never a fabricated FAIL or PASS, when the required pattern never appears", () => {
+      const events = [toolUse("Bash", { command: "git commit -m done" })];
+      const [result] = runDeterministicChecks([requireRule], events);
+      expect(result.status).toBe("UNCLEAR");
+    });
+
+    it("reports UNCLEAR on a completely empty session too (can't tell if it applied)", () => {
+      const [result] = runDeterministicChecks([requireRule], []);
+      expect(result.status).toBe("UNCLEAR");
+    });
+  });
+
   it("does not crash and stays fast on a pathologically long rule pattern", () => {
     const hugePattern = "a".repeat(200_000);
     const hugeRule: DeterministicClassification = {
       kind: "deterministic",
       rule: { id: "99", title: "Extreme pattern", text: `Never do \`${hugePattern}\`.`, source: "project" },
       patterns: [hugePattern],
+      polarity: "forbid",
     };
     const start = Date.now();
     const [result] = runDeterministicChecks([hugeRule], [toolUse("Bash", { command: "echo hi" })]);

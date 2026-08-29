@@ -49,28 +49,67 @@ export function runDeterministicChecks(
   classifications: DeterministicClassification[],
   events: TranscriptEvent[]
 ): CheckResult[] {
-  return classifications.map(({ rule, patterns }) => {
+  return classifications.map(({ rule, patterns, polarity }) => {
     try {
+      let foundEvent: TranscriptEvent | undefined;
+      let foundPattern: string | undefined;
       for (const event of events) {
         const haystack = eventSearchText(event);
         for (const pattern of patterns) {
           if (matchesPattern(haystack, pattern)) {
-            return {
-              ruleId: rule.id,
-              ruleTitle: rule.title,
-              ruleSource: rule.source,
-              status: "FAIL",
-              evidence: `found banned pattern "${pattern}" in a ${event.kind === "tool_use" ? event.toolName + " call" : event.kind}: ${haystack.slice(0, 160)}`,
-            };
+            foundEvent = event;
+            foundPattern = pattern;
+            break;
           }
         }
+        if (foundEvent) break;
+      }
+
+      if (polarity === "forbid") {
+        if (foundEvent && foundPattern) {
+          const haystack = eventSearchText(foundEvent);
+          return {
+            ruleId: rule.id,
+            ruleTitle: rule.title,
+            ruleSource: rule.source,
+            status: "FAIL",
+            evidence: `found banned pattern "${foundPattern}" in a ${foundEvent.kind === "tool_use" ? foundEvent.toolName + " call" : foundEvent.kind}: ${haystack.slice(0, 160)}`,
+          };
+        }
+        return {
+          ruleId: rule.id,
+          ruleTitle: rule.title,
+          ruleSource: rule.source,
+          status: "PASS",
+          evidence: `no occurrence of ${patterns.map((p) => `"${p}"`).join(" or ")} found in this session`,
+        };
+      }
+
+      // polarity === "require": absence is the failure, not presence. But
+      // a session that never touched anything relevant to this rule at all
+      // shouldn't be FAILed for it either — that's a false negative, and
+      // per this project's own rule, a wrong FAIL is worse than an honest
+      // "can't tell." With only pattern-matching (no diff/task-relevance
+      // signal available at this layer), there's no reliable way to
+      // distinguish "should have run this and didn't" from "this session
+      // never needed to" — so a required-but-absent pattern reports
+      // UNCLEAR, never a fabricated FAIL or a fabricated PASS.
+      if (foundEvent && foundPattern) {
+        const haystack = eventSearchText(foundEvent);
+        return {
+          ruleId: rule.id,
+          ruleTitle: rule.title,
+          ruleSource: rule.source,
+          status: "PASS",
+          evidence: `found required pattern "${foundPattern}" in a ${foundEvent.kind === "tool_use" ? foundEvent.toolName + " call" : foundEvent.kind}: ${haystack.slice(0, 160)}`,
+        };
       }
       return {
         ruleId: rule.id,
         ruleTitle: rule.title,
         ruleSource: rule.source,
-        status: "PASS",
-        evidence: `no occurrence of ${patterns.map((p) => `"${p}"`).join(" or ")} found in this session`,
+        status: "UNCLEAR",
+        evidence: `required pattern ${patterns.map((p) => `"${p}"`).join(" or ")} never appeared this session — can't tell if the rule didn't apply, or applied and was skipped`,
       };
     } catch (err) {
       // A pathological pattern (e.g. extremely long) can make `new RegExp`
