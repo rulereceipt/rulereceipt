@@ -109,26 +109,48 @@ export type Classification =
 // description. Deliberately broad on modals AND imperative verbs, because
 // a wrongly-excluded rule is a silent miss.
 const DIRECTIVE_LANGUAGE =
-  /\b(never|always|must|should|shall|do not|don't|dont|cannot|can't|required?|requires|ensure|avoid|prefer|forbidden|prohibited|only|make sure|be sure|need to|has to|have to|expected to)\b/i;
-
-// A glossary/listing shape: a backtick-quoted token followed by a dash and
-// a description ("`forge/llm/` - Multi-provider LLM integrations"). This is
-// documentation structure, not a directive, and it's the single most common
-// non-rule shape in the real corpus.
-const GLOSSARY_ENTRY = /^\s*`[^`]+`\s*[-–—:]/;
+  /\b(never|always|must|should|shall|do not|don't|dont|cannot|can't|required?|requires|ensure|avoid|prefer|forbidden|prohibited|only|make sure|be sure|need|needs|needed|need to|has to|have to|expected to|responsible for)\b/i;
 
 /**
- * Conservative on purpose: only excludes an item when it has NO directive
- * language anywhere AND looks structurally like documentation. A rule
- * wrongly excluded is a silent missed check; a doc line wrongly included is
- * a loud false positive. Given the real-world failure mode found on
- * 2026-08-30 was 10/10 false positives, the bias is set toward excluding
- * documentation — but only where both signals agree.
+ * Imperative instruction — a bare command verb starting a clause ("Use
+ * `gh pr merge`", "Run the tests first", "Keep functions small"). This is
+ * the other way a real rule is written when it doesn't use a modal.
+ *
+ * Anchored to a clause start (line start, or after sentence/bullet
+ * punctuation) on purpose: the same verbs appear mid-sentence in pure
+ * documentation ("the CLI can run migrations"), where they describe a
+ * capability rather than instruct the agent.
+ */
+const IMPERATIVE_INSTRUCTION =
+  /(?:^|[.;:!?]\s+|^\s*[-*+]\s*|\n\s*[-*+]\s*)(use|run|keep|write|add|remove|delete|check|verify|test|commit|document|update|create|follow|apply|include|exclude|handle|validate|escape|sanitize|log|report|raise|throw|return|call|invoke|split|group|sort|name|place|put|store|read|load|save|close|open|start|stop|restart|install|build|deploy|review|refactor|rename|move|copy|merge|rebase|squash|tag|branch|push|pull|fetch|clone|stage|stash|lead|state|explain|describe|list|show|surface|flag|mark|label|note|treat|assume|confirm|ask|wait|stick|limit|cap|batch|cache|mock|stub|assert|expect|measure|quantify|label)\b/i;
+
+/**
+ * Deliberately inverted: tests for the presence of a DIRECTIVE, never for
+ * the shape of documentation.
+ *
+ * The first version of this enumerated documentation shapes (backtick
+ * glossary, bold-term definition, arrow mapping, label rows, "Reference:"
+ * prefixes). That approach cannot work: every new rules-file convention is
+ * a new shape, so the list grows forever and is always one format behind —
+ * measurably so, since `notARule` coverage fell from 17.4% on a 40-file
+ * sample to 7.1% on a 658-file one purely because the bigger corpus used
+ * shapes the list didn't have yet.
+ *
+ * "Does this contain an instruction" is a bounded question about English —
+ * modal verbs plus the closed class of imperative command verbs — and it
+ * doesn't change when someone invents a new markdown convention. A line
+ * with no instruction in it has nothing to check compliance against,
+ * whatever its punctuation.
  */
 function isNotARule(rule: Rule): boolean {
-  const text = `${rule.title} ${rule.text}`;
-  if (DIRECTIVE_LANGUAGE.test(text)) return false;
-  return GLOSSARY_ENTRY.test(rule.title) || GLOSSARY_ENTRY.test(rule.text);
+  const combined = `${rule.title} ${rule.text}`;
+  if (DIRECTIVE_LANGUAGE.test(combined)) return false;
+  // Title and text are tested SEPARATELY: the imperative pattern is
+  // anchored to a clause start, and concatenating them pushes the text's
+  // opening verb into mid-string where the anchor can never match. That
+  // bug silently classified real rules ("Use `npm` for this project")
+  // as non-rules — caught by an existing test, not by inspection.
+  return !IMPERATIVE_INSTRUCTION.test(rule.title) && !IMPERATIVE_INSTRUCTION.test(rule.text);
 }
 
 const BRANCH_WORD = /\bbranch\b/i;
@@ -183,6 +205,41 @@ const BACKTICK_TOKEN = /`([^`]+)`/g;
 const REQUIRE_SIGNAL = /\b(always|must|required|require|ensure|need to)\b/i;
 const FORBID_SIGNAL = /\b(never|don't|do not|forbidden|banned|must not)\b/i;
 
+/**
+ * A rule can prohibit one thing AND prescribe another in the same breath:
+ * "NEVER squash when merging PRs. Use `gh pr merge --merge --admin`".
+ * Literal pattern matching cannot handle this — it extracts `--merge` from
+ * the PRESCRIBED command, then applies the rule's forbid polarity to it,
+ * so doing exactly what the rule demands gets reported as violating it.
+ * Real false positive found 2026-08-30 on a real rules file.
+ *
+ * There's no honest way to split which literal belongs to which half by
+ * pattern alone, so a mixed-polarity rule goes to judgment instead of
+ * being guessed at. Better an "needs --llm" than a confident wrong FAIL.
+ */
+// Prescriptive language beyond the modal verbs in REQUIRE_SIGNAL. A rule
+// often prescribes with a bare imperative ("Use `gh pr merge --merge`")
+// rather than "you must use" — and it's exactly those imperative clauses
+// whose literals get misattributed to the prohibiting half.
+const PRESCRIPTIVE_VERB = /\b(use|run|prefer|apply|follow|call|invoke|stick to)\b/i;
+
+function hasMixedPolarity(rule: Rule): boolean {
+  const text = `${rule.title} ${rule.text}`;
+  if (!FORBID_SIGNAL.test(text)) return false;
+
+  // The prescription must live in a DIFFERENT clause than the prohibition.
+  // "Never run `git push --force`" is one clause: "run" belongs to the
+  // forbidden action, and treating that as mixed polarity would send the
+  // most basic literal rule there is to the LLM. "NEVER squash when
+  // merging PRs. Use `gh pr merge --merge`" is two clauses, and only the
+  // second one's literals would be misattributed.
+  const clauses = text.split(/[.;\n]|(?:\s+-\s+)/).filter((c) => c.trim().length > 0);
+  return clauses.some(
+    (clause) =>
+      !FORBID_SIGNAL.test(clause) && (REQUIRE_SIGNAL.test(clause) || PRESCRIPTIVE_VERB.test(clause))
+  );
+}
+
 function detectPolarity(rule: Rule): DeterministicPolarity {
   const text = `${rule.title} ${rule.text}`;
   // An explicit forbid word anywhere wins over a require word — "you must
@@ -214,6 +271,12 @@ export function classifyRule(rule: Rule): Classification {
   for (const match of rule.title.matchAll(BACKTICK_TOKEN)) {
     const token = match[1].trim();
     if (token.length > 0) patterns.add(token);
+  }
+
+  // A rule that both forbids and prescribes can't be checked by literal
+  // matching without misattributing one half's tokens to the other.
+  if (patterns.size > 0 && hasMixedPolarity(rule)) {
+    return { kind: "judgment", rule };
   }
 
   if (patterns.size === 0) {

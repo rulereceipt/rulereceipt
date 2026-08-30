@@ -31,9 +31,13 @@ describe("classifyRule", () => {
     expect(classifyRule(rule).kind).toBe("judgment");
   });
 
-  it("defaults to judgment when text is empty (never guesses safe)", () => {
+  // assertion updated 2026-08-30 when notARule was introduced: an empty
+  // rule has no instruction in it, so there is nothing to check compliance
+  // against. Reporting N/A is more honest than spending an LLM call to
+  // grade an empty string, which is what "judgment" used to mean here.
+  it("classifies an empty rule as notARule — nothing to check, rather than an LLM call", () => {
     const rule = makeRule("");
-    expect(classifyRule(rule).kind).toBe("judgment");
+    expect(classifyRule(rule).kind).toBe("notARule");
   });
 
   // proves this test can fail: a rule with no backticks must NOT be
@@ -168,12 +172,53 @@ describe("classifyRule", () => {
       expect(classifyRule(rule).kind).toBe("judgment");
     });
 
-    // conservative by design: needs BOTH no-directive AND doc shape, so a
-    // plain descriptive sentence still goes to judgment rather than being
-    // silently dropped
-    it("does NOT drop a non-glossary descriptive line — it still goes to judgment", () => {
+    // assertion updated 2026-08-30 when detection was inverted from
+    // "looks like documentation" to "contains a directive". A purely
+    // descriptive sentence instructs the agent to do nothing, so there is
+    // no compliance question to answer — N/A is the correct answer, and
+    // the earlier "send it to judgment" behavior was spending an LLM call
+    // to grade a statement of fact.
+    it("classifies a purely descriptive statement as notARule — it instructs nothing", () => {
       const rule = makeRule("The build system uses Bazel for the core packages.");
+      expect(classifyRule(rule).kind).toBe("notARule");
+    });
+  });
+
+  // Real misclassifications reported from an independent run against a
+  // real, large rules file (2026-08-30). Each one is a permanent
+  // regression test now, not a one-off fix.
+  describe("real-world misclassifications reported from a live run", () => {
+    it("a section header is not a rule", () => {
+      expect(classifyRule(makeRule("Quick Reference - All Repositories")).kind).toBe("notARule");
+    });
+
+    it("a folder listing row is not a rule", () => {
+      expect(classifyRule(makeRule("nogit/ - Contains archived non-git folders")).kind).toBe("notARule");
+    });
+
+    it("a git-remote reference row is not a rule", () => {
+      expect(classifyRule(makeRule("Git: git@github.com:acme-core/acme-core-app.git")).kind).toBe("notARule");
+    });
+
+    it("a pointer to where information lives is not a rule", () => {
+      expect(
+        classifyRule(makeRule("Reference: `analytics.ts` in each frontend project for the available API")).kind
+      ).toBe("notARule");
+    });
+
+    // the worst of the reported cases: literals from the PRESCRIBED half
+    // were checked against the rule's forbid polarity, so running exactly
+    // the command the rule demands got reported as violating it
+    it("a rule that forbids one thing and prescribes another goes to judgment, not a literal guess", () => {
+      const rule = makeRule("NEVER squash when merging PRs. Use `gh pr merge {number} --merge --admin`");
       expect(classifyRule(rule).kind).toBe("judgment");
+    });
+
+    // the guard on that: a single-clause prohibition whose own verb is a
+    // command word is NOT mixed polarity, and must stay a literal check
+    it("a single-clause prohibition stays deterministic even though its verb is a command word", () => {
+      const rule = makeRule("Never run `git push --force`.");
+      expect(classifyRule(rule).kind).toBe("deterministic");
     });
   });
 

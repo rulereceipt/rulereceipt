@@ -10,17 +10,35 @@
  *
  * Usage: npx tsx scripts/corpus-report.ts [--show-deterministic]
  */
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { parseClaudeMd } from "../src/parsers/claudeMdParser.js";
 import { classifyRule } from "../src/checks/classify.js";
 
-const CORPUS_DIR = "corpus";
+const args = process.argv.slice(2).filter((a) => !a.startsWith("--"));
+const CORPUS_DIR = args[0] ?? "corpus";
 const showDeterministic = process.argv.includes("--show-deterministic");
+
+// Recursive: the corpus may be organized into per-format subdirectories
+// (claude_md/, agents_md/, cursor_legacy/, ...), which is exactly the
+// variety worth testing against.
+function walk(dir: string): string[] {
+  const out: string[] = [];
+  for (const entry of readdirSync(dir)) {
+    const full = join(dir, entry);
+    try {
+      if (statSync(full).isDirectory()) out.push(...walk(full));
+      else out.push(full);
+    } catch {
+      /* unreadable entry, skip */
+    }
+  }
+  return out;
+}
 
 let files: string[];
 try {
-  files = readdirSync(CORPUS_DIR).filter((f) => statSync(join(CORPUS_DIR, f)).isFile());
+  files = walk(CORPUS_DIR);
 } catch {
   console.error(`No ${CORPUS_DIR}/ directory. Run: bash scripts/fetch-corpus.sh`);
   process.exit(1);
@@ -32,8 +50,8 @@ const crashed: { file: string; error: string }[] = [];
 let totalRules = 0;
 let emptyFiles = 0;
 
-for (const file of files) {
-  const path = join(CORPUS_DIR, file);
+for (const path of files) {
+  const file = path.slice(CORPUS_DIR.length + 1);
   try {
     const rules = parseClaudeMd(path, "project");
     if (rules.length === 0) {
