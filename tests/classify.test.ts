@@ -130,4 +130,44 @@ describe("classifyRule", () => {
       expect(classifyRule(rule).kind).toBe("deterministic");
     });
   });
+
+  describe("codeContent classification (structured primitive, 2026-08-30)", () => {
+    it("routes a rule naming a function/method call to codeContent", () => {
+      const rule = makeRule("Never leave a `print(` statement in committed code.");
+      expect(classifyRule(rule).kind).toBe("codeContent");
+    });
+
+    it("does NOT route a plain CLI command rule to codeContent", () => {
+      const rule = makeRule("Never run `git push --force`.");
+      expect(classifyRule(rule).kind).toBe("deterministic");
+    });
+  });
+
+  describe("fileLifecycle classification (structured primitive, 2026-08-30)", () => {
+    it("routes a file-protection rule to fileLifecycle", () => {
+      const rule = makeRule("Never modify `.claude/settings.json`.");
+      const result = classifyRule(rule);
+      expect(result.kind).toBe("fileLifecycle");
+      if (result.kind === "fileLifecycle") {
+        expect(result.filePath).toBe(".claude/settings.json");
+      }
+    });
+
+    it("routes a bare-filename protection rule to fileLifecycle", () => {
+      const rule = makeRule("Never delete `config.yaml`.");
+      expect(classifyRule(rule).kind).toBe("fileLifecycle");
+    });
+
+    // needs BOTH a path shape and mutation intent — a rule that merely
+    // mentions a file isn't a protection rule
+    it("does NOT route to fileLifecycle when the rule names a file but has no mutation intent", () => {
+      const rule = makeRule("Read `config.yaml` before starting work.");
+      expect(classifyRule(rule).kind).not.toBe("fileLifecycle");
+    });
+
+    it("does NOT route a CLI command containing a slash to fileLifecycle", () => {
+      const rule = makeRule("Never change the remote with `git remote set-url origin`.");
+      expect(classifyRule(rule).kind).not.toBe("fileLifecycle");
+    });
+  });
 });

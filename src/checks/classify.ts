@@ -60,11 +60,29 @@ export interface CodeContentClassification {
   polarity: DeterministicPolarity;
 }
 
+/**
+ * Third structured-check primitive (2026-08-30): file lifecycle, for
+ * rules protecting a specific file ("never modify `.claude/settings.json`",
+ * "don't delete `config.yaml`"). Real false-positive this fixes: the path
+ * was flagged as touched when the agent merely READ it (`cat
+ * .claude/settings.json` to verify its contents) — reading a protected
+ * file is not modifying it. Routes to fileLifecycle.ts, which only counts
+ * real mutations: Write/Edit on that path, or a Bash rm/mv/truncate-style
+ * command targeting it.
+ */
+export interface FileLifecycleClassification {
+  kind: "fileLifecycle";
+  rule: Rule;
+  filePath: string;
+  polarity: DeterministicPolarity;
+}
+
 export type Classification =
   | DeterministicClassification
   | IfEditThenTestClassification
   | GitBranchPolicyClassification
   | CodeContentClassification
+  | FileLifecycleClassification
   | JudgmentClassification;
 
 const BRANCH_WORD = /\bbranch\b/i;
@@ -73,6 +91,18 @@ const BRANCH_WORD = /\bbranch\b/i;
 // simple signal that a backtick literal names actual CODE, not a CLI
 // command or flag ("git push --force", "npm test" never look like this).
 const CODE_CONSTRUCT_PATTERN = /\(/;
+
+// A file-path shape: a known config/source extension, or a path with a
+// directory separator. Deliberately requires no spaces — a real path
+// literal ("`.claude/settings.json`", "`config.yaml`") never has one,
+// while a command that happens to contain a slash ("`git push --force`")
+// does. Checked AFTER the code-construct test, so "foo(" never lands here.
+const FILE_PATH_PATTERN = /^[^\s]*(\.(json|ya?ml|toml|md|env|lock|ini|cfg|conf|xml|txt|js|ts|py|rb|go|rs|sh)$|\/)/i;
+
+// Only route to fileLifecycle when the rule is actually about touching the
+// file, not merely mentioning one (e.g. "read `config.yaml` before
+// starting" names a path but isn't a protection rule).
+const FILE_MUTATION_INTENT = /\b(modif|chang|edit|delet|remov|overwrit|touch|writ|creat|rename|mov)\w*\b/i;
 
 // Catches rules like "add tests for every change" or "every new function
 // needs a test" - no literal backtick token to pattern-match, so without
@@ -152,6 +182,11 @@ export function classifyRule(rule: Rule): Classification {
 
   if ([...patterns].some((p) => CODE_CONSTRUCT_PATTERN.test(p))) {
     return { kind: "codeContent", rule, patterns: [...patterns], polarity: detectPolarity(rule) };
+  }
+
+  const filePath = [...patterns].find((p) => FILE_PATH_PATTERN.test(p));
+  if (filePath && FILE_MUTATION_INTENT.test(text)) {
+    return { kind: "fileLifecycle", rule, filePath, polarity: detectPolarity(rule) };
   }
 
   return { kind: "deterministic", rule, patterns: [...patterns], polarity: detectPolarity(rule) };

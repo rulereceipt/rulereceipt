@@ -13,6 +13,7 @@ import { runDeterministicChecks } from "./checks/deterministicChecks.js";
 import { runIfEditThenTestChecks } from "./checks/ifEditThenTest.js";
 import { runGitBranchPolicyChecks } from "./checks/gitBranchPolicy.js";
 import { runCodeContentChecks } from "./checks/codeContent.js";
+import { runFileLifecycleChecks } from "./checks/fileLifecycle.js";
 import { runJudgmentChecks } from "./checks/judgmentChecks.js";
 import { generateReport, generateMarkdownReport } from "./report/generateReport.js";
 import { verifySessionHash } from "./verifyHash.js";
@@ -130,6 +131,7 @@ async function runCheck(
   const ifEditThenTest = classifications.filter((c) => c.kind === "ifEditThenTest");
   const gitBranchPolicy = classifications.filter((c) => c.kind === "gitBranchPolicy");
   const codeContent = classifications.filter((c) => c.kind === "codeContent");
+  const fileLifecycle = classifications.filter((c) => c.kind === "fileLifecycle");
   const judgment = classifications.filter((c) => c.kind === "judgment");
 
   const deterministicResults = [
@@ -137,6 +139,7 @@ async function runCheck(
     ...runIfEditThenTestChecks(ifEditThenTest, events),
     ...runGitBranchPolicyChecks(gitBranchPolicy, events),
     ...runCodeContentChecks(codeContent, events),
+    ...runFileLifecycleChecks(fileLifecycle, events),
   ];
   // Deterministic checks run by default, always, with no key — judgment
   // rules only call out to an LLM with an explicit --llm on THIS run, never
