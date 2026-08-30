@@ -114,4 +114,20 @@ describe("classifyRule", () => {
       expect(classifyRule(rule).kind).not.toBe("ifEditThenTest");
     });
   });
+
+  describe("gitBranchPolicy classification (new structured primitive, 2026-08-30)", () => {
+    it("routes a rule naming a branch in backticks, that also says 'branch', to gitBranchPolicy", () => {
+      const rule = makeRule("Never touch the `demo` branch.", "No demo branch");
+      const result = classifyRule(rule);
+      expect(result.kind).toBe("gitBranchPolicy");
+      if (result.kind === "gitBranchPolicy") {
+        expect(result.branchName).toBe("demo");
+      }
+    });
+
+    it("does NOT route a backtick rule to gitBranchPolicy when it doesn't mention 'branch' at all", () => {
+      const rule = makeRule("Never run `git push --force`.");
+      expect(classifyRule(rule).kind).toBe("deterministic");
+    });
+  });
 });

@@ -24,7 +24,29 @@ export interface JudgmentClassification {
   rule: Rule;
 }
 
-export type Classification = DeterministicClassification | IfEditThenTestClassification | JudgmentClassification;
+/**
+ * First real structured-check primitive (2026-08-30), replacing keyword
+ * search for one whole rule category: git branch policy. A rule naming a
+ * branch (e.g. "never touch the `demo` branch") was previously checked by
+ * searching for the word "demo" ANYWHERE in the transcript — matching a
+ * repo name, a directory, a sentence, anything. This routes instead to a
+ * real parser (gitBranchPolicy.ts) that reads actual git command
+ * arguments and checks the literal branch name, not a substring search.
+ */
+export interface GitBranchPolicyClassification {
+  kind: "gitBranchPolicy";
+  rule: Rule;
+  branchName: string;
+  polarity: DeterministicPolarity;
+}
+
+export type Classification =
+  | DeterministicClassification
+  | IfEditThenTestClassification
+  | GitBranchPolicyClassification
+  | JudgmentClassification;
+
+const BRANCH_WORD = /\bbranch\b/i;
 
 // Catches rules like "add tests for every change" or "every new function
 // needs a test" - no literal backtick token to pattern-match, so without
@@ -92,6 +114,16 @@ export function classifyRule(rule: Rule): Classification {
     }
     return { kind: "judgment", rule };
   }
+
+  const text = `${rule.title} ${rule.text}`;
+  if (BRANCH_WORD.test(text)) {
+    // first backtick literal is treated as the branch name — real rules
+    // this targets name exactly one branch ("the `demo` branch", "never
+    // push to `main`"), not a set of them
+    const [branchName] = patterns;
+    return { kind: "gitBranchPolicy", rule, branchName, polarity: detectPolarity(rule) };
+  }
+
   return { kind: "deterministic", rule, patterns: [...patterns], polarity: detectPolarity(rule) };
 }
 
