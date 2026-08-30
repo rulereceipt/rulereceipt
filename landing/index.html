@@ -19,7 +19,12 @@
 <meta property="og:url" content="https://rulereceipt.dev/" />
 <meta property="og:title" content="RuleReceipt — see what your AI agent actually did" />
 <meta property="og:description" content="Checks a coding agent's session against your own rules and shows precisely what was followed, what wasn't, and why — with evidence. Runs locally, nothing stored." />
+<meta property="og:image" content="https://rulereceipt.dev/og-image.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:alt" content="RuleReceipt" />
 <meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:image" content="https://rulereceipt.dev/og-image.png" />
 <meta name="twitter:title" content="RuleReceipt — see what your AI agent actually did" />
 <meta name="twitter:description" content="Checks a coding agent's session against your own rules and shows precisely what was followed, what wasn't, and why — with evidence. Runs locally, nothing stored." />
 <style>
@@ -432,14 +437,16 @@
     display: block;
   }
 
-  .faq-columns { display: flex; gap: 24px; align-items: flex-start; }
-  .faq-list { display: grid; gap: 10px; flex: 1 1 0; min-width: 0; }
-  @media (max-width: 720px) { .faq-columns { flex-direction: column; } }
+  .faq-columns { column-count: 2; column-gap: 24px; }
+  @media (max-width: 720px) { .faq-columns { column-count: 1; } }
   .faq-item {
     border: 1px solid var(--panel-line);
     border-radius: 12px;
     background: var(--panel);
     padding: 4px 20px;
+    margin-bottom: 10px;
+    break-inside: avoid;
+    -webkit-column-break-inside: avoid;
   }
   .faq-item summary {
     font-family: var(--font-sans);
@@ -602,9 +609,9 @@
       <h2>What we don't do</h2>
       <p class="band-sub">The privacy story, stated plainly, not buried in a policy page.</p>
       <div class="trust-grid">
-        <div class="trust-cell"><h3><span class="mark">—</span> Your rules and results never leave your machine</h3><p>Checks run locally, always. Your own Claude key talking to Anthropic (only with <code>--llm</code>) is the only call involving your actual content. A random per-machine ID for a distinct-install count goes out by default — see <a href="/privacy">Privacy</a> — but never your rules, files, or results. (<code>--share</code> adds opt-in pass/fail counts; both can be turned off.)</p></div>
-        <div class="trust-cell"><h3><span class="mark">—</span> We don't see your data</h3><p>No server of ours sits in the path of your actual checks. What you check stays yours.</p></div>
-        <div class="trust-cell"><h3><span class="mark">—</span> We never touch settings.json</h3><p>Read-only, always. CLAUDE.md and your transcript — nothing modified, no hooks, without you asking.</p></div>
+        <div class="trust-cell"><h3><span class="mark">—</span> Almost nothing leaves your machine</h3><p>Checks run locally, always. Only a random install ID goes out by default — never your rules, files, or results. <code>--llm</code> and <code>--share</code> are separate opt-ins. Full detail in <a href="/privacy">Privacy</a>.</p></div>
+        <div class="trust-cell"><h3><span class="mark">—</span> We don't see your data</h3><p>No server of ours sits in the path of your actual checks — no account, no login, nothing of ours to breach. What you check stays yours, always.</p></div>
+        <div class="trust-cell"><h3><span class="mark">—</span> We never touch settings.json</h3><p>Read-only, always. RuleReceipt only reads CLAUDE.md and your session transcript — it never writes to settings.json, never installs a hook, never changes anything without you asking.</p></div>
       </div>
       <div style="height:20px"></div>
       <div class="security-note"><strong>Worth saying directly, given the year it's been:</strong> malicious npm packages have specifically targeted Claude Code's hook system — planting code in <code>.claude/settings.json</code> that runs automatically on every session. RuleReceipt does none of that. It runs only when you type the command. Nothing automatic, nothing silent.</div>
@@ -648,7 +655,6 @@
       <h2>Questions</h2>
       <p class="band-sub">Straight answers, including where the answer is "not yet."</p>
       <div class="faq-columns">
-        <div class="faq-list">
           <details class="faq-item">
             <summary>Does this work with Cursor or other AI agents?</summary>
             <p>Not yet. v1 reads Claude Code sessions specifically. AGENTS.md as the rules format is already cross-tool, and support for other agents is the natural next step — but it isn't built yet, so it isn't claimed here.</p>
@@ -673,8 +679,6 @@
             <summary>What exactly counts as one credit?</summary>
             <p>One run of <code>rulereceipt check</code> — regardless of how many rules it checks. Not metered per rule, per token, or per API call.</p>
           </details>
-        </div>
-        <div class="faq-list">
           <details class="faq-item">
             <summary>Will it always be free?</summary>
             <p>Free during early access, no date attached. When that changes, you'll hear about it in advance — not find out by hitting a paywall.</p>
@@ -691,7 +695,6 @@
             <summary>Can this help with a vendor security review or DPA?</summary>
             <p>It can give you real evidence for the "how do you develop securely" questions — not certify you compliant. We put together a <a href="/templates/security-focused-CLAUDE.md">starting-point rule set</a> covering common asks (secrets, PII, input validation, auth checks); use it as a base and adjust it to what your actual reviewer asks for.</p>
           </details>
-        </div>
       </div>
     </div>
   </section>
