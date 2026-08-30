@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<script>
+    !function(t,e){var o,n,p,r;e.__SV||(window.posthog && window.posthog.__loaded)||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}p||((p=t.createElement("script")).type="text/javascript",p.crossOrigin="anonymous",p.async=!0,p.src=s.api_host.replace(".i.posthog.com","-assets.i.posthog.com")+"/static/array.js",p.onerror=function(){p=null},(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r));var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+".people (stub)"},o="Sn Cn init Hn Un Gn Yi zn Kn qn capture Vn kn calculateEventProperties es register register_once register_for_session unregister unregister_for_session os Bn ss getFeatureFlag getFeatureFlagPayload getFeatureFlagResult getAllFeatureFlags isFeatureEnabled reloadFeatureFlags updateFlags updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures on onFeatureFlags onSurveysLoaded onSessionId getSurveys getActiveMatchingSurveys renderSurvey displaySurvey cancelPendingSurvey canRenderSurvey canRenderSurveyAsync ls identify setPersonProperties unsetPersonProperties group resetGroups setPersonPropertiesForFlags resetPersonPropertiesForFlags setGroupPropertiesForFlags resetGroupPropertiesForFlags reset us shutdown setIdentity clearIdentity get_distinct_id getGroups get_session_id get_session_replay_url alias set_config startSessionRecording stopSessionRecording sessionRecordingStarted captureException addExceptionStep captureLog startExceptionAutocapture stopExceptionAutocapture loadToolbar get_property getSessionProperty rs Xn createPersonProfile setInternalOrTestUser ns $n vs opt_in_capturing opt_out_capturing has_opted_in_capturing has_opted_out_capturing get_explicit_consent_status is_capturing clear_opt_in_out_capturing Jn debug tr At getPageViewId captureTraceFeedback captureTraceMetric Ln".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
+    posthog.init('phc_A4TBtMr58tNcGFEnoC82pPqzrKxXRGw84B8RVd8JK2nW', {
+        api_host: 'https://us.i.posthog.com',
+        defaults: '2026-05-30',
+        person_profiles: 'identified_only',
+    })
+</script>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>RuleReceipt — What we got wrong</title>
+<meta name="description" content="We ran RuleReceipt against a real, complex session and found real false positives. Here's exactly what was wrong and how we fixed it." />
+<link rel="canonical" href="https://rulereceipt.dev/postmortem" />
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23FAFAF7'/%3E%3Cpath d='M9 8h14v17l-3-2-3 2-3-2-3 2-2-2z' fill='none' stroke='%2317191C' stroke-width='1.6'/%3E%3Cpath d='M12 14h8M12 18h6' stroke='%2317805F' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E" />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="https://rulereceipt.dev/postmortem" />
+<meta property="og:title" content="RuleReceipt — What we got wrong" />
+<meta property="og:description" content="We ran RuleReceipt against a real, complex session and found real false positives. Here's exactly what was wrong and how we fixed it." />
+<meta property="og:image" content="https://rulereceipt.dev/og-image.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:image" content="https://rulereceipt.dev/og-image.png" />
+<style>
+  body { margin:0; background:#FAFAF7; color:#17191C; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:17px; line-height:1.6; }
+  .wrap { max-width:680px; margin:0 auto; padding:60px 24px 90px; }
+  a { color:#17805F; }
+  h1 { font-size:1.9rem; margin-bottom:8px; line-height:1.2; }
+  .updated { color:#6B6F76; font-size:0.85rem; margin-bottom:36px; }
+  h2 { font-size:1.2rem; margin-top:42px; }
+  h3 { font-size:1.02rem; margin-top:28px; }
+  p { color:#3A3D42; }
+  .back { display:inline-block; margin-bottom:30px; font-size:0.85rem; }
+  .lede { font-size:1.1rem; color:#17191C; }
+  code { font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace; background:#F1F0EA; padding:1px 6px; border-radius:4px; font-size:0.9em; }
+  pre { background:#17191C; color:#FAFAF7; padding:16px 18px; border-radius:10px; overflow-x:auto; font-size:0.88rem; }
+  pre code { background:none; padding:0; color:inherit; }
+  .bug { border:1px solid #E7E5DC; border-radius:12px; padding:18px 22px; margin:18px 0; background:#FFFFFF; }
+  .bug .tag { font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace; font-size:0.72rem; letter-spacing:0.06em; text-transform:uppercase; color:#DD6A1F; margin-bottom:8px; }
+  .before-after { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin:14px 0; }
+  @media (max-width:560px) { .before-after { grid-template-columns:1fr; } }
+  .before-after .col { padding:12px 14px; border-radius:8px; font-size:0.88rem; }
+  .before-after .before { background:#FBEEEA; }
+  .before-after .after { background:#EAF3EE; }
+  .before-after .label { font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace; font-size:0.7rem; text-transform:uppercase; letter-spacing:0.06em; color:#6B6F76; margin-bottom:6px; }
+  .stat-row { display:flex; gap:24px; margin:20px 0; flex-wrap:wrap; }
+  .stat { font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace; }
+  .stat .num { font-size:1.8rem; font-weight:700; }
+  .stat .label { font-size:0.78rem; color:#6B6F76; text-transform:uppercase; letter-spacing:0.05em; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <a class="back" href="/">&larr; RuleReceipt</a>
+    <h1>What we got wrong, and how we caught it</h1>
+    <div class="updated">30 August 2026</div>
+
+    <p class="lede">We ran RuleReceipt against a real, long, complex session — not a demo, not a curated example. It found real bugs, in our own tool, before anyone else did. Here's exactly what was wrong.</p>
+
+    <div class="stat-row">
+      <div class="stat"><div class="num">35</div><div class="label">rules checked</div></div>
+      <div class="stat"><div class="num">10</div><div class="label">FAILs reported</div></div>
+      <div class="stat"><div class="num">10</div><div class="label">false alarms</div></div>
+    </div>
+
+    <p>Every single FAIL that session produced was wrong. Not "arguably wrong" — verifiably wrong, checked by hand against what actually happened. That's the kind of result that should stop a launch, not follow one. So we stopped, found the actual causes, fixed them, and are publishing exactly what happened instead of quietly patching it.</p>
+
+    <h2>The three real bugs</h2>
+
+    <div class="bug">
+      <div class="tag">Bug 1 — scanning what the agent read, not just what it did</div>
+      <p>A rule like <em>"never leave a <code>print(</code> statement in committed code"</em> was checked by searching the entire session transcript for the literal text <code>print(</code> — including the <em>output</em> of commands, not just the agent's own edits.</p>
+      <div class="before-after">
+        <div class="col before"><div class="label">What happened</div>The agent ran a search command whose <em>output</em> happened to contain <code>print(</code> in a file it never touched. Reported as a violation.</div>
+        <div class="col after"><div class="label">The fix</div>Checks now only look at what the agent actually wrote or ran — never at content it merely read or observed.</div>
+      </div>
+    </div>
+
+    <div class="bug">
+      <div class="tag">Bug 2 — flagging docs and config for "missing a test"</div>
+      <p>A rule requiring tests for code changes was checked by looking for ANY edited file that wasn't itself a test file — including markdown docs, JSON, and YAML.</p>
+      <div class="before-after">
+        <div class="col before"><div class="label">What happened</div>Editing a README got flagged: "edited a file but no test file was touched." Documentation was never supposed to need a test.</div>
+        <div class="col after"><div class="label">The fix</div>Docs and config files (<code>.md</code>, <code>.json</code>, <code>.yaml</code>, and similar) are excluded from this check entirely.</div>
+      </div>
+    </div>
+
+    <div class="bug">
+      <div class="tag">Bug 3 — misreading a rule about test QUALITY as a rule about test COVERAGE</div>
+      <p>Our own global rule, <em>"tests must be able to fail"</em> — the exact rule behind every red-run proof in this project — was misclassified as "every edit needs a test file," because the classifier just looked for the word "test" plus a generic word like "must" anywhere in the rule.</p>
+      <div class="before-after">
+        <div class="col before"><div class="label">What happened</div>Editing an unrelated file failed a rule that was actually about proving tests can catch bad input — nothing to do with "every edit needs a test."</div>
+        <div class="col after"><div class="label">The fix</div>Classification now requires a specific phrase shape ("needs a test," "add tests for") — not just two words appearing anywhere.</div>
+      </div>
+    </div>
+
+    <h2>What we're changing about how checks work, not just these three bugs</h2>
+    <p>The deeper pattern behind all three: checking a rule by searching for keywords in prose is fragile by nature. A rule about a git branch named <code>demo</code> shouldn't be checked by searching for the word "demo" anywhere — it should be checked by looking at the actual git command that was run, and the actual branch it targeted.</p>
+    <p>We've started building exactly that: a small library of structured checks that read real, structured data (an actual git command's actual branch argument) instead of prose. The first one — git branch policy — is live now. More are coming, one rule category at a time. Where no structured check exists yet, the honest answer is <strong>UNCLEAR</strong>, never a confident guess.</p>
+
+    <h2>Why we're publishing this instead of quietly fixing it</h2>
+    <p>A tool whose entire purpose is "don't just trust the summary, show the evidence" doesn't get to ask for trust it isn't willing to extend to itself. We found these by actually using the tool on real work, the same way we're asking you to. If we'd hidden this, the next person to hit it would have had to find it themselves, with no idea whether it was a one-off or the whole thing being unreliable. Now you know exactly what was wrong, exactly how it was found, and exactly what changed.</p>
+
+    <p><a href="/">&larr; Back to RuleReceipt</a> · <a href="https://github.com/rulereceipt/rulereceipt" target="_blank" rel="noopener">See the actual fixes on GitHub</a></p>
+  </div>
+</body>
+</html>
