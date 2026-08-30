@@ -7,6 +7,10 @@ function toolUse(toolName: string, input: unknown): TranscriptEvent {
   return { role: "assistant", kind: "tool_use", toolName, input, timestamp: "2026-08-16T00:00:00Z" };
 }
 
+function toolResult(content: string): TranscriptEvent {
+  return { role: "user", kind: "tool_result", content, isError: false, timestamp: "2026-08-16T00:00:00Z" };
+}
+
 const rule: DeterministicClassification = {
   kind: "deterministic",
   rule: { id: "5", title: "No force push", text: "Never run `git push --force`.", source: "project" },
@@ -105,6 +109,45 @@ describe("runDeterministicChecks", () => {
 
     it("reports UNCLEAR on a completely empty session too (can't tell if it applied)", () => {
       const [result] = runDeterministicChecks([requireRule], []);
+      expect(result.status).toBe("UNCLEAR");
+    });
+  });
+
+  describe("tool_result content is never scanned (real false-positive found 2026-08-30)", () => {
+    const noPrintRule: DeterministicClassification = {
+      kind: "deterministic",
+      rule: { id: "20", title: "No debug print statements", text: "Never leave a `print(` statement in committed code.", source: "project" },
+      patterns: ["print("],
+      polarity: "forbid",
+    };
+
+    it("does NOT fail when the pattern only appears in a tool_result (e.g. reading a file's contents), never in the agent's own command or writes", () => {
+      // deliberately an innocuous command whose OWN input text doesn't
+      // contain "print(" at all — only the simulated file content
+      // returned in the tool_result does, which is the real scenario
+      // being tested
+      const events = [toolUse("Read", { file_path: "src/legacy.py" }), toolResult("def f():\n    print('debug value:', x)\n")];
+      const [result] = runDeterministicChecks([noPrintRule], events);
+      expect(result.status).toBe("PASS");
+    });
+
+    it("still correctly FAILs when the pattern appears in what the agent actually wrote (tool_use input)", () => {
+      const events = [toolUse("Write", { file_path: "src/new.py", content: "print('debug')" })];
+      const [result] = runDeterministicChecks([noPrintRule], events);
+      expect(result.status).toBe("FAIL");
+    });
+
+    it("does NOT fail a require-polarity rule just because the required text appeared in read-only tool_result content", () => {
+      const closesRule: DeterministicClassification = {
+        kind: "deterministic",
+        rule: { id: "21", title: "PR must close an issue", text: "Always include `Closes #N` in the PR description.", source: "project" },
+        patterns: ["Closes #N"],
+        polarity: "require",
+      };
+      // the agent merely READ a template file containing this text, never
+      // wrote it into an actual PR body
+      const events = [toolResult("PR_TEMPLATE.md contents: ## Description\nCloses #N\n")];
+      const [result] = runDeterministicChecks([closesRule], events);
       expect(result.status).toBe("UNCLEAR");
     });
   });

@@ -3,6 +3,13 @@ import type { IfEditThenTestClassification } from "./classify.js";
 
 const TEST_FILE_PATTERN = /(\.test\.|\.spec\.|__tests__\/|_test\.|\/tests?\/)/i;
 
+// Real false-positive found 2026-08-30 on an actual session: editing a
+// markdown documentation file flagged "no test file touched" four
+// separate times — but a doc/config file was never going to have a test
+// companion under any reasonable reading of an "add tests for every
+// change" rule. Excluded from prodPaths entirely, same as test files.
+const NON_TESTABLE_FILE_PATTERN = /\.(md|mdx|txt|rst|json|ya?ml|toml|lock|csv|log)$/i;
+
 const WRITE_LIKE_TOOLS = new Set(["Write", "Edit", "NotebookEdit"]);
 
 function extractEditedPaths(events: TranscriptEvent[]): string[] {
@@ -42,7 +49,7 @@ export function runIfEditThenTestChecks(
 ): CheckResult[] {
   const editedPaths = extractEditedPaths(events);
   const testPaths = editedPaths.filter((p) => TEST_FILE_PATTERN.test(p));
-  const prodPaths = editedPaths.filter((p) => !TEST_FILE_PATTERN.test(p));
+  const prodPaths = editedPaths.filter((p) => !TEST_FILE_PATTERN.test(p) && !NON_TESTABLE_FILE_PATTERN.test(p));
 
   return classifications.map(({ rule }) => {
     if (prodPaths.length === 0) {
@@ -54,7 +61,7 @@ export function runIfEditThenTestChecks(
         evidence:
           editedPaths.length === 0
             ? "no Write/Edit/NotebookEdit tool calls with a file_path in this session — can't tell if the rule applied"
-            : "no non-test file was edited this session — the rule never had a chance to apply",
+            : "no code file was edited this session (only test/doc/config files, if any) — the rule never had a chance to apply",
       };
     }
 

@@ -1,6 +1,17 @@
 import type { TranscriptEvent, CheckResult } from "../types.js";
 import type { DeterministicClassification } from "./classify.js";
 
+/**
+ * Real false-positive found 2026-08-30 on an actual complex session: a
+ * "no debug print() statements" rule failed because the agent ran a grep
+ * for "print(" and the SEARCH RESULT (tool_result) contained the string —
+ * no print statement was ever written. Same pattern hit a rule expecting
+ * `Closes #N` in a PR body: it appeared in a file the agent merely read.
+ * Deliberately excluding tool_result here: a deterministic check answers
+ * "did the agent DO or SAY the thing," not "did anything the agent's
+ * environment ever printed contain this string" — the second question
+ * produces confident, wrong verdicts on content the agent never wrote.
+ */
 function eventSearchText(event: TranscriptEvent): string {
   if (event.kind === "tool_use") {
     return `${event.toolName} ${JSON.stringify(event.input)}`;
@@ -8,7 +19,7 @@ function eventSearchText(event: TranscriptEvent): string {
   if (event.kind === "text") {
     return event.text;
   }
-  return event.content;
+  return "";
 }
 
 function escapeRegex(literal: string): string {

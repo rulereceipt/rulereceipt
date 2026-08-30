@@ -60,4 +60,32 @@ describe("runIfEditThenTestChecks", () => {
     // a Read is not an edit, so this should behave like no edits happened
     expect(result.status).toBe("UNCLEAR");
   });
+
+  describe("non-testable files (docs/config) never count as needing a test (real false-positive found 2026-08-30)", () => {
+    it("does NOT fail when only a markdown documentation file was edited", () => {
+      const events = [edit("README.md")];
+      const [result] = runIfEditThenTestChecks([rule], events);
+      expect(result.status).toBe("UNCLEAR");
+    });
+
+    it("does NOT fail when only JSON/YAML config files were edited", () => {
+      const events = [edit("package.json"), edit("config.yaml")];
+      const [result] = runIfEditThenTestChecks([rule], events);
+      expect(result.status).toBe("UNCLEAR");
+    });
+
+    it("still correctly FAILs on a real code file even when a doc file was ALSO edited without a test", () => {
+      const events = [edit("src/foo.ts"), edit("README.md")];
+      const [result] = runIfEditThenTestChecks([rule], events);
+      expect(result.status).toBe("FAIL");
+      expect(result.evidence).toContain("src/foo.ts");
+      expect(result.evidence).not.toContain("README.md");
+    });
+
+    it("still correctly PASSes when a real code file has a matching test, regardless of docs also being edited", () => {
+      const events = [edit("src/foo.ts"), edit("src/foo.test.ts"), edit("README.md")];
+      const [result] = runIfEditThenTestChecks([rule], events);
+      expect(result.status).toBe("PASS");
+    });
+  });
 });
