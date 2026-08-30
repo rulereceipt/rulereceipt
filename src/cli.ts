@@ -21,7 +21,7 @@ import { generateDigest } from "./digest.js";
 import { enableSchedule, disableSchedule, scheduleStatus, type Cadence } from "./schedule.js";
 import { findSplitBrainConflicts } from "./checks/splitBrain.js";
 import { runDoctor } from "./checks/doctor.js";
-import { sendTelemetryPing, isTelemetryDisabled } from "./telemetry.js";
+import { sendTelemetryPing, isTelemetryEnabled } from "./telemetry.js";
 import type { Rule, CheckResult } from "./types.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -106,7 +106,7 @@ async function runCheck(
   email: boolean,
   emailAlways: boolean,
   llm: boolean,
-  noTelemetry: boolean
+  telemetry: boolean
 ) {
   const cwd = process.cwd();
   const rules = loadRules(cwd);
@@ -171,7 +171,7 @@ async function runCheck(
     }
   }
 
-  if (!isTelemetryDisabled(noTelemetry)) {
+  if (isTelemetryEnabled(telemetry)) {
     await sendTelemetryPing();
   }
 }
@@ -206,8 +206,8 @@ program
     "opt-in: grade rules that need judgment (not just pattern matching) using your own Anthropic key. Without this flag, those rules report UNCLEAR and nothing is sent anywhere — deterministic checks always run with no key regardless."
   )
   .option(
-    "--no-telemetry",
-    "opt-out for this run only: skip sending the anonymous install-count ping (a random per-machine ID, never rule text or results). Also respected: DO_NOT_TRACK=1 or RULERECEIPT_NO_TELEMETRY=1 as a permanent opt-out."
+    "--telemetry",
+    "opt-in: send an anonymous install-count ping (a random per-machine ID, never rule text or results) so real distinct-install counts are knowable. Off by default. DO_NOT_TRACK=1 or RULERECEIPT_NO_TELEMETRY=1 overrides this flag back off."
   )
   .action((opts) => {
     runCheck(
@@ -216,7 +216,7 @@ program
       Boolean(opts.email),
       Boolean(opts.emailAlways),
       Boolean(opts.llm),
-      opts.telemetry === false
+      Boolean(opts.telemetry)
     ).catch((err) => {
       console.error("Something went wrong:", err instanceof Error ? err.message : err);
       process.exitCode = 1;

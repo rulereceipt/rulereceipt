@@ -39,15 +39,20 @@ function getOrCreateTelemetryId(): string {
 }
 
 /**
- * Respects the cross-tool DO_NOT_TRACK convention (Next.js, Vite, etc. all
- * honor this) in addition to a project-specific env var and a per-run CLI
- * flag — three independent ways to opt out, deliberately more than one.
+ * Opt-in only, same convention as --share: off unless this run explicitly
+ * asks for it. Real gap found after shipping this default-on for a few
+ * hours (2026-08-30): a per-run ping is exactly the kind of unannounced
+ * network call this tool's own `doctor` command exists to flag in OTHER
+ * projects' configs, and the audience for a Claude Code auditing tool is
+ * unusually likely to actually check with mitmproxy/strace. Reversed
+ * before any real install base existed — DO_NOT_TRACK/RULERECEIPT_NO_TELEMETRY
+ * still work as a hard override even if --telemetry is passed, so opting in
+ * once can still be overridden per-environment (e.g. a shared CI runner).
  */
-export function isTelemetryDisabled(noTelemetryFlag: boolean): boolean {
-  if (noTelemetryFlag) return true;
-  if (process.env.DO_NOT_TRACK === "1" || process.env.DO_NOT_TRACK === "true") return true;
-  if (process.env.RULERECEIPT_NO_TELEMETRY === "1" || process.env.RULERECEIPT_NO_TELEMETRY === "true") return true;
-  return false;
+export function isTelemetryEnabled(telemetryFlag: boolean): boolean {
+  if (process.env.DO_NOT_TRACK === "1" || process.env.DO_NOT_TRACK === "true") return false;
+  if (process.env.RULERECEIPT_NO_TELEMETRY === "1" || process.env.RULERECEIPT_NO_TELEMETRY === "true") return false;
+  return telemetryFlag;
 }
 
 /**

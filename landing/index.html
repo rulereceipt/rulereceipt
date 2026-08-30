@@ -504,6 +504,7 @@
         <span class="prompt">$</span>
         <span class="cmd">npx rulereceipt check</span>
       </div>
+      <p style="margin-top:14px; font-size:0.85rem;"><a href="https://github.com/rulereceipt/rulereceipt" target="_blank" rel="noopener">Read the source on GitHub</a> before you run it — reasonable, given what this tool is for.</p>
     </div>
 
     <div class="trace-stage">
@@ -609,7 +610,7 @@
       <h2>What we don't do</h2>
       <p class="band-sub">The privacy story, stated plainly, not buried in a policy page.</p>
       <div class="trust-grid">
-        <div class="trust-cell"><h3><span class="mark">—</span> Almost nothing leaves your machine</h3><p>Checks run locally, always. Only a random install ID goes out by default — never your rules, files, or results. <code>--llm</code> and <code>--share</code> are separate opt-ins. Full detail in <a href="/privacy">Privacy</a>.</p></div>
+        <div class="trust-cell"><h3><span class="mark">—</span> Nothing leaves your machine</h3><p>Checks run locally, always — zero network calls by default. <code>--llm</code>, <code>--share</code>, and an anonymous install count (<code>--telemetry</code>) are all separate, off-by-default opt-ins. Full detail in <a href="/privacy">Privacy</a>.</p></div>
         <div class="trust-cell"><h3><span class="mark">—</span> We don't see your data</h3><p>No server of ours sits in the path of your actual checks — no account, no login, nothing of ours to breach. What you check stays yours, always.</p></div>
         <div class="trust-cell"><h3><span class="mark">—</span> We never touch settings.json</h3><p>Read-only, always. RuleReceipt only reads CLAUDE.md and your session transcript — it never writes to settings.json, never installs a hook, never changes anything without you asking.</p></div>
       </div>
@@ -718,7 +719,7 @@
       <div class="cmd-repeat" id="copy-footer" data-copy="npx rulereceipt check" data-loc="footer" role="button" tabindex="0" title="Click to copy">npx rulereceipt check</div>
       <div class="fine">Your machine. Your rules. Your receipt.</div>
       <div class="fine" style="margin-top:14px">
-        <a href="/about">About</a> · <a href="/rulereceipt-onepager.pdf">One-pager (PDF)</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a> · <a href="/unsubscribe">Unsubscribe</a> · source-available
+        <a href="/about">About</a> · <a href="https://github.com/rulereceipt/rulereceipt" target="_blank" rel="noopener">Source on GitHub</a> · <a href="/rulereceipt-onepager.pdf">One-pager (PDF)</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a> · <a href="/unsubscribe">Unsubscribe</a>
       </div>
       <div class="fine" style="margin-top:10px">
         <a href="mailto:hello@rulereceipt.dev">hello@rulereceipt.dev</a>

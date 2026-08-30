@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { isTelemetryDisabled } from "../src/telemetry.js";
+import { isTelemetryEnabled } from "../src/telemetry.js";
 
 // getOrCreateTelemetryId/sendTelemetryPing touch the real filesystem
 // (~/.rulereceipt/telemetry-id) and the real network — same reasoning as
 // emailConfig.ts's save/load functions, which are excluded from unit tests
-// for the same reason. isTelemetryDisabled is the pure, meaningfully
+// for the same reason. isTelemetryEnabled is the pure, meaningfully
 // testable logic, and it's also the part that determines whether a real
 // user's data ever gets sent at all — the highest-stakes part to get right.
 
@@ -25,39 +25,43 @@ afterEach(() => {
   }
 });
 
-describe("isTelemetryDisabled", () => {
-  it("is NOT disabled by default (no flag, no env vars)", () => {
-    expect(isTelemetryDisabled(false)).toBe(false);
+describe("isTelemetryEnabled", () => {
+  // real reversal, 2026-08-30: telemetry shipped default-on for a few hours,
+  // then was reverted to opt-in before any real install base existed — see
+  // src/telemetry.ts for why. This is now the load-bearing test: telemetry
+  // must NEVER fire without an explicit --telemetry flag.
+  it("is OFF by default (no flag, no env vars) — opt-in, not opt-out", () => {
+    expect(isTelemetryEnabled(false)).toBe(false);
   });
 
-  it("is disabled when the --no-telemetry flag is passed", () => {
-    expect(isTelemetryDisabled(true)).toBe(true);
+  it("is ON when the --telemetry flag is explicitly passed", () => {
+    expect(isTelemetryEnabled(true)).toBe(true);
   });
 
-  it("respects the cross-tool DO_NOT_TRACK=1 convention", () => {
+  it("DO_NOT_TRACK=1 overrides an explicit --telemetry flag back off", () => {
     process.env.DO_NOT_TRACK = "1";
-    expect(isTelemetryDisabled(false)).toBe(true);
+    expect(isTelemetryEnabled(true)).toBe(false);
   });
 
-  it("respects DO_NOT_TRACK=true", () => {
+  it("DO_NOT_TRACK=true overrides an explicit --telemetry flag back off", () => {
     process.env.DO_NOT_TRACK = "true";
-    expect(isTelemetryDisabled(false)).toBe(true);
+    expect(isTelemetryEnabled(true)).toBe(false);
   });
 
-  it("respects the project-specific RULERECEIPT_NO_TELEMETRY=1", () => {
+  it("RULERECEIPT_NO_TELEMETRY=1 overrides an explicit --telemetry flag back off", () => {
     process.env.RULERECEIPT_NO_TELEMETRY = "1";
-    expect(isTelemetryDisabled(false)).toBe(true);
+    expect(isTelemetryEnabled(true)).toBe(false);
   });
 
   // proves this can actually fail: an unrelated or malformed env value
-  // must NOT be treated as an opt-out
-  it("does NOT disable telemetry for an unrelated DO_NOT_TRACK value", () => {
+  // must NOT be treated as an override
+  it("does NOT override the flag for an unrelated DO_NOT_TRACK value", () => {
     process.env.DO_NOT_TRACK = "0";
-    expect(isTelemetryDisabled(false)).toBe(false);
+    expect(isTelemetryEnabled(true)).toBe(true);
   });
 
-  it("does NOT disable telemetry for a random RULERECEIPT_NO_TELEMETRY value", () => {
+  it("does NOT override the flag for a random RULERECEIPT_NO_TELEMETRY value", () => {
     process.env.RULERECEIPT_NO_TELEMETRY = "nah";
-    expect(isTelemetryDisabled(false)).toBe(false);
+    expect(isTelemetryEnabled(true)).toBe(true);
   });
 });

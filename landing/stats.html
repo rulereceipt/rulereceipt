@@ -145,7 +145,7 @@
       </div>
     </div>
     <div class="note" id="note-installs" style="display:none; margin-bottom:28px;">
-      "Distinct installs" is a random, non-identifying ID generated once per machine and sent on every <code>rulereceipt check</code> run — never rule text, file paths, or results. It's the real count of separate installs used, not just events. Turn it off with <code>--no-telemetry</code> or <code>DO_NOT_TRACK=1</code>. See <a href="/privacy">Privacy</a>.<br><br>
+      "Distinct installs" counts a random, non-identifying ID sent only when someone opts in with <code>rulereceipt check --telemetry</code> — never rule text, file paths, or results, and off by default. See <a href="/privacy">Privacy</a>.<br><br>
       "npm downloads" is the raw number npm reports — it counts CI pipelines and automated security scanners too, not just people. Shown for transparency, not as a user count.
     </div>
 

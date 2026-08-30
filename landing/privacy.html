@@ -47,12 +47,12 @@
     <p>RuleReceipt is a command-line tool that runs on your own computer. This page explains, plainly, what that means for your data.</p>
 
     <h2>What RuleReceipt does with your data</h2>
-    <p>RuleReceipt reads your CLAUDE.md/AGENTS.md file and your local Claude Code session transcript on your machine, and prints a report to your terminal. None of that content — no rule text, no file paths, no session content — is ever sent to us, stored by us, or seen by us.</p>
+    <p>Nothing, by default. RuleReceipt reads your CLAUDE.md/AGENTS.md file and your local Claude Code session transcript on your machine, and prints a report to your terminal. None of that content — no rule text, no file paths, no session content — is ever sent to us, stored by us, or seen by us. Plain <code>rulereceipt check</code> makes zero network calls.</p>
 
-    <h2>Network calls RuleReceipt makes</h2>
-    <p><strong>Anonymous install count (on by default):</strong> each time you run <code>rulereceipt check</code>, it sends one random ID — generated once per machine, stored locally, never tied to your name or email — so we can count how many distinct installs are actually being used, not just guess. That's the entire payload: one ID, nothing else. Turn it off anytime with <code>rulereceipt check --no-telemetry</code> for a single run, or permanently with <code>DO_NOT_TRACK=1</code> or <code>RULERECEIPT_NO_TELEMETRY=1</code> in your environment.</p>
+    <h2>Network calls RuleReceipt makes (all opt-in)</h2>
+    <p><strong>Anonymous install count:</strong> pass <code>rulereceipt check --telemetry</code> and it sends one random ID — generated once per machine, stored locally, never tied to your name or email — so we can count real distinct installs instead of guessing. That's the entire payload: one ID, nothing else. Off by default; even with the flag, <code>DO_NOT_TRACK=1</code> or <code>RULERECEIPT_NO_TELEMETRY=1</code> in your environment forces it back off. A raw HTTP request inherently exposes your IP and the request time to whatever server receives it (ours or anyone's) — we don't store or use that, but we're not going to pretend it isn't technically visible either.</p>
     <p>For rules that need judgment rather than a simple pattern match, RuleReceipt calls the Claude API using your own Anthropic API key, only when you pass <code>--llm</code> — the same way Claude Code itself already does. That call goes directly from your machine to Anthropic. We don't proxy it, log it, or see it.</p>
-    <p>Running <code>rulereceipt check --share</code> is opt-in and off by default. If you use it, it additionally sends aggregate pass/fail/unclear counts — never rule text, file paths, or session content.</p>
+    <p>Running <code>rulereceipt check --share</code> is opt-in and off by default. If you use it, it sends aggregate pass/fail/unclear counts — never rule text, file paths, or session content.</p>
 
     <h2>This website</h2>
     <p>This landing page uses PostHog, a privacy-conscious analytics tool, to see basic visit counts and which pages get read — general browser and location info, no cross-site tracking, no ad networks, and we don't sell or share this data with anyone.</p>

@@ -7,16 +7,14 @@ Licensed source-available software — see [LICENSE](./LICENSE) and
 [NOTICE.md](./NOTICE.md) before reusing this code.
 
 Runs entirely on your machine. Your code, rules, and session content never
-leave your computer, ever. `--llm` is opt-in and calls the Claude API
-using your own Anthropic key, same as normal Claude Code usage.
-
-By default, `rulereceipt check` sends one thing: a random ID generated
-once per machine, so we can count distinct installs instead of guessing —
-never rule text, file paths, results, or anything else. Turn it off with
-`--no-telemetry` (one run) or `DO_NOT_TRACK=1` / `RULERECEIPT_NO_TELEMETRY=1`
-(permanently). `rulereceipt check --share` is a separate opt-in that adds
-aggregate pass/fail/unclear counts — still never rule text or session
-content.
+leave your computer, ever. Plain `rulereceipt check` makes zero network
+calls. `--llm`, `--share`, and `--telemetry` are all separate, off-by-default
+opt-ins: `--llm` calls the Claude API using your own Anthropic key for rules
+that need judgment; `--share` sends aggregate pass/fail/unclear counts;
+`--telemetry` sends one random per-machine ID so real distinct-install
+counts are knowable, nothing else. None of them fire unless you explicitly
+pass the flag, and `DO_NOT_TRACK=1` / `RULERECEIPT_NO_TELEMETRY=1` forces
+telemetry off even if you do.
 
 **Security note:** RuleReceipt never modifies `.claude/settings.json` and
 installs no hooks without explicit action. It only ever reads your
