@@ -21,6 +21,7 @@ import { generateDigest } from "./digest.js";
 import { enableSchedule, disableSchedule, scheduleStatus, type Cadence } from "./schedule.js";
 import { findSplitBrainConflicts } from "./checks/splitBrain.js";
 import { runDoctor } from "./checks/doctor.js";
+import { sendTelemetryPing, isTelemetryDisabled } from "./telemetry.js";
 import type { Rule, CheckResult } from "./types.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -99,7 +100,14 @@ function needsLlmResult(rule: Rule): CheckResult {
   };
 }
 
-async function runCheck(markdown: boolean, share: boolean, email: boolean, emailAlways: boolean, llm: boolean) {
+async function runCheck(
+  markdown: boolean,
+  share: boolean,
+  email: boolean,
+  emailAlways: boolean,
+  llm: boolean,
+  noTelemetry: boolean
+) {
   const cwd = process.cwd();
   const rules = loadRules(cwd);
 
@@ -130,14 +138,16 @@ async function runCheck(markdown: boolean, share: boolean, email: boolean, email
     ...runDeterministicChecks(deterministic, events),
     ...runIfEditThenTestChecks(ifEditThenTest, events),
   ];
-  // Deterministic checks run by default, always, with no key — that's the
-  // actual "nothing leaves your machine" promise. Judgment rules only call
-  // out to an LLM with an explicit --llm on THIS run, never just because a
-  // key happens to be sitting in the environment (a Claude Code user very
-  // commonly has ANTHROPIC_API_KEY set for unrelated reasons — silently
-  // using it here would be sending transcript excerpts to a vendor without
-  // the user having asked THIS tool to do that, which is exactly the gap
-  // both independent reviews caught in the same session this was found).
+  // Deterministic checks run by default, always, with no key — judgment
+  // rules only call out to an LLM with an explicit --llm on THIS run, never
+  // just because a key happens to be sitting in the environment (a Claude
+  // Code user very commonly has ANTHROPIC_API_KEY set for unrelated
+  // reasons — silently using it here would be sending transcript excerpts
+  // to a vendor without the user having asked THIS tool to do that, which
+  // is exactly the gap both independent reviews caught in the same session
+  // this was found). This is separate from the telemetry ping below: that
+  // sends only a random install ID, never rule text or transcript content,
+  // regardless of --llm.
   const judgmentResults = llm ? await runJudgmentChecks(judgment, events) : judgment.map(({ rule }) => needsLlmResult(rule));
   const results = [...deterministicResults, ...judgmentResults];
 
@@ -159,6 +169,10 @@ async function runCheck(markdown: boolean, share: boolean, email: boolean, email
         "\n(--email: nothing failed, so nothing was sent — a manager doesn't need an email for every clean run. Use --email-always to send regardless.)"
       );
     }
+  }
+
+  if (!isTelemetryDisabled(noTelemetry)) {
+    await sendTelemetryPing();
   }
 }
 
@@ -191,8 +205,19 @@ program
     "--llm",
     "opt-in: grade rules that need judgment (not just pattern matching) using your own Anthropic key. Without this flag, those rules report UNCLEAR and nothing is sent anywhere — deterministic checks always run with no key regardless."
   )
+  .option(
+    "--no-telemetry",
+    "opt-out for this run only: skip sending the anonymous install-count ping (a random per-machine ID, never rule text or results). Also respected: DO_NOT_TRACK=1 or RULERECEIPT_NO_TELEMETRY=1 as a permanent opt-out."
+  )
   .action((opts) => {
-    runCheck(Boolean(opts.markdown), Boolean(opts.share), Boolean(opts.email), Boolean(opts.emailAlways), Boolean(opts.llm)).catch((err) => {
+    runCheck(
+      Boolean(opts.markdown),
+      Boolean(opts.share),
+      Boolean(opts.email),
+      Boolean(opts.emailAlways),
+      Boolean(opts.llm),
+      opts.telemetry === false
+    ).catch((err) => {
       console.error("Something went wrong:", err instanceof Error ? err.message : err);
       process.exitCode = 1;
     });

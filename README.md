@@ -6,13 +6,17 @@ CLAUDE.md / AGENTS.md — with evidence, not just a vibe.
 Licensed source-available software — see [LICENSE](./LICENSE) and
 [NOTICE.md](./NOTICE.md) before reusing this code.
 
-Runs entirely on your machine by default. Your code and session content
-never leave your computer — the only network call by default is your own
-Claude API key talking to Anthropic, the same as normal Claude Code usage.
-`rulereceipt check --share` is opt-in only and, if you use it, sends
-nothing but aggregate pass/fail/unclear counts — never rule text, file
-paths, or session content. Without `--share`, no usage data is ever sent
-anywhere.
+Runs entirely on your machine. Your code, rules, and session content never
+leave your computer, ever. `--llm` is opt-in and calls the Claude API
+using your own Anthropic key, same as normal Claude Code usage.
+
+By default, `rulereceipt check` sends one thing: a random ID generated
+once per machine, so we can count distinct installs instead of guessing —
+never rule text, file paths, results, or anything else. Turn it off with
+`--no-telemetry` (one run) or `DO_NOT_TRACK=1` / `RULERECEIPT_NO_TELEMETRY=1`
+(permanently). `rulereceipt check --share` is a separate opt-in that adds
+aggregate pass/fail/unclear counts — still never rule text or session
+content.
 
 **Security note:** RuleReceipt never modifies `.claude/settings.json` and
 installs no hooks without explicit action. It only ever reads your

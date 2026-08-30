@@ -531,7 +531,7 @@
           </div>
           <div class="r-evidence">evidence: no error occurred this session, nothing to verify against</div>
         </div>
-        <div class="r-foot"><span>8 pass · 2 fail · 1 unclear</span><span>no data sent</span></div>
+        <div class="r-foot"><span>8 pass · 2 fail · 1 unclear</span><span>no rule text or results sent</span></div>
       </div>
     </div>
   </div>
@@ -602,8 +602,8 @@
       <h2>What we don't do</h2>
       <p class="band-sub">The privacy story, stated plainly, not buried in a policy page.</p>
       <div class="trust-grid">
-        <div class="trust-cell"><h3><span class="mark">—</span> Nothing leaves your machine</h3><p>Runs locally, always. The only server call is your own Claude key talking to Anthropic — nothing else. (<code>--share</code> is opt-in, and even then, just counts.)</p></div>
-        <div class="trust-cell"><h3><span class="mark">—</span> We don't see your data</h3><p>No server of ours sits in the path. What you check stays yours.</p></div>
+        <div class="trust-cell"><h3><span class="mark">—</span> Your rules and results never leave your machine</h3><p>Checks run locally, always. Your own Claude key talking to Anthropic (only with <code>--llm</code>) is the only call involving your actual content. A random per-machine ID for a distinct-install count goes out by default — see <a href="/privacy.html">Privacy</a> — but never your rules, files, or results. (<code>--share</code> adds opt-in pass/fail counts; both can be turned off.)</p></div>
+        <div class="trust-cell"><h3><span class="mark">—</span> We don't see your data</h3><p>No server of ours sits in the path of your actual checks. What you check stays yours.</p></div>
         <div class="trust-cell"><h3><span class="mark">—</span> We never touch settings.json</h3><p>Read-only, always. CLAUDE.md and your transcript — nothing modified, no hooks, without you asking.</p></div>
       </div>
       <div style="height:20px"></div>
