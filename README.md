@@ -23,29 +23,38 @@ only (`rulereceipt check`). No automatic hooks, ever, in v1.
 
 ## Status
 
-Published and live on npm. Core CLI is built and tested (100 tests
-passing).
+Published and live on npm, actively developed.
 
 ## How it works
 
 1. Reads your CLAUDE.md / AGENTS.md and extracts individual rules —
-   from the current project directory and `~/.claude/CLAUDE.md`.
-2. Reads your most recent Claude Code session transcript (stored locally
-   at `~/.claude/projects/...`).
-3. Splits rules into two kinds:
-   - **Deterministic** — checkable by plain pattern matching (a rule
-     naming a specific literal in backticks, e.g. "never use
-     `git push --force`"). No AI call, no cost, no data exposure.
-   - **Judgment** — needs actual understanding (e.g. "surface bad news
-     first"). Checked via one batched API call using *your own* Claude
-     API key. If no key is set, these rules report UNCLEAR with an
-     explanation — never a silent guess at PASS.
+   from the current project directory and your global rules file.
+2. Reads your most recent Claude Code session transcript, wherever Claude
+   Code stored it — including hosted or enterprise variants that use a
+   different directory.
+3. Routes each rule to the narrowest check that can actually answer it:
+   - **Structured checks** read what the session really did — an actual
+     git command's branch argument, actual file edits, actual file
+     operations. These are the only checks that report a confident FAIL,
+     because they can tell an action from a mention.
+   - **Literal checks** look for a specific string named in the rule.
+     Absence is real evidence, so a clean session PASSes. A match reports
+     UNCLEAR with the text quoted, because a text match alone cannot
+     distinguish doing the forbidden thing from grepping for it, quoting
+     it, or naming it in a commit message.
+   - **Judgment** rules need real understanding (e.g. "surface bad news
+     first"). With `--llm` each is graded individually using *your own*
+     Claude key; without it they report UNCLEAR rather than guessing.
+   - Lines containing no instruction at all — directory listings,
+     reference tables, examples — aren't rules, and are reported as such
+     instead of being checked.
 4. Prints a report — terminal table by default, or `--markdown` for
    pasting into a PR or Slack message — showing what passed, what
    failed, and a quoted line of evidence for each. Every report includes
    a SHA-256 hash of the session file it checked, so anyone with that
-   file can independently confirm the report matches a real, unaltered
-   session.
+   file can confirm the report describes that exact file. (It proves the
+   report matches the file, not that the file is an unmodified record —
+   see SECURITY.md.)
 
 ## Try it with zero setup
 
@@ -61,7 +70,14 @@ report so you can see the output shape immediately.
 ```bash
 rulereceipt check              # check the latest session in this project
 rulereceipt check --markdown   # same, formatted for pasting into a PR/Slack
-rulereceipt check --share      # opt-in: also send anonymous pass/fail/unclear counts
+rulereceipt check --llm        # opt-in: grade judgment rules with your own Claude key
+rulereceipt check --share      # opt-in: send anonymous pass/fail/unclear counts
+rulereceipt check --telemetry  # opt-in: send one random per-machine ID
+rulereceipt check --transcript <path>      # check a specific session file
+rulereceipt doctor             # list hooks/auto-run tasks configured on this machine
+rulereceipt lint               # find contradictions between CLAUDE.md and AGENTS.md
+rulereceipt digest             # summarise recent checks; --email to send it
+rulereceipt config             # set up email sending (stays on your machine)
 rulereceipt demo               # sample output, no setup needed
 rulereceipt demo --markdown
 rulereceipt --version          # print the installed version

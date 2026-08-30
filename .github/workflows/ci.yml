@@ -21,13 +21,20 @@ jobs:
           cache: npm
 
       - run: npm ci
+      - run: npm run lint
       - run: npm run typecheck
       - run: npm run build
       - run: npm test
 
-      # dependency vulnerability floor -- catches known CVEs, not zero-day
-      # supply-chain malware, but it's the cheap layer worth having in CI
-      - run: npm audit --audit-level=high
+      # Blocking gate on what actually ships. Dev-only advisories (a test
+      # runner, a types package) cannot affect a published CLI or a
+      # deployed function, so gating on them means a permanently red CI
+      # that everyone learns to ignore -- which is worse than no gate.
+      - run: npm audit --omit=dev --audit-level=high
+
+      # Dev advisories stay visible, without blocking. Reviewed, not ignored.
+      - name: Dev dependency advisories (informational)
+        run: npm audit --audit-level=high || true
 
   test-landing:
     runs-on: ubuntu-latest
@@ -45,4 +52,6 @@ jobs:
 
       - run: npm ci
       - run: npm test
-      - run: npm audit --audit-level=high
+      - run: npm audit --omit=dev --audit-level=high
+      - name: Dev dependency advisories (informational)
+        run: npm audit --audit-level=high || true

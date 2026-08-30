@@ -1,11 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
-import { tmpdir, homedir } from "node:os";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runDoctor } from "../src/checks/doctor.js";
 
 let testCwd: string;
-const realHome = homedir();
 
 beforeEach(() => {
   testCwd = mkdtempSync(join(tmpdir(), "rulereceipt-doctor-test-"));

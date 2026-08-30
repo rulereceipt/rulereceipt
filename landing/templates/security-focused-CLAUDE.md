@@ -5,10 +5,10 @@ one). It's written to map to what vendor security questionnaires and
 DPAs commonly ask about — so `rulereceipt check` gives you real,
 evidence-backed answers to those questions instead of "we think so."
 
-Rules with a backtick-quoted literal get checked instantly by pattern
-match, no API call. Everything else gets checked by Claude judging the
-actual session against the rule — still evidence-based, just needs an
-ANTHROPIC_API_KEY set.
+Rules naming something concrete — a command, a file, a branch — are
+checked locally with no API call. Rules needing real judgment are graded
+against the actual session with `--llm`, using your own Anthropic key.
+Either way you get the evidence, not a verdict to take on faith.
 
 ## 1. No secrets in source code
 Never commit an API key, password, private key, or token directly in
