@@ -44,19 +44,23 @@ describe("runGitBranchPolicyChecks", () => {
     expect(result.status).toBe("PASS");
   });
 
-  it("correctly FAILs when git checkout actually targets the named branch", () => {
+  // A bare checkout with no commit is routine (syncing before branching
+  // off) and correctly does NOT fail on its own — see the
+  // "checkout-vs-commit sequencing" describe block below for the real
+  // violation case (a commit while sitting on the protected branch).
+  it("does NOT fail on a bare git checkout of the named branch with no commit following it", () => {
     const events = [bash("git checkout demo")];
     const [result] = runGitBranchPolicyChecks([forbidDemoRule], events);
-    expect(result.status).toBe("FAIL");
+    expect(result.status).toBe("PASS");
   });
 
-  it("correctly FAILs when git switch actually targets the named branch", () => {
+  it("does NOT fail on a bare git switch to the named branch with no commit following it", () => {
     const events = [bash("git switch demo")];
     const [result] = runGitBranchPolicyChecks([forbidDemoRule], events);
-    expect(result.status).toBe("FAIL");
+    expect(result.status).toBe("PASS");
   });
 
-  it("correctly FAILs when git checkout -b creates and switches to the named branch", () => {
+  it("correctly FAILs when git checkout -b CREATES a new branch with the exact forbidden name", () => {
     const events = [bash("git checkout -b demo")];
     const [result] = runGitBranchPolicyChecks([forbidDemoRule], events);
     expect(result.status).toBe("FAIL");
@@ -86,9 +90,46 @@ describe("runGitBranchPolicyChecks", () => {
   });
 
   it("includes the actual command in the evidence when it FAILs", () => {
-    const events = [bash("git checkout demo")];
+    const events = [bash("git push origin demo")];
     const [result] = runGitBranchPolicyChecks([forbidDemoRule], events);
-    expect(result.evidence).toContain("git checkout demo");
+    expect(result.evidence).toContain("git push origin demo");
+  });
+
+  // real bug found 2026-08-30, one publish after the first version of
+  // this file shipped: checking out the protected branch to sync/pull
+  // before branching off is normal, compliant workflow -- the actual
+  // violation is committing while sitting on that branch, not visiting it
+  describe("checkout-vs-commit sequencing (real bug found on the 2nd real-world test)", () => {
+    const forbidSprintRule: GitBranchPolicyClassification = {
+      kind: "gitBranchPolicy",
+      rule: { id: "40", title: "Never work on sprint", text: "Never commit directly to the `sprint` branch.", source: "project" },
+      branchName: "sprint",
+      polarity: "forbid",
+    };
+
+    it("does NOT fail when the protected branch is checked out only to sync/pull before branching off", () => {
+      const events = [bash("git checkout sprint && git pull origin sprint"), bash("git checkout -b feature/new-thing")];
+      const [result] = runGitBranchPolicyChecks([forbidSprintRule], events);
+      expect(result.status).toBe("PASS");
+    });
+
+    it("correctly FAILs when a commit actually happens while sitting on the protected branch", () => {
+      const events = [bash("git checkout sprint"), bash("git commit -am 'quick fix'")];
+      const [result] = runGitBranchPolicyChecks([forbidSprintRule], events);
+      expect(result.status).toBe("FAIL");
+    });
+
+    it("does NOT fail when a commit happens on a DIFFERENT branch checked out after leaving the protected one", () => {
+      const events = [bash("git checkout sprint"), bash("git checkout -b feature/x"), bash("git commit -am 'real work'")];
+      const [result] = runGitBranchPolicyChecks([forbidSprintRule], events);
+      expect(result.status).toBe("PASS");
+    });
+
+    it("still correctly FAILs on a direct push to the protected branch, with no checkout involved at all", () => {
+      const events = [bash("git push origin sprint")];
+      const [result] = runGitBranchPolicyChecks([forbidSprintRule], events);
+      expect(result.status).toBe("FAIL");
+    });
   });
 
   describe("require polarity", () => {

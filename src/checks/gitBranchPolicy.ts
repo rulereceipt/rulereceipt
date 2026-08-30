@@ -21,13 +21,23 @@ import type { GitBranchPolicyClassification } from "./classify.js";
  * which is the safe direction — this must never fabricate a FAIL from a
  * command that didn't actually target the named branch.
  */
-const GIT_CHECKOUT_OR_SWITCH = /\bgit\s+(?:checkout|switch)\s+(?:-[bcB]\s+)?(?:--\s+)?([^\s-][^\s]*)/;
+// Split from a single "checkout or switch" pattern: `checkout -b`/`switch
+// -c` CREATE a new branch with that exact name — nobody accidentally
+// creates a branch named exactly the protected name while trying to sync
+// something else, so this is an immediate hit, same as GIT_BRANCH_CREATE.
+// A bare `checkout`/`switch` (no -b/-c) only SWITCHES to an existing
+// branch, which is routine (syncing before branching off) and only
+// becomes a real violation if a commit follows it — see
+// findCheckoutCommitViolation.
+const GIT_CHECKOUT_CREATE = /\bgit\s+(?:checkout\s+-[bB]|switch\s+-c)\s+([^\s-][^\s]*)/;
+const GIT_CHECKOUT_SWITCH_ONLY = /\bgit\s+(?:checkout|switch)\s+(?:--\s+)?([^\s-][^\s]*)/;
 const GIT_BRANCH_CREATE = /\bgit\s+branch\s+(?:-[a-zA-Z]+\s+)?([^\s-][^\s]*)/;
 const GIT_PUSH = /\bgit\s+push\s+(?:\S+\s+)?(?:\+)?(?:[^\s:]+:)?([^\s:]+)\s*$/;
+const GIT_COMMIT = /\bgit\s+commit\b/;
 
 function extractGitBranchTargets(command: string): string[] {
   const targets: string[] = [];
-  for (const regex of [GIT_CHECKOUT_OR_SWITCH, GIT_BRANCH_CREATE, GIT_PUSH]) {
+  for (const regex of [GIT_CHECKOUT_CREATE, GIT_CHECKOUT_SWITCH_ONLY, GIT_BRANCH_CREATE, GIT_PUSH]) {
     const match = command.match(regex);
     if (match) targets.push(match[1]);
   }
@@ -40,21 +50,58 @@ function commandFromEvent(event: TranscriptEvent): string | null {
   return typeof input?.command === "string" ? input.command : null;
 }
 
+/**
+ * Real gap found 2026-08-30, one publish after the first version of this
+ * file shipped: the original version treated ANY checkout of the named
+ * branch as a violation — but "git checkout sprint && git pull origin
+ * sprint" (sync, then branch off) is normal, compliant workflow, not a
+ * violation of "never work on the sprint branch." The actual violation is
+ * COMMITTING while that branch is checked out, not merely visiting it.
+ * Simulates the current checked-out branch across the session in
+ * chronological order, and only counts a checkout-based hit when a real
+ * `git commit` happens while that branch is current. Push/branch-create
+ * targeting the named branch stay immediate hits regardless — pushing
+ * straight to a protected branch, or creating/renaming/deleting it, is
+ * the violation itself, not something that needs a following commit.
+ */
+function findCheckoutCommitViolation(commands: string[], branchName: string): string | null {
+  let currentBranch: string | null = null;
+  for (const command of commands) {
+    const checkoutMatch = command.match(GIT_CHECKOUT_CREATE) ?? command.match(GIT_CHECKOUT_SWITCH_ONLY);
+    if (checkoutMatch) {
+      currentBranch = checkoutMatch[1];
+      continue;
+    }
+    if (currentBranch === branchName && GIT_COMMIT.test(command)) {
+      return command;
+    }
+  }
+  return null;
+}
+
 export function runGitBranchPolicyChecks(
   classifications: GitBranchPolicyClassification[],
   events: TranscriptEvent[]
 ): CheckResult[] {
+  const commands: string[] = [];
   const allTargets: { branch: string; command: string }[] = [];
   for (const event of events) {
     const command = commandFromEvent(event);
     if (!command) continue;
+    commands.push(command);
     for (const branch of extractGitBranchTargets(command)) {
       allTargets.push({ branch, command });
     }
   }
 
   return classifications.map(({ rule, branchName, polarity }) => {
-    const hit = allTargets.find((t) => t.branch === branchName);
+    const pushOrCreateHit = allTargets.find(
+      (t) =>
+        t.branch === branchName &&
+        (GIT_PUSH.test(t.command) || GIT_BRANCH_CREATE.test(t.command) || GIT_CHECKOUT_CREATE.test(t.command))
+    );
+    const commitViolationCommand = findCheckoutCommitViolation(commands, branchName);
+    const hit = pushOrCreateHit ?? (commitViolationCommand ? { branch: branchName, command: commitViolationCommand } : undefined);
 
     if (polarity === "forbid") {
       if (hit) {
