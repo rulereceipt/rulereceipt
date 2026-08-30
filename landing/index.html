@@ -316,7 +316,10 @@
     margin: 0 0 8px;
     text-wrap: balance;
   }
-  .band-sub { color: var(--paper-dim); margin: 0 0 34px; max-width: 540px; text-wrap: balance; }
+  /* 540px + text-wrap:balance produced short, evenly-matched lines with
+     empty space beside them — balance equalises line lengths, so in a
+     narrow container every line ends early. Wider box, natural wrapping. */
+  .band-sub { color: var(--paper-dim); margin: 0 0 34px; max-width: 860px; }
 
   .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; }
   .step .n { font-family: var(--font-mono); color: var(--cyan); font-size: 0.85rem; margin-bottom: 10px; }
@@ -369,7 +372,7 @@
     margin-bottom: 14px;
   }
   .dpa-card h2 { margin: 0 0 14px; text-align: left; }
-  .dpa-card .band-sub { margin: 0 0 0; text-align: left; }
+  .dpa-card .band-sub { margin: 0 0 0; text-align: left; max-width: 540px; }
   .dpa-side {
     background: var(--bg-deep);
     border: 1px solid var(--panel-line);
