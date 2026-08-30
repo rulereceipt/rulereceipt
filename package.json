@@ -4,7 +4,7 @@
   "description": "Checks whether a Claude Code session actually followed your CLAUDE.md / AGENTS.md rules, with evidence.",
   "type": "module",
   "bin": {
-    "rulereceipt": "./dist/cli.js"
+    "rulereceipt": "dist/cli.js"
   },
   "files": [
     "dist",
