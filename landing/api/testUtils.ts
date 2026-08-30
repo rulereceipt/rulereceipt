@@ -1,4 +1,4 @@
-import type { VercelRequest, VercelResponse } from "@vercel/node";
+import type { VercelRequest, VercelResponse } from "./vercel-types.js";
 import { vi } from "vitest";
 
 export function mockReq(opts: {

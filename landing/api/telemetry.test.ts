@@ -4,7 +4,12 @@ import { mockReq, mockRes, createMockRedis } from "./testUtils.js";
 const redisInstance = createMockRedis();
 
 vi.mock("@upstash/redis", () => ({
-  Redis: vi.fn(() => redisInstance),
+  // a regular function, not an arrow: this is called with `new`, and an
+  // arrow function cannot be a constructor (vitest 4 surfaces this;
+  // vitest 2 quietly tolerated it)
+  Redis: vi.fn(function () {
+    return redisInstance;
+  }),
 }));
 
 process.env.KV_REST_API_URL = "https://fake.upstash.io";

@@ -1,4 +1,4 @@
-import type { VercelRequest, VercelResponse } from "@vercel/node";
+import type { VercelRequest, VercelResponse } from "./vercel-types.js";
 import { Redis } from "@upstash/redis";
 
 // Removes an email from the same signup list /api/signup.ts adds to

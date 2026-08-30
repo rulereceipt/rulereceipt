@@ -1,4 +1,4 @@
-import type { VercelRequest, VercelResponse } from "@vercel/node";
+import type { VercelRequest, VercelResponse } from "./vercel-types.js";
 import { Redis } from "@upstash/redis";
 
 // Opt-in usage counter. Receives only aggregate PASS/FAIL/UNCLEAR counts from

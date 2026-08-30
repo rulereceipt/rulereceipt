@@ -1,4 +1,4 @@
-import type { VercelRequest, VercelResponse } from "@vercel/node";
+import type { VercelRequest, VercelResponse } from "./vercel-types.js";
 
 // Server-side proxy for npm's public download-count API. Two reasons this
 // isn't a direct client-side fetch to api.npmjs.org: (1) it would require

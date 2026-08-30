@@ -1,4 +1,4 @@
-import type { VercelRequest, VercelResponse } from "@vercel/node";
+import type { VercelRequest, VercelResponse } from "./vercel-types.js";
 import { Redis } from "@upstash/redis";
 
 // Optional "get early access / updates" email signup. Separate from the CLI

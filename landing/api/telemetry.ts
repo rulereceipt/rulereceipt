@@ -1,4 +1,4 @@
-import type { VercelRequest, VercelResponse } from "@vercel/node";
+import type { VercelRequest, VercelResponse } from "./vercel-types.js";
 import { Redis } from "@upstash/redis";
 
 // Receives only a random, non-identifying per-install ID from `rulereceipt
