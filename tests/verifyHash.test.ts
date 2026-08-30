@@ -35,8 +35,21 @@ describe("verifySessionHash", () => {
   it("MATCHes regardless of case", () => {
     const file = makeSessionFile('{"type":"user","message":{"content":"hi"}}\n');
     const full = computeTranscriptHash(file)!;
-    const result = verifySessionHash(file, full.slice(0, 12).toUpperCase());
+    const result = verifySessionHash(file, full.slice(0, 16).toUpperCase());
     expect(result.match).toBe(true);
+  });
+
+  // real gap found and fixed 2026-08-30: a claimed hash below the 16-char
+  // length a real report actually prints isn't a truncated real hash, it's
+  // a forgery/typo — without this floor, a 1-char claim like "a" matches
+  // roughly 1 in 16 unrelated session files purely by chance, which was
+  // demonstrated with a standalone script (15/200 unrelated files spuriously
+  // matched claim "a"). This proves that gap is now closed.
+  it("does NOT MATCH a short prefix shorter than a real report ever prints, even if it happens to be a true prefix", () => {
+    const file = makeSessionFile('{"type":"user","message":{"content":"hi"}}\n');
+    const full = computeTranscriptHash(file)!;
+    const result = verifySessionHash(file, full.slice(0, 4));
+    expect(result.match).toBe(false);
   });
 
   it("MISMATCHes when the file content differs from the claimed hash", () => {
