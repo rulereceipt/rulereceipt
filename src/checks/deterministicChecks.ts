@@ -79,12 +79,25 @@ export function runDeterministicChecks(
       if (polarity === "forbid") {
         if (foundEvent && foundPattern) {
           const haystack = eventSearchText(foundEvent);
+          // Deliberately UNCLEAR, never FAIL. A bare literal match proves
+          // the string appeared somewhere; it cannot prove the agent DID
+          // the forbidden thing. The same match is produced by grepping
+          // for the pattern, quoting it in an explanation, or naming it in
+          // a commit message — all compliant. Every false positive found
+          // on 2026-08-30 was this exact confusion, and no amount of
+          // pattern tuning fixes it, because the information needed to
+          // tell action from mention is not in the string.
+          //
+          // Confident FAILs come only from the structured primitives
+          // (gitBranchPolicy, codeContent, fileLifecycle), which read what
+          // the agent actually executed or wrote. This path reports the
+          // evidence and says plainly that it can't confirm a violation.
           return {
             ruleId: rule.id,
             ruleTitle: rule.title,
             ruleSource: rule.source,
-            status: "FAIL",
-            evidence: `found banned pattern "${foundPattern}" in a ${foundEvent.kind === "tool_use" ? foundEvent.toolName + " call" : foundEvent.kind}: ${haystack.slice(0, 160)}`,
+            status: "UNCLEAR",
+            evidence: `"${foundPattern}" appears in a ${foundEvent.kind === "tool_use" ? foundEvent.toolName + " call" : foundEvent.kind}, but a text match alone can't tell an actual violation from a mention (a search for it, a quote, an explanation) — needs a human look: ${haystack.slice(0, 160)}`,
           };
         }
         return {

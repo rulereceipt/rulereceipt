@@ -19,10 +19,54 @@ const rule: DeterministicClassification = {
 };
 
 describe("runDeterministicChecks", () => {
-  it("FAILs when the banned pattern actually appears in a tool call", () => {
+  // The permanent guarantee, not a per-case fix: no bare text match may
+  // ever produce a confident FAIL, for any rule, in any format. A match
+  // proves a string appeared; it cannot distinguish the agent DOING the
+  // forbidden thing from grepping for it, quoting it, or naming it in a
+  // commit message. Independent testing on a real session found 19 of 19
+  // remaining FAILs were exactly that confusion — repo and branch names
+  // in ordinary conversation and inside legitimate git commands.
+  // Confident FAILs come only from structured primitives that read what
+  // was actually executed or written. If this test ever fails, the
+  // false-positive class has been reintroduced.
+  it("NEVER returns FAIL from a text match, whatever the pattern or event kind", () => {
+    const patterns = ["git push --force", "sprint", "acme-core-app", "print(", "http://"];
+    const events: TranscriptEvent[] = [
+      toolUse("Bash", { command: "git push --force origin sprint" }),
+      toolUse("Write", { file_path: "a.py", content: "print('x') // http://x.com" }),
+      toolUse("Bash", { command: "git clone acme-core-app" }),
+      { role: "assistant", kind: "text", text: "I will not run git push --force on sprint", timestamp: "t" },
+    ];
+    for (const p of patterns) {
+      const r: DeterministicClassification = {
+        kind: "deterministic",
+        rule: { id: "x", title: "t", text: `Never use \`${p}\`.`, source: "project" },
+        patterns: [p],
+        polarity: "forbid",
+      };
+      const [result] = runDeterministicChecks([r], events);
+      expect(result.status).not.toBe("FAIL");
+    }
+  });
+
+  // Behavior changed 2026-08-30 and this assertion changed with it: a
+  // bare literal match cannot prove the agent DID the forbidden thing.
+  // The identical match is produced by grepping for the pattern, quoting
+  // it, or naming it in a commit message. Independent testing found 19/19
+  // remaining FAILs were exactly this confusion. UNCLEAR-with-evidence is
+  // the honest answer; confident FAILs now come only from the structured
+  // primitives that read what the agent actually executed or wrote.
+  it("reports UNCLEAR, not FAIL, when the banned pattern appears — a match is not proof of an action", () => {
     const events = [toolUse("Bash", { command: "git push --force origin main" })];
     const [result] = runDeterministicChecks([rule], events);
-    expect(result.status).toBe("FAIL");
+    expect(result.status).toBe("UNCLEAR");
+  });
+
+  it("quotes the real matched text as evidence so a human can judge it", () => {
+    const events = [toolUse("Bash", { command: "git push --force origin main" })];
+    const [result] = runDeterministicChecks([rule], events);
+    expect(result.evidence).toContain("git push --force");
+    expect(result.evidence).toContain("needs a human look");
   });
 
   it("includes the actual matched text in the evidence, not a generic message", () => {
@@ -45,7 +89,7 @@ describe("runDeterministicChecks", () => {
   it("checks non-Bash tool calls too, not just Bash", () => {
     const events = [toolUse("Write", { content: "run: git push --force later" })];
     const [result] = runDeterministicChecks([rule], events);
-    expect(result.status).toBe("FAIL");
+    expect(result.status).toBe("UNCLEAR");
   });
 
   // this is the exact false-positive that failed before the word-boundary
@@ -72,7 +116,11 @@ describe("runDeterministicChecks", () => {
     };
     const events = [toolUse("Write", { content: 'const url = "http://api.example.com/data";' })];
     const [result] = runDeterministicChecks([urlRule], events);
-    expect(result.status).toBe("FAIL");
+    // the point of this test is that the pattern MATCHES at all (the old
+    // bug made it unmatchable); a match now surfaces as UNCLEAR rather
+    // than FAIL, per the action-vs-mention rule
+    expect(result.status).toBe("UNCLEAR");
+    expect(result.evidence).toContain("http://");
   });
 
   it("still applies the word-boundary check when the pattern ends in a word character (regression guard)", () => {
@@ -131,10 +179,11 @@ describe("runDeterministicChecks", () => {
       expect(result.status).toBe("PASS");
     });
 
-    it("still correctly FAILs when the pattern appears in what the agent actually wrote (tool_use input)", () => {
+    it("surfaces the match when the pattern appears in what the agent actually wrote (tool_use input)", () => {
       const events = [toolUse("Write", { file_path: "src/new.py", content: "print('debug')" })];
       const [result] = runDeterministicChecks([noPrintRule], events);
-      expect(result.status).toBe("FAIL");
+      expect(result.status).toBe("UNCLEAR");
+      expect(result.evidence).toContain("print(");
     });
 
     it("does NOT fail a require-polarity rule just because the required text appeared in read-only tool_result content", () => {
