@@ -31,15 +31,21 @@ export type Classification = DeterministicClassification | IfEditThenTestClassif
 // this they'd fall all the way through to judgment (an LLM call) even
 // though they're actually structurally checkable: did a production file
 // get edited without a corresponding test file also being touched.
-// Deliberately requires BOTH signals together, not just the word "test"
-// alone (which would also match purely descriptive rules like "write
-// good tests" that aren't actually an edit-implies-test requirement).
-const TEST_WORD = /\btest/i;
-const REQUIRE_TEST_SIGNAL = /\b(always|must|required|require|ensure|need to|every)\b/i;
+//
+// Real false-positive found 2026-08-30 on an actual session: the earlier
+// version of this heuristic (bare "test" word + any require-signal word,
+// independently anywhere in the text) misclassified "Tests must be able
+// to fail" - a rule about test QUALITY (a test must be demonstrated to
+// fail on bad input before it counts) - as an edit-implies-test rule,
+// producing nonsense like "you edited .env but no test file was touched"
+// for a rule that was never about that at all. Fixed by requiring a
+// specific phrase shape - a create/add/need verb close to the word
+// "test" - not just independent word presence anywhere in the text.
+const EDIT_IMPLIES_TEST_PHRASE = /\b(needs?\s+(a\s+)?(corresponding\s+)?test|add(?:ing|ed)?\s+tests?|write\s+tests?|include\s+tests?|corresponding\s+test|test\s+coverage\s+for)\b/i;
 
 function isEditImpliesTestRule(rule: Rule): boolean {
   const text = `${rule.title} ${rule.text}`;
-  return TEST_WORD.test(text) && REQUIRE_TEST_SIGNAL.test(text);
+  return EDIT_IMPLIES_TEST_PHRASE.test(text);
 }
 
 const BACKTICK_TOKEN = /`([^`]+)`/g;

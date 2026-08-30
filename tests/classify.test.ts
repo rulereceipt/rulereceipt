@@ -100,5 +100,18 @@ describe("classifyRule", () => {
       const rule = makeRule("Always run `npm test` before committing.");
       expect(classifyRule(rule).kind).toBe("deterministic");
     });
+
+    // real false-positive found 2026-08-30 on an actual session: this
+    // exact real global rule ("test" + "must" both present) was
+    // misclassified as ifEditThenTest, producing nonsense like "you
+    // edited .env but no test file was touched" for a rule that is
+    // actually about test QUALITY, not "every edit needs a test file"
+    it("does NOT classify 'Tests must be able to fail' (a test-quality rule) as ifEditThenTest", () => {
+      const rule = makeRule(
+        "Any test you write must be demonstrated to fail on bad input at least once (show the red run) before its green run counts. A test that cannot fail is decoration.",
+        "Tests must be able to fail"
+      );
+      expect(classifyRule(rule).kind).not.toBe("ifEditThenTest");
+    });
   });
 });
