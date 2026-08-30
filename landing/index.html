@@ -710,6 +710,11 @@
             <p>Every PASS/FAIL/UNCLEAR comes with a quoted line of evidence specifically so you can check it yourself, not just trust it. It's Claude's judgment on the harder rules — not infallible, which is exactly why the evidence is shown, not hidden.</p>
           </details>
           <details class="faq-item">
+            <summary>Could someone edit the transcript before running the check?</summary>
+            <p>Yes, and we won't pretend otherwise. The transcript is a file on your own machine — anyone with access to it could edit it before running <code>rulereceipt check</code>, and the report would faithfully describe the edited file. The hash proves the report matches the file it read; it does not prove that file is an unmodified record of the session.</p>
+            <p>What that means in practice: this is solid for the honest case — catching what an agent actually did when nobody's trying to hide anything, which is nearly every real session. It is not, today, tamper-evident against someone deliberately covering their tracks. Making it so would need the record signed where it's written, not where it's read — that's not something a tool reading a local file after the fact can do alone. We'd rather say that clearly than let "receipt" imply more than it delivers.</p>
+          </details>
+          <details class="faq-item">
             <summary>Can my team or manager use this too?</summary>
             <p>Yes — same tool, no team plan needed for this. A developer runs it after a session and shares the report directly (a markdown output is built for pasting into a PR or Slack). It's how an engineering lead sees whether the team's agent-assisted work actually followed standards, without a new dashboard to roll out.</p>
           </details>
