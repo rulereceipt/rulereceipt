@@ -133,6 +133,12 @@ async function runCheck(
   const codeContent = classifications.filter((c) => c.kind === "codeContent");
   const fileLifecycle = classifications.filter((c) => c.kind === "fileLifecycle");
   const judgment = classifications.filter((c) => c.kind === "judgment");
+  // Not rules at all — documentation, glossary entries, reference tables.
+  // Measured on 40 real public rule files: ~17% of parsed items. Reported
+  // as a count so nothing is silently dropped, but never checked, since
+  // "did the session violate a directory listing" has no meaningful answer
+  // and any coincidental match is pure noise.
+  const notARule = classifications.filter((c) => c.kind === "notARule");
 
   const deterministicResults = [
     ...runDeterministicChecks(deterministic, events),
@@ -154,9 +160,15 @@ async function runCheck(
   const judgmentResults = llm ? await runJudgmentChecks(judgment, events) : judgment.map(({ rule }) => needsLlmResult(rule));
   const results = [...deterministicResults, ...judgmentResults];
 
-  const meta = { sessionFilePath, ruleCount: rules.length };
+  const meta = { sessionFilePath, ruleCount: results.length };
   const reportText = markdown ? generateMarkdownReport(results, meta) : generateReport(results, meta);
   console.log(reportText);
+
+  if (notARule.length > 0) {
+    console.log(
+      `\n(${notARule.length} item${notARule.length === 1 ? "" : "s"} in your rules file ${notARule.length === 1 ? "is" : "are"} documentation, not a rule — directory listings, reference tables, examples. Not checked, because there's nothing to check.)`
+    );
+  }
 
   appendHistory(results, sessionFilePath);
 

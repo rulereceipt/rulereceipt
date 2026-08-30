@@ -77,13 +77,59 @@ export interface FileLifecycleClassification {
   polarity: DeterministicPolarity;
 }
 
+/**
+ * Not every line in a real CLAUDE.md is a rule. Measured against 40 real
+ * public rule files (1,441 parsed items, 2026-08-30): only ~20% contained
+ * any directive language at all. The other ~80% is documentation —
+ * directory listings ("`forge/llm/` - Multi-provider LLM integrations"),
+ * import examples, model-name tables, glob-syntax references. 521 of those
+ * were getting a literal keyword check run against them, which is the
+ * single largest source of false positives: checking whether a session
+ * "violated" a directory listing is meaningless, and any coincidental
+ * match is noise reported as a finding.
+ *
+ * These are reported as N/A and excluded from pass/fail entirely — not
+ * sent to the LLM either, since there's no rule to judge.
+ */
+export interface NotARuleClassification {
+  kind: "notARule";
+  rule: Rule;
+}
+
 export type Classification =
   | DeterministicClassification
   | IfEditThenTestClassification
   | GitBranchPolicyClassification
   | CodeContentClassification
   | FileLifecycleClassification
+  | NotARuleClassification
   | JudgmentClassification;
+
+// Normative language — the thing that makes a line a rule rather than a
+// description. Deliberately broad on modals AND imperative verbs, because
+// a wrongly-excluded rule is a silent miss.
+const DIRECTIVE_LANGUAGE =
+  /\b(never|always|must|should|shall|do not|don't|dont|cannot|can't|required?|requires|ensure|avoid|prefer|forbidden|prohibited|only|make sure|be sure|need to|has to|have to|expected to)\b/i;
+
+// A glossary/listing shape: a backtick-quoted token followed by a dash and
+// a description ("`forge/llm/` - Multi-provider LLM integrations"). This is
+// documentation structure, not a directive, and it's the single most common
+// non-rule shape in the real corpus.
+const GLOSSARY_ENTRY = /^\s*`[^`]+`\s*[-–—:]/;
+
+/**
+ * Conservative on purpose: only excludes an item when it has NO directive
+ * language anywhere AND looks structurally like documentation. A rule
+ * wrongly excluded is a silent missed check; a doc line wrongly included is
+ * a loud false positive. Given the real-world failure mode found on
+ * 2026-08-30 was 10/10 false positives, the bias is set toward excluding
+ * documentation — but only where both signals agree.
+ */
+function isNotARule(rule: Rule): boolean {
+  const text = `${rule.title} ${rule.text}`;
+  if (DIRECTIVE_LANGUAGE.test(text)) return false;
+  return GLOSSARY_ENTRY.test(rule.title) || GLOSSARY_ENTRY.test(rule.text);
+}
 
 const BRANCH_WORD = /\bbranch\b/i;
 
@@ -154,6 +200,12 @@ function detectPolarity(rule: Rule): DeterministicPolarity {
  * guessing it's safe to pattern-match.
  */
 export function classifyRule(rule: Rule): Classification {
+  // Checked first: if this isn't a rule at all, no check of any kind
+  // should run against it — not a keyword match, not an LLM call.
+  if (isNotARule(rule)) {
+    return { kind: "notARule", rule };
+  }
+
   const patterns = new Set<string>();
   for (const match of rule.text.matchAll(BACKTICK_TOKEN)) {
     const token = match[1].trim();

@@ -131,6 +131,52 @@ describe("classifyRule", () => {
     });
   });
 
+  // Measured against 40 real public rule files (1,441 parsed items,
+  // 2026-08-30): only ~20% contained any directive language. The rest is
+  // documentation, and 521 of those were getting keyword checks run
+  // against them — the single largest false-positive source found.
+  describe("notARule classification — documentation is not checked (2026-08-30)", () => {
+    it("classifies a directory-listing glossary entry as notARule", () => {
+      const rule = makeRule("`forge/llm/` - Multi-provider LLM integrations (OpenAI, Anthropic)");
+      expect(classifyRule(rule).kind).toBe("notARule");
+    });
+
+    it("classifies a model-reference table entry as notARule", () => {
+      const rule = makeRule("`claude-opus` - opus smart, sonnet fast");
+      expect(classifyRule(rule).kind).toBe("notARule");
+    });
+
+    it("classifies a glob-syntax documentation entry as notARule", () => {
+      const rule = makeRule("`**` - Matches any path including `/`");
+      expect(classifyRule(rule).kind).toBe("notARule");
+    });
+
+    // the guard that keeps this from silently swallowing real rules:
+    // directive language anywhere means it IS a rule, whatever its shape
+    it("does NOT classify as notARule when directive language is present, even in glossary shape", () => {
+      const rule = makeRule("`.env` - never commit this file");
+      expect(classifyRule(rule).kind).not.toBe("notARule");
+    });
+
+    it("does NOT classify a normal prose rule as notARule", () => {
+      const rule = makeRule("Never run `git push --force`.");
+      expect(classifyRule(rule).kind).toBe("deterministic");
+    });
+
+    it("does NOT classify a judgment rule as notARule", () => {
+      const rule = makeRule("Lead every status report with what is broken.", "Surface bad news first");
+      expect(classifyRule(rule).kind).toBe("judgment");
+    });
+
+    // conservative by design: needs BOTH no-directive AND doc shape, so a
+    // plain descriptive sentence still goes to judgment rather than being
+    // silently dropped
+    it("does NOT drop a non-glossary descriptive line — it still goes to judgment", () => {
+      const rule = makeRule("The build system uses Bazel for the core packages.");
+      expect(classifyRule(rule).kind).toBe("judgment");
+    });
+  });
+
   describe("codeContent classification (structured primitive, 2026-08-30)", () => {
     it("routes a rule naming a function/method call to codeContent", () => {
       const rule = makeRule("Never leave a `print(` statement in committed code.");
