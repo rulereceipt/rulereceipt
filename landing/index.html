@@ -623,6 +623,27 @@
 
   <section class="band">
     <div class="wrap-wide">
+      <h2>Why an outside check</h2>
+      <p class="band-sub">An agent grading its own work has the same problem a company auditing its own books does. That's structural — it doesn't go away as models improve.</p>
+
+      <div class="security-note" style="margin-top:8px;">
+        <strong>Anthropic makes the architectural case themselves.</strong> Their April 2026 paper <a href="https://www.anthropic.com/research/trustworthy-agents" target="_blank" rel="noopener">Trustworthy agents in practice</a> splits agent security into four layers — model, harness, tools, environment — and notes that <em>"a well-trained model can still be exploited through a poorly configured harness, an overly permissive tool, or an exposed environment."</em> Three of those four layers belong to whoever deploys the agent, not the model vendor. They describe what's needed as <em>"the kind of infrastructure no single company can build alone."</em>
+      </div>
+
+      <div class="security-note">
+        <strong>The gap is measured, not assumed.</strong> A <a href="https://cloudsecurityalliance.org/press-releases/2026/04/16/more-than-half-of-organizations-experience-ai-agent-scope-violations-cloud-security-alliance-study-finds" target="_blank" rel="noopener">Cloud Security Alliance study published April 2026</a> found <strong>53%</strong> of organizations had AI agents exceed their intended permissions — and only <strong>8%</strong> said it never happens. In the same research, more than two-thirds reported they can't clearly tell an agent's actions apart from a human's. That last one is the whole problem in a sentence: you can't review what you can't distinguish.
+      </div>
+
+      <div class="security-note">
+        <strong>Where the rules are heading.</strong> Singapore's <a href="https://www.imda.gov.sg/resources/press-releases-factsheets-and-speeches/press-releases/2026/new-model-ai-governance-framework-for-agentic-ai" target="_blank" rel="noopener">Model AI Governance Framework for Agentic AI</a> (January 2026, the first of its kind) asks for a verifiable identity per agent and an audit trail of which agent acted under whose authorization. It's voluntary guidance, not enforcement — and the EU AI Act's high-risk obligations were pushed to December 2027, not this year. We'd rather say that plainly than manufacture a deadline. The direction is clear even where the dates aren't.
+      </div>
+
+      <p class="band-sub" style="font-size:0.82rem; margin-top:18px;">Figures above are dated on purpose — they're from specific 2026 studies and will age. The structural argument is what we'd stand behind regardless: an independent record beats a self-report, whatever the current numbers say.</p>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap-wide">
       <div class="dpa-card">
         <div>
           <div class="dpa-eyebrow">for teams closing bigger deals</div>
