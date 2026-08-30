@@ -40,13 +40,39 @@ export interface GitBranchPolicyClassification {
   polarity: DeterministicPolarity;
 }
 
+/**
+ * Second structured-check primitive (2026-08-30): code content, for rules
+ * naming an actual code construct — a function/method call like `print(`
+ * or `analytics.track(` — rather than a CLI command. Real false-positive
+ * this fixes: even after excluding tool_result (see deterministicChecks.ts),
+ * a rule like "no `print(` statements" still matched when the agent's OWN
+ * Bash command merely MENTIONED the pattern as an argument (e.g. grepping
+ * for it), because generic deterministic matching scans the whole
+ * stringified tool_use input, commands included. This routes instead to
+ * codeContent.ts, which only looks at the actual content of real file
+ * edits (Write/Edit/NotebookEdit) — never a Bash command string, never
+ * prose, never a search argument.
+ */
+export interface CodeContentClassification {
+  kind: "codeContent";
+  rule: Rule;
+  patterns: string[];
+  polarity: DeterministicPolarity;
+}
+
 export type Classification =
   | DeterministicClassification
   | IfEditThenTestClassification
   | GitBranchPolicyClassification
+  | CodeContentClassification
   | JudgmentClassification;
 
 const BRANCH_WORD = /\bbranch\b/i;
+
+// A function/method-call shape ("print(", "analytics.track(") is a strong,
+// simple signal that a backtick literal names actual CODE, not a CLI
+// command or flag ("git push --force", "npm test" never look like this).
+const CODE_CONSTRUCT_PATTERN = /\(/;
 
 // Catches rules like "add tests for every change" or "every new function
 // needs a test" - no literal backtick token to pattern-match, so without
@@ -122,6 +148,10 @@ export function classifyRule(rule: Rule): Classification {
     // push to `main`"), not a set of them
     const [branchName] = patterns;
     return { kind: "gitBranchPolicy", rule, branchName, polarity: detectPolarity(rule) };
+  }
+
+  if ([...patterns].some((p) => CODE_CONSTRUCT_PATTERN.test(p))) {
+    return { kind: "codeContent", rule, patterns: [...patterns], polarity: detectPolarity(rule) };
   }
 
   return { kind: "deterministic", rule, patterns: [...patterns], polarity: detectPolarity(rule) };
