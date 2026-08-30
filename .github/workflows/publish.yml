@@ -1,0 +1,40 @@
+name: Publish
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  id-token: write # required for npm trusted publishing (OIDC) + provenance
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: "https://registry.npmjs.org"
+          cache: npm
+
+      # trusted publishing needs a recent npm CLI (11.5.1+) -- don't rely
+      # on whatever version actions/setup-node's Node bundles
+      - run: npm install -g npm@latest
+
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm test
+      - run: npm audit --audit-level=high
+
+      # no NPM_TOKEN anywhere: this repo/workflow must be configured as a
+      # trusted publisher on npmjs.com first (package settings -> Trusted
+      # Publisher -> GitHub Actions -> this repo + this workflow file).
+      # Until that's done, this step fails closed rather than falling back
+      # to an unsigned/unattested publish.
+      - run: npm publish --provenance --access public
