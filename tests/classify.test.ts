@@ -79,4 +79,26 @@ describe("classifyRule", () => {
       expect(result.polarity).toBe("forbid");
     });
   });
+
+  describe("ifEditThenTest classification (new: previously fell through to judgment)", () => {
+    it("classifies 'every change needs a test' as ifEditThenTest, not judgment", () => {
+      const rule = makeRule("Every new function needs a corresponding test.");
+      expect(classifyRule(rule).kind).toBe("ifEditThenTest");
+    });
+
+    it("classifies 'always add tests' as ifEditThenTest", () => {
+      const rule = makeRule("Always add tests for every production code change.");
+      expect(classifyRule(rule).kind).toBe("ifEditThenTest");
+    });
+
+    it("does NOT classify a purely descriptive test-quality rule as ifEditThenTest (needs both signals)", () => {
+      const rule = makeRule("Write good, readable tests.");
+      expect(classifyRule(rule).kind).not.toBe("ifEditThenTest");
+    });
+
+    it("does NOT override an existing backtick-based deterministic rule, even if it mentions tests", () => {
+      const rule = makeRule("Always run `npm test` before committing.");
+      expect(classifyRule(rule).kind).toBe("deterministic");
+    });
+  });
 });

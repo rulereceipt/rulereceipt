@@ -14,12 +14,33 @@ export interface DeterministicClassification {
   polarity: DeterministicPolarity;
 }
 
+export interface IfEditThenTestClassification {
+  kind: "ifEditThenTest";
+  rule: Rule;
+}
+
 export interface JudgmentClassification {
   kind: "judgment";
   rule: Rule;
 }
 
-export type Classification = DeterministicClassification | JudgmentClassification;
+export type Classification = DeterministicClassification | IfEditThenTestClassification | JudgmentClassification;
+
+// Catches rules like "add tests for every change" or "every new function
+// needs a test" - no literal backtick token to pattern-match, so without
+// this they'd fall all the way through to judgment (an LLM call) even
+// though they're actually structurally checkable: did a production file
+// get edited without a corresponding test file also being touched.
+// Deliberately requires BOTH signals together, not just the word "test"
+// alone (which would also match purely descriptive rules like "write
+// good tests" that aren't actually an edit-implies-test requirement).
+const TEST_WORD = /\btest/i;
+const REQUIRE_TEST_SIGNAL = /\b(always|must|required|require|ensure|need to|every)\b/i;
+
+function isEditImpliesTestRule(rule: Rule): boolean {
+  const text = `${rule.title} ${rule.text}`;
+  return TEST_WORD.test(text) && REQUIRE_TEST_SIGNAL.test(text);
+}
 
 const BACKTICK_TOKEN = /`([^`]+)`/g;
 
@@ -60,6 +81,9 @@ export function classifyRule(rule: Rule): Classification {
   }
 
   if (patterns.size === 0) {
+    if (isEditImpliesTestRule(rule)) {
+      return { kind: "ifEditThenTest", rule };
+    }
     return { kind: "judgment", rule };
   }
   return { kind: "deterministic", rule, patterns: [...patterns], polarity: detectPolarity(rule) };
