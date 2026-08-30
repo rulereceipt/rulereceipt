@@ -11,43 +11,85 @@
 </script>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>RuleReceipt — Privacy</title>
-<meta name="description" content="What RuleReceipt does with your data: nothing, by default. Read exactly what runs locally and what the opt-in --share flag sends." />
+<title>RuleReceipt — Unsubscribe</title>
+<meta name="description" content="Remove your email from the RuleReceipt signup list." />
 <style>
   body { margin:0; background:#FAFAF7; color:#17191C; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:17px; line-height:1.6; }
-  .wrap { max-width:620px; margin:0 auto; padding:60px 24px 80px; }
+  .wrap { max-width:520px; margin:0 auto; padding:60px 24px 80px; }
   a { color:#17805F; }
   h1 { font-size:1.8rem; margin-bottom:6px; }
-  .updated { color:#6B6F76; font-size:0.85rem; margin-bottom:36px; }
-  h2 { font-size:1.15rem; margin-top:36px; }
   p { color:#3A3D42; }
   .back { display:inline-block; margin-bottom:30px; font-size:0.85rem; }
+  form { display:flex; gap:10px; flex-wrap:wrap; margin-top:24px; }
+  input[type="email"] {
+    flex:1; min-width:220px; padding:12px 14px; border:1px solid #D3D0C3; border-radius:8px;
+    font-size:1rem; font-family:inherit; background:#FFFFFF; color:#17191C;
+  }
+  input[type="email"]:focus { outline:2px solid #DD6A1F; outline-offset:1px; }
+  button {
+    padding:12px 20px; border:none; border-radius:8px; background:#17191C; color:#FAFAF7;
+    font-size:1rem; font-family:inherit; cursor:pointer;
+  }
+  button:hover { background:#3A3D42; }
+  button:disabled { opacity:0.6; cursor:default; }
+  .note { margin-top:14px; font-size:0.9rem; min-height:1.2em; }
+  .note.ok { color:#17805F; }
+  .note.err { color:#B3261E; }
 </style>
 </head>
 <body>
   <div class="wrap">
     <a class="back" href="/">&larr; RuleReceipt</a>
-    <h1>Privacy</h1>
-    <div class="updated">Last updated 17 August 2026</div>
+    <h1>Unsubscribe</h1>
+    <p>Type the email you signed up with. It will be removed from our list immediately — no confirmation email, no further contact.</p>
 
-    <p>RuleReceipt is a command-line tool that runs on your own computer. This page explains, plainly, what that means for your data.</p>
+    <form id="unsub-form">
+      <input type="email" id="unsub-email" placeholder="you@example.com" required>
+      <button type="submit">Remove me</button>
+    </form>
+    <div class="note" id="unsub-note"></div>
 
-    <h2>What RuleReceipt does with your data</h2>
-    <p>Nothing. RuleReceipt reads your CLAUDE.md/AGENTS.md file and your local Claude Code session transcript on your machine, and prints a report to your terminal. None of that content is sent to us, stored by us, or seen by us — we don't operate a server that's part of this process at all.</p>
-
-    <h2>Network calls RuleReceipt makes</h2>
-    <p>For rules that need judgment rather than a simple pattern match, RuleReceipt calls the Claude API using your own Anthropic API key — the same way Claude Code itself already does. That call goes directly from your machine to Anthropic. We don't proxy it, log it, or see it.</p>
-    <p>Running <code>rulereceipt check --share</code> is opt-in and off by default. If you use it, it sends only aggregate pass/fail/unclear counts to us — never rule text, file paths, or session content. Without <code>--share</code>, nothing about your checks is ever sent anywhere.</p>
-
-    <h2>This website</h2>
-    <p>This landing page uses PostHog, a privacy-conscious analytics tool, to see basic visit counts and which pages get read — general browser and location info, no cross-site tracking, no ad networks, and we don't sell or share this data with anyone.</p>
-
-    <h2>Email signup</h2>
-    <p>If you submit your email on this site (to get notified before pricing changes), we store it in a database (hosted by Upstash) so we can send you that one update. We don't sell it, share it with anyone else, or use it for anything beyond what you signed up for. There's currently no automatic expiry — it stays until you remove it.</p>
-    <p>To remove your email at any time, use the <a href="/unsubscribe.html">unsubscribe page</a> or just email us (see below) — either way it's deleted immediately, not just marked inactive.</p>
-
-    <h2>Questions</h2>
-    <p>Email <a href="mailto:hello@rulereceipt.dev">hello@rulereceipt.dev</a>.</p>
+    <p style="margin-top:36px; font-size:0.85rem; color:#6B6F76;">
+      Prefer email? <a href="mailto:hello@rulereceipt.dev">hello@rulereceipt.dev</a> works too.
+    </p>
   </div>
+
+<script>
+  var form = document.getElementById('unsub-form');
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var emailInput = document.getElementById('unsub-email');
+    var note = document.getElementById('unsub-note');
+    var button = form.querySelector('button');
+    var email = emailInput.value.trim();
+
+    button.disabled = true;
+    note.textContent = '';
+    note.className = 'note';
+
+    fetch('/api/unsubscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email }),
+    })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
+      .then(function (result) {
+        button.disabled = false;
+        if (!result.ok) {
+          note.textContent = result.data.error || 'Something went wrong. Try again.';
+          note.className = 'note err';
+          return;
+        }
+        note.textContent = "Done — you've been removed.";
+        note.className = 'note ok';
+        emailInput.value = '';
+      })
+      .catch(function () {
+        button.disabled = false;
+        note.textContent = 'Could not reach the server. Try again, or email hello@rulereceipt.dev directly.';
+        note.className = 'note err';
+      });
+  });
+</script>
 </body>
 </html>

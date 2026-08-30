@@ -74,6 +74,12 @@ export function createMockRedis() {
       sets.set(key, set);
       return added;
     }),
+    srem: vi.fn(async (key: string, member: string) => {
+      const set = sets.get(key);
+      if (!set || !set.has(member)) return 0;
+      set.delete(member);
+      return 1;
+    }),
     scard: vi.fn(async (key: string) => sets.get(key)?.size ?? 0),
     _store: store,
     _sets: sets,
