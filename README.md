@@ -68,6 +68,31 @@ Published and live on npm, actively developed.
    that exact file. (It proves the report matches the file, not that the
    file is an unmodified record — see SECURITY.md.)
 
+## Exit codes
+
+`check` exits **1** when a rule was actually broken, and **0** otherwise,
+so CI can gate on it. Rules that need human judgment report UNCLEAR and
+never affect the exit code — most rules in a real CLAUDE.md need judgment,
+and gating on those would make every build red on day one.
+
+`--exit-zero` prints the report without failing the build. `--require-session`
+does the opposite and is the one to use anywhere automated: it fails when
+there is no session, or an empty one, instead of reporting a pass for a
+check that never actually ran.
+
+### A limit worth knowing before you wire this into CI
+
+Claude Code writes its session transcript to the machine the agent ran on
+— your laptop. A CI runner is a fresh machine that has never seen it, so a
+CI job cannot check a session that happened on your laptop unless you
+deliberately make that transcript available to the job. See
+[templates/rulereceipt-ci.yml](./templates/rulereceipt-ci.yml), which
+explains the options and, if you use it, fails loudly rather than passing
+on a session it never found.
+
+For most people the honest answer is simpler: run `rulereceipt check --html`
+locally and attach the report to the PR.
+
 ## Sharing a report
 
 `rulereceipt check --html` writes one self-contained HTML file. No
@@ -101,6 +126,8 @@ rulereceipt check              # check the latest session in this project
 rulereceipt check --markdown   # same, formatted for pasting into a PR/Slack
 rulereceipt check --html       # write a shareable single-file HTML report you can send
 rulereceipt check --html report.html       # ...to a specific path
+rulereceipt check --require-session        # fail if there's no session, instead of passing silently
+rulereceipt check --exit-zero              # report failures without failing the build
 rulereceipt check --llm        # opt-in: grade judgment rules with your own Claude key
 rulereceipt check --share      # opt-in: send anonymous pass/fail/unclear counts
 rulereceipt check --telemetry  # opt-in: send one random per-machine ID

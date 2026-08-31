@@ -1,28 +1,94 @@
 name: RuleReceipt check
 
-# Copy this file to .github/workflows/rulereceipt-check.yml in your own repo.
-# Runs `rulereceipt check` against the agent session from your last commit
-# and fails the build on any FAIL result - rulereceipt already exits
-# non-zero on FAIL, this just wires that into CI.
+# READ THIS FIRST — it decides whether this template is useful to you.
 #
-# Requires: an ANTHROPIC_API_KEY secret if any of your CLAUDE.md/AGENTS.md
-# rules need judgment (not just pattern-matchable rules). Deterministic-only
-# checks work with zero secrets configured.
+# Claude Code writes its session transcript to the machine the agent ran
+# on: your laptop, under ~/.claude/projects/. A CI runner is a fresh
+# machine that has never seen it. So a CI job cannot, on its own, check a
+# session that happened on your laptop — there is nothing there to read.
+#
+# An earlier version of this template ignored that. It ran plain
+# `rulereceipt check` on a runner, found no session, printed "nothing to
+# check", and passed. Every time, including when the agent had broken
+# every rule in the file. A green tick for a check that never ran is worse
+# than no check at all, because people trust it. Fixed 2026-08-31.
+#
+# So this template does the one thing that genuinely works in CI: it
+# checks a transcript you have deliberately made available to the job, and
+# it FAILS if that transcript is missing or empty rather than reporting a
+# pass for a check that never happened.
+#
+# ---------------------------------------------------------------------
+# Getting the transcript to CI — pick one:
+#
+#   1. Upload it from your machine as a workflow artifact, then download
+#      it in this job. Best for a one-off review of a specific session.
+#
+#   2. Have the developer commit the session file with the PR. Simplest,
+#      but read it first: a transcript contains everything the agent saw
+#      and did, which may include file contents you would not want in a
+#      public repository.
+#
+#   3. Don't use CI at all — run it locally instead. For most people this
+#      is the honest answer:
+#
+#          rulereceipt check --html
+#
+#      and attach the report to the PR. The report carries a fingerprint
+#      of the session, so a reviewer can verify it describes a real,
+#      unaltered session (see `rulereceipt verify`).
+#
+# If none of those fit your workflow, don't adopt this file. A check that
+# can't see the session isn't protecting you.
+# ---------------------------------------------------------------------
 
 on:
   pull_request:
+
+env:
+  # ----------------------------------------------------------------
+  # SET THIS. The only line you must change.
+  #
+  # Path to the session transcript, as it exists inside the job — a
+  # committed file, or wherever a previous download step put it.
+  # RuleReceipt does not guess this: you say where the session is, and
+  # it checks that. If the path is wrong the job fails loudly rather
+  # than passing on a file it never found.
+  # ----------------------------------------------------------------
+  SESSION_TRANSCRIPT: ./session.jsonl
 
 jobs:
   rulereceipt:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      # Pinned to a commit SHA rather than a moving tag: a tag can be
+      # repointed by whoever owns the action, and it runs with your
+      # repository's permissions.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: 20
+          node-version: 22
 
+      # If the transcript arrives as an artifact rather than a committed
+      # file, download it here and point SESSION_TRANSCRIPT at it:
+      #
+      # - uses: actions/download-artifact@<sha>
+      #   with:
+      #     name: claude-session
+      #     path: .
+
+      # --require-session is the flag that matters: without it, a missing
+      # or empty transcript exits 0 and the job goes green having checked
+      # nothing at all.
+      #
+      # Rules needing human judgment report UNCLEAR and never fail the
+      # build. Only a rule that was actually broken exits non-zero. Add
+      # --llm (with the secret below) if you also want a model's opinion
+      # on the judgment rules; without it nothing is sent anywhere.
       - name: Run rulereceipt check
-        run: npx rulereceipt check --markdown
+        run: npx rulereceipt check --markdown --require-session --transcript "$SESSION_TRANSCRIPT"
         env:
+          # Only needed if you add --llm above. Deterministic checks run
+          # with no key and no network call at all.
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}

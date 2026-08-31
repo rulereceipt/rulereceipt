@@ -142,11 +142,15 @@ interface CheckOptions {
   telemetry: boolean;
   /** false = not requested; true = requested at the default path; string = explicit path. */
   html: boolean | string;
+  /** Report failures but always exit 0 — for anyone who wants the report without gating on it. */
+  exitZero: boolean;
+  /** Fail when there is no session, or an empty one, instead of reporting a pass for a check that never ran. */
+  requireSession: boolean;
   transcriptOverride?: string;
 }
 
 async function runCheck(opts: CheckOptions) {
-  const { markdown, share, email, emailAlways, llm, telemetry, html, transcriptOverride } = opts;
+  const { markdown, share, email, emailAlways, llm, telemetry, html, exitZero, requireSession, transcriptOverride } = opts;
   const cwd = process.cwd();
   const rules = loadRules(cwd);
 
@@ -170,10 +174,40 @@ async function runCheck(opts: CheckOptions) {
         "Run Claude Code here at least once, then try `rulereceipt check` again — " +
         "or pass --transcript <path-to-.jsonl> directly if your session lives somewhere non-standard."
     );
+    // Exiting 0 here is right for a person running this locally for the
+    // first time — nothing is wrong, there is simply nothing yet. It is
+    // dangerous anywhere automated, where a silent 0 reads as "checked,
+    // all clear" when nothing was checked at all. --require-session makes
+    // that case fail loudly. See the note in templates/rulereceipt-ci.yml.
+    if (requireSession) {
+      console.error(
+        "\n--require-session was set and no session was found, so nothing could be checked. " +
+          "Failing rather than reporting a pass for a check that never ran."
+      );
+      process.exitCode = 1;
+    }
     return;
   }
 
   const events = transcriptOverride ? readTranscriptFromFile(sessionFilePath) : readLatestTranscript(cwd);
+
+  // A session file with nothing in it produces a report full of PASSes,
+  // because no forbidden action appears in an empty session. That is
+  // technically true and badly misleading: "we found no proof of
+  // wrongdoing" gets printed as "you're fine." Same shape as the rule this
+  // tool already enforces on itself — an absence of evidence is not
+  // evidence. Say so out loud, and fail where a machine is reading it.
+  if (events.length === 0) {
+    console.log(
+      "\n⚠ This session file contains no recorded activity, so there was nothing to check against.\n" +
+        "  Every result below reflects an empty session, not a clean one."
+    );
+    if (requireSession) {
+      console.error("\n--require-session was set and the session was empty. Failing rather than reporting a pass for a check that had no evidence.");
+      process.exitCode = 1;
+      return;
+    }
+  }
   const classifications = classifyRules(rules);
   const deterministic = classifications.filter((c) => c.kind === "deterministic");
   const ifEditThenTest = classifications.filter((c) => c.kind === "ifEditThenTest");
@@ -243,6 +277,24 @@ async function runCheck(opts: CheckOptions) {
   if (isTelemetryEnabled(telemetry)) {
     await sendTelemetryPing();
   }
+
+  // Exit non-zero when a rule was actually broken, so CI can gate on it.
+  //
+  // This was a real shipped falsehood (found 2026-08-31):
+  // templates/rulereceipt-ci.yml told people to copy a workflow and said
+  // "rulereceipt already exits non-zero on FAIL, this just wires that
+  // into CI" — while `check` always exited 0. Anyone who used that
+  // template had a job that passed even as the agent broke their rules,
+  // which is worse than having no check at all, because it reads as
+  // evidence that nothing went wrong.
+  //
+  // Only FAIL counts. UNCLEAR must not, and that isn't a softening: most
+  // rules in a real CLAUDE.md need judgment, so without --llm they
+  // legitimately report UNCLEAR. Gating on those would make every build
+  // red on day one and the check would be deleted within a week.
+  if (!exitZero && results.some((r) => r.status === "FAIL")) {
+    process.exitCode = 1;
+  }
 }
 
 function runDemo(markdown: boolean) {
@@ -283,6 +335,14 @@ program
     `write a shareable single-file HTML report you can email, attach to a ticket, or print to PDF. Defaults to ./${DEFAULT_HTML_REPORT_NAME}. Written locally — nothing is uploaded.`
   )
   .option(
+    "--exit-zero",
+    "always exit 0, even when a rule was broken. Without this, `check` exits 1 on any FAIL so CI can gate on it (rules needing human judgment report UNCLEAR and never affect the exit code)."
+  )
+  .option(
+    "--require-session",
+    "fail (exit 1) if no session is found, or the session is empty, instead of reporting a pass for a check that never actually ran. Use this anywhere automated."
+  )
+  .option(
     "--transcript <path>",
     "manual override: check this exact .jsonl session file instead of auto-detecting one. Useful if your Claude Code session lives somewhere non-standard that auto-detection doesn't cover."
   )
@@ -296,6 +356,8 @@ program
       telemetry: Boolean(opts.telemetry),
       // commander gives `true` for a bare --html and the string for --html <path>
       html: opts.html ?? false,
+      exitZero: Boolean(opts.exitZero),
+      requireSession: Boolean(opts.requireSession),
       transcriptOverride: opts.transcript,
     }).catch((err) => {
       console.error("Something went wrong:", err instanceof Error ? err.message : err);

@@ -1,6 +1,8 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { execFileSync } from "node:child_process";
-import { resolve } from "node:path";
+import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 
 /**
  * Every subcommand must actually be reachable.
@@ -78,5 +80,83 @@ describe("every subcommand is reachable, not swallowed by the default command", 
     const { out, ok } = run(["definitelynotacommand"]);
     expect(ok).toBe(false);
     expect(out.toLowerCase()).toMatch(/unknown|error|too many arguments/);
+  });
+});
+
+/**
+ * Exit codes. CI can only gate on this, so it is the difference between a
+ * check that protects a repository and one that decorates it.
+ *
+ * Real shipped falsehood found 2026-08-31: templates/rulereceipt-ci.yml
+ * told people to copy a workflow and stated "rulereceipt already exits
+ * non-zero on FAIL, this just wires that into CI" — while `check` always
+ * exited 0. Anyone following that template had a green build while the
+ * agent broke their rules, which is worse than no check at all, because a
+ * passing job reads as evidence that nothing went wrong.
+ */
+describe("exit codes", () => {
+  const dir = mkdtempSync(join(tmpdir(), "rr-exit-"));
+
+  beforeAll(() => {
+    writeFileSync(
+      join(dir, "CLAUDE.md"),
+      "# Rules\n\n## 1. No console.log\nNever leave a `console.log(` call in committed code.\n"
+    );
+    writeFileSync(
+      join(dir, "fail.jsonl"),
+      JSON.stringify({
+        type: "assistant",
+        message: { role: "assistant", content: [{ type: "tool_use", name: "Write", input: { file_path: "a.ts", content: "console.log(1)" } }] },
+      })
+    );
+    writeFileSync(
+      join(dir, "pass.jsonl"),
+      JSON.stringify({
+        type: "assistant",
+        message: { role: "assistant", content: [{ type: "tool_use", name: "Bash", input: { command: "ls" } }] },
+      })
+    );
+  });
+
+  afterAll(() => rmSync(dir, { recursive: true, force: true }));
+
+  function exitCodeFor(args: string[]): number {
+    try {
+      execFileSync("node", [CLI, ...args], { cwd: dir, encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] });
+      return 0;
+    } catch (err) {
+      return (err as { status?: number }).status ?? -1;
+    }
+  }
+
+  it("exits 1 when a rule was actually broken, so CI can gate on it", () => {
+    expect(exitCodeFor(["check", "--transcript", "fail.jsonl"])).toBe(1);
+  });
+
+  it("exits 0 when nothing was broken", () => {
+    expect(exitCodeFor(["check", "--transcript", "pass.jsonl"])).toBe(0);
+  });
+
+  it("--exit-zero reports the failure but does not fail the build", () => {
+    expect(exitCodeFor(["check", "--transcript", "fail.jsonl", "--exit-zero"])).toBe(0);
+  });
+
+  // Not a softening. Most rules in a real CLAUDE.md need judgment and
+  // legitimately report UNCLEAR without --llm; gating on those would make
+  // every build red on day one and the check would be deleted in a week.
+  it("does NOT fail the build for rules that merely need human review", () => {
+    const u = mkdtempSync(join(tmpdir(), "rr-exit-unclear-"));
+    writeFileSync(join(u, "CLAUDE.md"), "# Rules\n\n## 1. Surface bad news first\nAlways lead a status report with what is broken.\n");
+    writeFileSync(join(u, "s.jsonl"), JSON.stringify({
+      type: "assistant",
+      message: { role: "assistant", content: [{ type: "tool_use", name: "Bash", input: { command: "ls" } }] },
+    }));
+    try {
+      execFileSync("node", [CLI, "check", "--transcript", "s.jsonl"], { cwd: u, encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] });
+    } catch {
+      throw new Error("UNCLEAR results must not fail the build");
+    } finally {
+      rmSync(u, { recursive: true, force: true });
+    }
   });
 });

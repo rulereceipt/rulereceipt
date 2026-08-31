@@ -21,13 +21,26 @@ const CLI = resolve(__dirname, "..", "dist", "cli.js");
 
 let dir: string;
 
+/**
+ * Captures output regardless of exit code. These fixtures deliberately
+ * break a rule, and `check` exits 1 when a rule was actually broken (so
+ * CI can gate on it), which makes execFileSync throw. That non-zero exit
+ * is correct behaviour, not a test failure — this suite is asserting on
+ * file output, and exit codes have their own tests in cliCommands.test.ts.
+ */
 function run(args: string[]): string {
-  return execFileSync("node", [CLI, ...args], {
-    cwd: dir,
-    encoding: "utf-8",
-    // The tool also reads global ~/.claude*/CLAUDE.md; that's real behaviour
-    // and harmless here — these assertions are about file output only.
-  });
+  try {
+    return execFileSync("node", [CLI, ...args], {
+      cwd: dir,
+      encoding: "utf-8",
+      // The tool also reads global ~/.claude*/CLAUDE.md; that's real behaviour
+      // and harmless here — these assertions are about file output only.
+    });
+  } catch (err) {
+    const e = err as { stdout?: string; stderr?: string; status?: number };
+    if (typeof e.status !== "number") throw err; // a real crash, not a rule failure
+    return `${e.stdout ?? ""}${e.stderr ?? ""}`;
+  }
 }
 
 beforeAll(() => {
