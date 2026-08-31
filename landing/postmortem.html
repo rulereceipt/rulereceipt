@@ -98,7 +98,7 @@
     </div>
 
     <h2>Then we looked harder, and found something worse</h2>
-    <p>Fixing three bugs wasn't enough, because chasing individual false positives is itself the mistake. So we built a test harness and ran the classifier over <strong>948 real public rule files</strong> — CLAUDE.md, AGENTS.md, AGENT.md, .cursorrules, Copilot instructions, GEMINI.md — from projects like React, PyTorch, Kubernetes, and Elasticsearch. 35,755 rules. Two things came out of it.</p>
+    <p>Fixing three bugs wasn't enough, because chasing individual false positives is itself the mistake. So we built a test harness and ran the classifier over <strong>1,870 real public rule files</strong> — CLAUDE.md, AGENTS.md, AGENT.md, .cursorrules, Copilot instructions, GEMINI.md, WARP.md, replit.md, Amazon Q, Junie, Roo, Continue, Cline, aider conventions — from projects like React, PyTorch, Kubernetes, and Elasticsearch. 72,078 rules. Two things came out of it.</p>
 
     <div class="bug">
       <div class="tag">Finding 1 — most "rules" in a rules file aren't rules</div>
@@ -113,7 +113,7 @@
       <p>So we changed the rule permanently, for every check, in every format: <strong>a text match never produces a failure.</strong> It reports what it found, quotes it, and says plainly that it can't distinguish a violation from a mention. Confident failures now come only from structured checks that read what was actually executed or written — an actual git command's actual branch argument, actual file edits, actual file operations. Three of those exist so far; more will follow, one category at a time.</p>
     </div>
 
-    <p>The measurable result: the fragile keyword path — the source of every false positive on this page — dropped from <strong>43.5% of real-world rules to about 10%</strong>, and the remainder can no longer report a false failure by construction. Verified across all 948 files, with no crashes.</p>
+    <p>The measurable result: the fragile keyword path — the source of every false positive on this page — dropped from <strong>43.5% of real-world rules to about 10%</strong>, and the remainder can no longer report a false failure by construction. Verified across all 1,870 files, with no crashes. The corpus later nearly doubled, adding around ten formats the classifier had never been tuned on — GEMINI.md, WARP.md, replit.md, Amazon Q, Junie, Roo, Continue, Cline, aider — and the distribution barely moved. That stability is the actual argument: directives are a property of language, not of file format.</p>
 
     <h2>Why we're publishing this instead of quietly fixing it</h2>
     <p>A tool whose entire purpose is "don't just trust the summary, show the evidence" doesn't get to ask for trust it isn't willing to extend to itself. We found these by actually using the tool on real work, the same way we're asking you to. If we'd hidden this, the next person to hit it would have had to find it themselves, with no idea whether it was a one-off or the whole thing being unreliable. Now you know exactly what was wrong, exactly how it was found, and exactly what changed.</p>

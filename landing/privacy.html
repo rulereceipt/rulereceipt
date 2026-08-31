@@ -51,7 +51,7 @@
 
     <h2>Network calls RuleReceipt makes (all opt-in)</h2>
     <p><strong>Anonymous install count:</strong> pass <code>rulereceipt check --telemetry</code> and it sends one random ID — generated once per machine, stored locally, never tied to your name or email — so we can count real distinct installs instead of guessing. That's the entire payload: one ID, nothing else. Off by default; even with the flag, <code>DO_NOT_TRACK=1</code> or <code>RULERECEIPT_NO_TELEMETRY=1</code> in your environment forces it back off. A raw HTTP request inherently exposes your IP and the request time to whatever server receives it (ours or anyone's) — we don't store or use that, but we're not going to pretend it isn't technically visible either.</p>
-    <p>For rules that need judgment rather than a simple pattern match, RuleReceipt calls the Claude API using your own Anthropic API key, only when you pass <code>--llm</code> — the same way Claude Code itself already does. That call goes directly from your machine to Anthropic. We don't proxy it, log it, or see it.</p>
+    <p>For rules that need judgment rather than a local check, RuleReceipt calls the Claude API using your own Anthropic API key, only when you pass <code>--llm</code> — the same way Claude Code itself already does. That call goes directly from your machine to Anthropic. We don't proxy it, log it, or see it.</p>
     <p>Running <code>rulereceipt check --share</code> is opt-in and off by default. If you use it, it sends aggregate pass/fail/unclear counts — never rule text, file paths, or session content.</p>
 
     <h2>This website</h2>

@@ -233,7 +233,15 @@ function hasMixedPolarity(rule: Rule): boolean {
   // most basic literal rule there is to the LLM. "NEVER squash when
   // merging PRs. Use `gh pr merge --merge`" is two clauses, and only the
   // second one's literals would be misattributed.
-  const clauses = text.split(/[.;\n]|(?:\s+-\s+)/).filter((c) => c.trim().length > 0);
+  //
+  // Code spans are masked before splitting. Real bug caught by the
+  // end-to-end violation tests: "Never leave a `console.log(` call in
+  // committed code" was split on the period INSIDE the code span, leaving
+  // a fragment ("log(` call in committed code") with no forbid word but a
+  // prescriptive one, so a plain prohibition was misread as mixed
+  // polarity and sent to judgment instead of being checked.
+  const masked = text.replace(/`[^`]*`/g, (m) => "`" + "x".repeat(Math.max(m.length - 2, 0)) + "`");
+  const clauses = masked.split(/[.;\n]|(?:\s+-\s+)/).filter((c) => c.trim().length > 0);
   return clauses.some(
     (clause) =>
       !FORBID_SIGNAL.test(clause) && (REQUIRE_SIGNAL.test(clause) || PRESCRIPTIVE_VERB.test(clause))

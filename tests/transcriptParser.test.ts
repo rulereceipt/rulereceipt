@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { dirname, join } from "node:path";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, utimesSync } from "node:fs";
-import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { readLatestTranscript, parseLine, findLatestSessionFile } from "../src/parsers/transcriptParser.js";
 
