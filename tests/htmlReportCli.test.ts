@@ -102,10 +102,18 @@ describe("rulereceipt check --html", () => {
     rmSync(target, { force: true });
   });
 
+  // Asserts on the structure the terminal report always emits, not on a
+  // loose word. The previous version checked for the lowercase string
+  // "fail", which passed locally only because a developer's global
+  // ~/.claude/CLAUDE.md happened to add rules whose text contained it, and
+  // broke in CI the moment the summary wording changed. A test that
+  // depends on the machine it runs on isn't testing the tool.
   it("still prints the terminal report when --html is used", () => {
     const out = run(["check", "--transcript", "session.jsonl", "--html", "both.html"]);
     expect(out).toContain("RuleReceipt");
-    expect(out).toContain("fail");
+    expect(out).toContain("rules checked");
+    expect(out).toMatch(/\d+ followed · \d+ not followed/);
+    expect(out).toContain("Never commit directly to main");
     rmSync(join(dir, "both.html"), { force: true });
   });
 });
