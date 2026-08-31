@@ -21,7 +21,7 @@ jobs:
       # >=22.22.2. On Node 20 the `npm install -g npm@latest` step below
       # fails EBADENGINE and no publish happens at all (real failure,
       # 2026-08-31, run 33362264889).
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           registry-url: "https://registry.npmjs.org"
