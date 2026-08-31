@@ -1,6 +1,6 @@
 {
   "name": "rulereceipt",
-  "version": "0.1.17",
+  "version": "0.1.18",
   "description": "Checks whether a Claude Code session actually followed your CLAUDE.md / AGENTS.md rules, with evidence.",
   "type": "module",
   "bin": {
@@ -18,7 +18,8 @@
     "dev": "tsx src/cli.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "eslint src tests"
+    "lint": "eslint src tests",
+    "prepublishOnly": "npm run build && npm test"
   },
   "engines": {
     "node": ">=18"
