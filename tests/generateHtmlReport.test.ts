@@ -121,10 +121,31 @@ describe("generateHtmlReport", () => {
       expect(html).toContain("verdict--fail");
     });
 
-    it("does not claim a clean result when rules still need human review", () => {
+    // Both unresolved kinds must appear in the headline. "No rule
+    // violations found" alone, when half the rules were never evaluated
+    // mechanically, reads as full coverage — which is the overclaim this
+    // whole report is built to avoid.
+    // The apostrophe arrives HTML-escaped, which is the escaping choke
+    // point doing its job on our own copy as well as on untrusted input.
+    it("does not claim a clean result when the evidence was ambiguous", () => {
       const html = generateHtmlReport([result({ status: "UNCLEAR" })], meta());
-      expect(html).toContain("need human review");
-      expect(html).toContain("verdict--unclear");
+      expect(html).toContain("couldn&#39;t be determined");
+      expect(html).toContain(`<div class="verdict verdict--unclear">`);
+    });
+
+    it("does not claim a clean result when rules still need human review", () => {
+      const html = generateHtmlReport([result({ status: "UNCLEAR", needsHuman: true })], meta());
+      expect(html).toContain("still need human review");
+      expect(html).not.toContain(`<div class="verdict verdict--pass">`);
+    });
+
+    // ...but a judgment call is not a failure, and must not be dressed as one.
+    // Scoped to the rendered element: the stylesheet always defines every
+    // verdict class regardless of outcome.
+    it("does not style a judgment call as a problem", () => {
+      const html = generateHtmlReport([result({ status: "UNCLEAR", needsHuman: true })], meta());
+      expect(html).not.toContain(`<div class="verdict verdict--fail">`);
+      expect(html).toContain(`<div class="verdict verdict--judgment">`);
     });
 
     // Scoped to the rendered verdict element, not the whole document — the

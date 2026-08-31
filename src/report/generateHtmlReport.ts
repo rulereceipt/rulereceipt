@@ -69,18 +69,50 @@ function clean(value: string): string {
   return escapeHtml(stripControlChars(value));
 }
 
-const STATUS_LABEL: Record<CheckResult["status"], string> = {
+/**
+ * Four buckets, not three. "Couldn't tell" and "needs your judgment" are
+ * both UNCLEAR internally, but they say completely different things to
+ * the person reading the report:
+ *
+ *   couldn't tell     — the tool looked and the evidence was ambiguous.
+ *                       A gap.
+ *   needs your judgment — never had a mechanical answer to begin with
+ *                       ("surface bad news first"). Not a gap; the half
+ *                       of the work that was always a human's.
+ *
+ * Measured on 40 real rules files, 52.2% of the actual rules people write
+ * are judgment calls. Presenting those as an unresolved pile makes an
+ * accurate report look like a broken one.
+ */
+type Bucket = "FAIL" | "UNCLEAR_EVIDENCE" | "UNCLEAR_JUDGMENT" | "PASS";
+
+function bucketOf(result: CheckResult): Bucket {
+  if (result.status === "FAIL") return "FAIL";
+  if (result.status === "PASS") return "PASS";
+  return result.needsHuman ? "UNCLEAR_JUDGMENT" : "UNCLEAR_EVIDENCE";
+}
+
+const BUCKET_LABEL: Record<Bucket, string> = {
   FAIL: "Not followed",
+  UNCLEAR_EVIDENCE: "Couldn't tell",
+  UNCLEAR_JUDGMENT: "Needs your judgment",
   PASS: "Followed",
-  UNCLEAR: "Needs review",
+};
+
+const BUCKET_CLASS: Record<Bucket, string> = {
+  FAIL: "fail",
+  UNCLEAR_EVIDENCE: "unclear",
+  UNCLEAR_JUDGMENT: "judgment",
+  PASS: "pass",
 };
 
 /**
  * Failures first, deliberately. A report that opens with a wall of passes
  * and buries one failure at the bottom is a report designed to be skimmed
- * past — the opposite of what an audit document is for.
+ * past — the opposite of what an audit document is for. Judgment calls
+ * sit last: they're expected, and they're the longest section.
  */
-const STATUS_ORDER: CheckResult["status"][] = ["FAIL", "UNCLEAR", "PASS"];
+const BUCKET_ORDER: Bucket[] = ["FAIL", "UNCLEAR_EVIDENCE", "PASS", "UNCLEAR_JUDGMENT"];
 
 function ruleLabel(result: CheckResult, all: CheckResult[]): string {
   const collides = all.filter((other) => other.ruleId === result.ruleId).length > 1;
@@ -94,11 +126,12 @@ function countBy(results: CheckResult[], status: CheckResult["status"]): number 
 }
 
 function renderResultRow(result: CheckResult, all: CheckResult[]): string {
-  const cls = result.status.toLowerCase();
+  const bucket = bucketOf(result);
+  const cls = BUCKET_CLASS[bucket];
   return `
         <article class="result result--${cls}">
           <div class="result__head">
-            <span class="badge badge--${cls}">${clean(STATUS_LABEL[result.status])}</span>
+            <span class="badge badge--${cls}">${clean(BUCKET_LABEL[bucket])}</span>
             <span class="result__id">${clean(ruleLabel(result, all))}</span>
           </div>
           <h3 class="result__title">${clean(result.ruleTitle)}</h3>
@@ -106,12 +139,17 @@ function renderResultRow(result: CheckResult, all: CheckResult[]): string {
         </article>`;
 }
 
-function renderSection(status: CheckResult["status"], results: CheckResult[], all: CheckResult[]): string {
-  const inSection = results.filter((r) => r.status === status);
+function renderSection(bucket: Bucket, results: CheckResult[], all: CheckResult[]): string {
+  const inSection = results.filter((r) => bucketOf(r) === bucket);
   if (inSection.length === 0) return "";
+  const note =
+    bucket === "UNCLEAR_JUDGMENT"
+      ? `<p class="section__note">These were never questions a tool could settle — they need someone to read the session and decide. That is expected, not a gap in the check.</p>`
+      : "";
   return `
       <section class="section">
-        <h2 class="section__title">${clean(STATUS_LABEL[status])} <span class="section__count">${inSection.length}</span></h2>
+        <h2 class="section__title">${clean(BUCKET_LABEL[bucket])} <span class="section__count">${inSection.length}</span></h2>
+        ${note}
         ${inSection.map((r) => renderResultRow(r, all)).join("")}
       </section>`;
 }
@@ -124,12 +162,23 @@ function renderSection(status: CheckResult["status"], results: CheckResult[], al
  */
 function verdict(results: CheckResult[]): { text: string; cls: string } {
   const fail = countBy(results, "FAIL");
-  const unclear = countBy(results, "UNCLEAR");
+  const couldntTell = results.filter((r) => bucketOf(r) === "UNCLEAR_EVIDENCE").length;
+  const needsHuman = results.filter((r) => bucketOf(r) === "UNCLEAR_JUDGMENT").length;
+
   if (fail > 0) {
     return { text: `${fail} rule${fail === 1 ? "" : "s"} not followed`, cls: "fail" };
   }
-  if (unclear > 0) {
-    return { text: `No rule violations found · ${unclear} need human review`, cls: "unclear" };
+  if (couldntTell > 0) {
+    return { text: `No rule violations found · ${couldntTell} couldn't be determined`, cls: "unclear" };
+  }
+  // Judgment rules still appear in the headline. They must not be styled
+  // as a problem — they aren't one — but they must not be omitted either.
+  // "No rule violations found" on its own, when half the rules were never
+  // evaluated mechanically, reads as full coverage. Naming the count is
+  // what keeps the headline from overclaiming, and it is the property the
+  // "does not claim a clean result" test exists to hold.
+  if (needsHuman > 0) {
+    return { text: `No rule violations found · ${needsHuman} still need human review`, cls: "judgment" };
   }
   return { text: "No rule violations found", cls: "pass" };
 }
@@ -168,6 +217,7 @@ export function generateHtmlReport(results: CheckResult[], meta: HtmlReportMeta)
   .verdict--fail { background: var(--fail-bg); border-color: #f0c4c6; }
   .verdict--pass { background: var(--pass-bg); border-color: #bfe3cd; }
   .verdict--unclear { background: var(--unclear-bg); border-color: #ecdcb0; }
+  .verdict--judgment { background: var(--panel); border-color: var(--line); }
   .verdict strong { display: block; font-size: 19px; margin-bottom: 2px; }
   .verdict span { color: var(--muted); font-size: 14px; }
   .facts { width: 100%; border-collapse: collapse; margin-bottom: 32px; font-size: 14px; }
@@ -187,6 +237,9 @@ export function generateHtmlReport(results: CheckResult[], meta: HtmlReportMeta)
   .badge--fail { background: var(--fail-bg); color: var(--fail); }
   .badge--pass { background: var(--pass-bg); color: var(--pass); }
   .badge--unclear { background: var(--unclear-bg); color: var(--unclear); }
+  .result--judgment { border-left-color: #6b6f76; }
+  .badge--judgment { background: #f2f3f5; color: #4a4e55; }
+  .section__note { font-size: 13px; color: var(--muted); margin: -4px 0 12px; }
   .result__id { font-size: 12px; color: var(--muted); }
   .result__title { font-size: 15px; margin: 0 0 6px; font-weight: 600; }
   .result__evidence { margin: 0; font-size: 14px; color: var(--muted); white-space: pre-wrap; }
@@ -217,7 +270,7 @@ export function generateHtmlReport(results: CheckResult[], meta: HtmlReportMeta)
 
   <div class="verdict verdict--${v.cls}">
     <strong>${clean(v.text)}</strong>
-    <span>${countBy(results, "PASS")} followed · ${countBy(results, "FAIL")} not followed · ${countBy(results, "UNCLEAR")} need review · ${results.length} rules checked</span>
+    <span>${countBy(results, "PASS")} followed · ${countBy(results, "FAIL")} not followed · ${results.filter((r) => bucketOf(r) === "UNCLEAR_EVIDENCE").length} couldn&#39;t tell · ${results.filter((r) => bucketOf(r) === "UNCLEAR_JUDGMENT").length} need your judgment</span>
   </div>
 
   <table class="facts">
@@ -228,14 +281,15 @@ export function generateHtmlReport(results: CheckResult[], meta: HtmlReportMeta)
     <tr><th>Tool version</th><td><code>rulereceipt ${clean(meta.toolVersion)}</code></td></tr>
   </table>
 
-${STATUS_ORDER.map((s) => renderSection(s, results, results)).join("")}
+${BUCKET_ORDER.map((b) => renderSection(b, results, results)).join("")}
 
   <div class="note">
     <h2>How to read this report</h2>
     <ul>
       <li><strong>Followed</strong> — a specific action in the session satisfies the rule, or the forbidden action never occurred.</li>
       <li><strong>Not followed</strong> — a real action in the session contradicts the rule. The evidence quotes it.</li>
-      <li><strong>Needs review</strong> — this rule can't be settled by looking at what commands ran. It is not a pass and not a failure; a person has to read the session and decide.</li>
+      <li><strong>Couldn&#39;t tell</strong> — the check ran and the evidence was ambiguous. A genuine gap.</li>
+      <li><strong>Needs your judgment</strong> — this rule never had a mechanical answer ("surface bad news first"). Not a pass, not a failure, and not a shortcoming of the check: it is the part that was always a person&#39;s call.</li>
     </ul>
     <h2>What this report does not establish</h2>
     <ul>

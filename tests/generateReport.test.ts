@@ -45,7 +45,7 @@ describe("generateReport (terminal)", () => {
 
   it("includes an accurate pass/fail/unclear summary count", () => {
     const output = generateReport(results, { sessionFilePath: null, ruleCount: 3 });
-    expect(output).toContain("1 pass · 1 fail · 1 unclear");
+    expect(output).toContain("1 followed · 1 not followed · 1 couldn't tell");
   });
 
   it("clearly labels demo/no-file state rather than showing a fake hash", () => {

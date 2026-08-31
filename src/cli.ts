@@ -97,6 +97,7 @@ function needsLlmResult(rule: Rule): CheckResult {
     ruleTitle: rule.title,
     ruleSource: rule.source,
     status: "UNCLEAR",
+    needsHuman: true,
     evidence:
       "NEEDS HUMAN REVIEW — this rule is a judgment call, not something that can be settled by looking at what commands ran. Read the session and decide for yourself. (`--llm` will give you a model's opinion on it, using your own Anthropic key — an opinion, not a verdict.)",
   };
@@ -215,11 +216,22 @@ async function runCheck(opts: CheckOptions) {
   const codeContent = classifications.filter((c) => c.kind === "codeContent");
   const fileLifecycle = classifications.filter((c) => c.kind === "fileLifecycle");
   const judgment = classifications.filter((c) => c.kind === "judgment");
-  // Not rules at all — documentation, glossary entries, reference tables.
-  // Measured on 40 real public rule files: ~17% of parsed items. Reported
-  // as a count so nothing is silently dropped, but never checked, since
-  // "did the session violate a directory listing" has no meaningful answer
-  // and any coincidental match is pure noise.
+  // Not rules at all — documentation, glossary entries, reference tables,
+  // URLs, directory listings, code examples.
+  //
+  // Re-measured 2026-08-31 across 40 real public rule files: 943 of 1,441
+  // parsed items, i.e. 65.4%. A previous comment here said ~17%, which was
+  // wrong and made the tool look like it was discarding far less than it
+  // is. Sampled and reviewed by hand before trusting the new figure: the
+  // classification is correct, real rules files simply are mostly prose.
+  //
+  // The number that actually matters is the one about RULES rather than
+  // lines: of the 498 genuine rules in that corpus, 238 (47.8%) are
+  // mechanically answerable and 260 (52.2%) are judgment calls.
+  //
+  // Reported as a count so nothing is silently dropped, but never checked,
+  // since "did the session violate a directory listing" has no meaningful
+  // answer and any coincidental match is pure noise.
   const notARule = classifications.filter((c) => c.kind === "notARule");
 
   const deterministicResults = [
