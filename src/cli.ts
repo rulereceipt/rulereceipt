@@ -26,7 +26,6 @@ import { enableSchedule, disableSchedule, scheduleStatus, type Cadence } from ".
 import { findSplitBrainConflicts } from "./checks/splitBrain.js";
 import { runDoctor } from "./checks/doctor.js";
 import { sendTelemetryPing, isTelemetryEnabled } from "./telemetry.js";
-import { loadOverrides, resolveOverrides } from "./overrides.js";
 import type { Rule, CheckResult } from "./types.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -265,26 +264,7 @@ async function runCheck(opts: CheckOptions) {
   // sends only a random install ID, never rule text or transcript content,
   // regardless of --llm.
   const judgmentResults = llm ? await runJudgmentChecks(judgment, events) : judgment.map(({ rule }) => needsLlmResult(rule));
-  const computed = [...deterministicResults, ...judgmentResults];
-
-  // Applied AFTER every check has run, and it only attaches a label.
-  // Nothing is skipped and no status is changed: an override that could
-  // suppress a check would let anyone delete their own violations, which
-  // is precisely what this design refuses to allow. See src/overrides.ts.
-  // Resolved against the rules actually present, and scoped by source: a
-  // global and a project rules file can both define "Rule 1", and a bare
-  // id would otherwise silently disable both.
-  const { bySourceAndId: overrides, problems: overrideProblems } = resolveOverrides(
-    loadOverrides(cwd),
-    computed.map((r) => ({ ruleId: r.ruleId, ruleSource: r.ruleSource }))
-  );
-  const results = computed.map((r) => {
-    const o = overrides.get(`${r.ruleSource}:${r.ruleId}`);
-    return o ? { ...r, overriddenReason: o.reason, overriddenDate: o.date } : r;
-  });
-  for (const problem of overrideProblems) {
-    console.log(`\n(${problem})`);
-  }
+  const results = [...deterministicResults, ...judgmentResults];
 
   const meta = { sessionFilePath, ruleCount: results.length };
   const reportText = markdown ? generateMarkdownReport(results, meta) : generateReport(results, meta);
@@ -336,9 +316,6 @@ async function runCheck(opts: CheckOptions) {
   // rules in a real CLAUDE.md need judgment, so without --llm they
   // legitimately report UNCLEAR. Gating on those would make every build
   // red on day one and the check would be deleted within a week.
-  // Deliberately reads .status, which an override never changes. If an
-  // overridden failure exited 0, CI would become the loophole this whole
-  // design exists to close: mark the rule, get a green build, done.
   if (!exitZero && results.some((r) => r.status === "FAIL")) {
     process.exitCode = 1;
   }

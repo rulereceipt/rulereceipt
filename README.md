@@ -93,38 +93,6 @@ on a session it never found.
 For most people the honest answer is simpler: run `rulereceipt check --html`
 locally and attach the report to the PR.
 
-## Correcting a misclassification
-
-If the tool treats something in your rules file as a rule when it isn't,
-create `.rulereceipt.json` in your project:
-
-```json
-{
-  "overrides": [
-    { "rule": "12", "reason": "changelog entry, not a rule", "date": "2026-08-31" }
-  ]
-}
-```
-
-Commit it. An override should be visible in code review, not just in the
-report.
-
-**An override cannot hide a violation, by design.** The check still runs,
-keeps its real result, and the override only adds a label. So the report
-shows the rule, its true result, your reason, and a line saying what the
-result would have been without the override. The headline count includes
-overridden failures, and the exit code still fails on them — otherwise CI
-would be the loophole.
-
-The worst an override can do is draw a labelled box around a real
-violation and sign it with your reason. That leaves a reader better
-informed than a plain failure would, not worse.
-
-A reason is required; an override without one is refused rather than
-applied quietly. If a rule id exists in both your global and project
-rules files, write `"project:12"` or `"global:12"` — a bare id that
-matches both is refused rather than silently disabling both.
-
 ## Sharing a report
 
 `rulereceipt check --html` writes one self-contained HTML file. No
@@ -160,7 +128,6 @@ rulereceipt check --html       # write a shareable single-file HTML report you c
 rulereceipt check --html report.html       # ...to a specific path
 rulereceipt check --require-session        # fail if there's no session, instead of passing silently
 rulereceipt check --exit-zero              # report failures without failing the build
-# .rulereceipt.json          # mark a misclassified item as not-a-rule (see below)
 rulereceipt check --llm        # opt-in: grade judgment rules with your own Claude key
 rulereceipt check --share      # opt-in: send anonymous pass/fail/unclear counts
 rulereceipt check --telemetry  # opt-in: send one random per-machine ID

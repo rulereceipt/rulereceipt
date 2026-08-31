@@ -42,15 +42,6 @@ export interface CheckResult {
   status: CheckStatus;
   evidence: string;
   /**
-   * Set when the user marked this rule as "not a rule for my project" in
-   * .rulereceipt.json. The status above is STILL the real, computed
-   * result — an override changes presentation only, never the answer.
-   * See src/overrides.ts for why that distinction is the whole design.
-   */
-  overriddenReason?: string;
-  /** Optional date from the override entry, so a reader can judge staleness. */
-  overriddenDate?: string;
-  /**
    * True when this rule was never mechanically answerable — a judgment
    * call like "surface bad news first", which has no command to inspect.
    *

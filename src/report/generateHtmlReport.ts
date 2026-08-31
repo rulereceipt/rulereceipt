@@ -168,15 +168,6 @@ function renderResultRow(result: CheckResult, all: CheckResult[]): string {
           </div>
           <h3 class="result__title">${clean(result.ruleTitle)}</h3>
           ${result.evidence ? `<p class="result__evidence">${clean(result.evidence)}</p>` : ""}
-          ${
-            result.overriddenReason
-              ? `<div class="override">
-            <strong>Marked by the developer as &ldquo;not a rule for this project&rdquo;${result.overriddenDate ? ` on ${clean(result.overriddenDate)}` : ""}.</strong>
-            Reason given: ${clean(result.overriddenReason)}
-            <span class="override__truth">Without this override, the result is: <strong>${clean(BUCKET_LABEL[bucketOf({ ...result, overriddenReason: undefined })])}</strong></span>
-          </div>`
-              : ""
-          }
         </article>`;
 }
 
@@ -281,9 +272,6 @@ export function generateHtmlReport(results: CheckResult[], meta: HtmlReportMeta)
   .result--judgment { border-left-color: #6b6f76; }
   .badge--judgment { background: #f2f3f5; color: #4a4e55; }
   .section__note { font-size: 13px; color: var(--muted); margin: -4px 0 12px; }
-  .override { margin-top: 10px; padding: 10px 12px; border-radius: 6px; background: var(--unclear-bg); border: 1px solid var(--unclear-line); font-size: 13.5px; color: var(--ink-soft); }
-  .override strong { color: var(--ink); }
-  .override__truth { display: block; margin-top: 6px; }
   .result__id { font-size: 12px; color: var(--muted); }
   .result__title { font-size: 15px; margin: 0 0 6px; font-weight: 600; }
   .result__evidence { margin: 0; font-size: 14px; color: var(--muted); white-space: pre-wrap; }
@@ -314,7 +302,7 @@ export function generateHtmlReport(results: CheckResult[], meta: HtmlReportMeta)
 
   <div class="verdict verdict--${v.cls}">
     <strong>${clean(v.text)}</strong>
-    <span>${countBy(results, "PASS")} followed · ${countBy(results, "FAIL")} not followed · ${results.filter((r) => bucketOf(r) === "UNCLEAR_EVIDENCE").length} couldn&#39;t tell · ${results.filter((r) => bucketOf(r) === "UNCLEAR_JUDGMENT").length} need your judgment${results.filter((r) => r.overriddenReason).length > 0 ? ` · ${results.filter((r) => r.overriddenReason).length} developer-overridden` : ""}</span>
+    <span>${countBy(results, "PASS")} followed · ${countBy(results, "FAIL")} not followed · ${results.filter((r) => bucketOf(r) === "UNCLEAR_EVIDENCE").length} couldn&#39;t tell · ${results.filter((r) => bucketOf(r) === "UNCLEAR_JUDGMENT").length} need your judgment</span>
   </div>
 
   <table class="facts">

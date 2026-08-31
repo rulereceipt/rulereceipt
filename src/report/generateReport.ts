@@ -75,22 +75,9 @@ function summaryLine(results: CheckResult[]): string {
   const needsHuman = results.filter((r) => r.status === "UNCLEAR" && r.needsHuman).length;
   const couldntTell = results.filter((r) => r.status === "UNCLEAR" && !r.needsHuman).length;
 
-  const overriddenFails = results.filter((r) => r.status === "FAIL" && r.overriddenReason).length;
-  const overridden = results.filter((r) => r.overriddenReason).length;
-
   const parts = [`${pass} followed`, `${fail} not followed`];
   if (couldntTell > 0) parts.push(`${couldntTell} couldn't tell`);
   if (needsHuman > 0) parts.push(`${needsHuman} need your judgment`);
-  // Named in the one line everyone reads. A headline that quietly folded
-  // overridden failures into a clean total would be the single most
-  // misleading thing this tool could print.
-  if (overridden > 0) {
-    parts.push(
-      overriddenFails > 0
-        ? `${overridden} user-overridden (${overriddenFails} still not followed)`
-        : `${overridden} user-overridden`
-    );
-  }
   return parts.join(" · ");
 }
 
@@ -102,17 +89,6 @@ export function generateReport(results: CheckResult[], meta: ReportMeta): string
   for (const r of clean) {
     lines.push(`${MARK[r.status]} ${r.status.padEnd(7)} ${ruleLabel(r, clean)}`);
     if (r.evidence) lines.push(`  evidence: ${r.evidence}`);
-    // The true status is printed above, unchanged. This line adds the
-    // override on top of it rather than replacing it — a reader must be
-    // able to see what the result would have been without the override.
-    if (r.overriddenReason) {
-      lines.push(
-        `  USER-OVERRIDDEN as "not a rule for this project"${r.overriddenDate ? ` on ${r.overriddenDate}` : ""} — reason: ${r.overriddenReason}`
-      );
-      if (r.status === "FAIL") {
-        lines.push("  NOTE: this rule was NOT FOLLOWED. The override does not change that.");
-      }
-    }
   }
   lines.push("─".repeat(40));
   lines.push(summaryLine(clean));
