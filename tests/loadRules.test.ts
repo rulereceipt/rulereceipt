@@ -78,4 +78,53 @@ describe("loadRules collects global CLAUDE.md from every .claude*-prefixed home 
     expect(hasMarker(rules, "office-marker", "global")).toBe(true);
     expect(hasMarker(rules, "project-marker", "project")).toBe(true);
   });
+
+  // Real gap: rules were only read from the exact directory the command
+  // ran in. Claude Code applies a rules file to everything beneath it, so
+  // in a monorepo the root CLAUDE.md governs packages/api — running the
+  // check there silently reported on a subset of the rules that applied.
+  describe("nested / monorepo rules files", () => {
+    it("reads a rules file from a parent directory, not just the cwd", () => {
+      writeFileSync(join(projectDir, "CLAUDE.md"), "## Rule\n- root-marker\n");
+      writeFileSync(join(projectDir, ".git"), "");
+      const pkg = join(projectDir, "packages", "api");
+      mkdirSync(pkg, { recursive: true });
+      const rules = loadRules(pkg);
+      expect(hasMarker(rules, "root-marker", "project")).toBe(true);
+    });
+
+    it("combines rules from every level, not just the nearest one", () => {
+      writeFileSync(join(projectDir, "CLAUDE.md"), "## Rule\n- root-marker\n");
+      writeFileSync(join(projectDir, ".git"), "");
+      const pkg = join(projectDir, "packages", "api");
+      mkdirSync(pkg, { recursive: true });
+      writeFileSync(join(pkg, "CLAUDE.md"), "## Rule\n- package-marker\n");
+      const rules = loadRules(pkg);
+      expect(hasMarker(rules, "root-marker", "project")).toBe(true);
+      expect(hasMarker(rules, "package-marker", "project")).toBe(true);
+    });
+
+    it("picks up AGENTS.md at a parent level too, not only CLAUDE.md", () => {
+      writeFileSync(join(projectDir, "AGENTS.md"), "## Rule\n- agents-root-marker\n");
+      writeFileSync(join(projectDir, ".git"), "");
+      const pkg = join(projectDir, "packages", "web");
+      mkdirSync(pkg, { recursive: true });
+      expect(hasMarker(loadRules(pkg), "agents-root-marker", "project")).toBe(true);
+    });
+
+    // the guard: stopping at the repo root means an unrelated rules file
+    // in a parent workspace is never pulled into this project
+    it("stops at the repository root and does not climb into unrelated parents", () => {
+      const outside = join(projectDir, "outside-marker-holder");
+      mkdirSync(outside, { recursive: true });
+      writeFileSync(join(projectDir, "CLAUDE.md"), "## Rule\n- outside-marker\n");
+      const repo = join(projectDir, "the-repo");
+      mkdirSync(repo, { recursive: true });
+      writeFileSync(join(repo, ".git"), "");
+      writeFileSync(join(repo, "CLAUDE.md"), "## Rule\n- repo-marker\n");
+      const rules = loadRules(repo);
+      expect(hasMarker(rules, "repo-marker", "project")).toBe(true);
+      expect(hasMarker(rules, "outside-marker", "project")).toBe(false);
+    });
+  });
 });

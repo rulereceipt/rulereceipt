@@ -80,13 +80,24 @@ async function emailResults(reportText: string): Promise<void> {
   }
 }
 
+/**
+ * A rule that genuinely requires judgment ("surface bad news first",
+ * "write readable code") has no mechanical answer. Reporting that as a
+ * deficiency of the tool ("run with --llm") frames the honest answer as a
+ * missing feature; it isn't. Deciding a subjective rule was followed is a
+ * human call, and saying so plainly is the product working correctly.
+ *
+ * --llm is offered as what it is — a second opinion from a model, still
+ * not a substitute for the reader's judgment.
+ */
 function needsLlmResult(rule: Rule): CheckResult {
   return {
     ruleId: rule.id,
     ruleTitle: rule.title,
     ruleSource: rule.source,
     status: "UNCLEAR",
-    evidence: "this rule needs judgment, not just pattern matching — run with --llm to grade it (opt-in: sends this rule's text and transcript excerpts to your own configured Anthropic key)",
+    evidence:
+      "NEEDS HUMAN REVIEW — this rule is a judgment call, not something that can be settled by looking at what commands ran. Read the session and decide for yourself. (`--llm` will give you a model's opinion on it, using your own Anthropic key — an opinion, not a verdict.)",
   };
 }
 
