@@ -1,6 +1,6 @@
 {
   "name": "rulereceipt",
-  "version": "0.1.19",
+  "version": "0.1.20",
   "description": "Checks whether a Claude Code session actually followed your CLAUDE.md / AGENTS.md rules, with evidence.",
   "repository": {
     "type": "git",
