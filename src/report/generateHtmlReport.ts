@@ -1,4 +1,5 @@
 import { basename } from "node:path";
+import { homedir } from "node:os";
 import type { CheckResult } from "../types.js";
 import { computeTranscriptHash, type ReportMeta } from "./generateReport.js";
 
@@ -64,9 +65,33 @@ function stripControlChars(value: string): string {
   return value.replace(/[\x00-\x09\x0B-\x1F\x7F-\x9F]/g, "");
 }
 
+/**
+ * Replaces the user's home directory with `~`.
+ *
+ * Found by dogfooding on a real session (2026-08-31): the shareable
+ * report is the one output explicitly designed to be emailed to someone
+ * else, and it was printing absolute paths like
+ * /Users/<realname>/Desktop/... in both the project header and inside
+ * quoted evidence. For anyone publishing under a pseudonym — or simply
+ * anyone who would rather not hand a stranger their username and
+ * directory layout — that is a leak in the one artifact most likely to
+ * leave the machine.
+ *
+ * This is a mechanical, judgment-free redaction: it removes the home
+ * prefix and nothing else. It is NOT a general secret scrubber, and must
+ * not be described as one. Rule text and evidence are still reproduced
+ * verbatim, because that is what makes the report useful — which is why
+ * the CLI warns the user to read the file before sending it.
+ */
+function redactHome(value: string): string {
+  const home = homedir();
+  if (!home || home === "/" || home.length < 4) return value;
+  return value.split(home).join("~");
+}
+
 /** Single choke point: nothing untrusted reaches the document except through this. */
 function clean(value: string): string {
-  return escapeHtml(stripControlChars(value));
+  return escapeHtml(stripControlChars(redactHome(value)));
 }
 
 /**

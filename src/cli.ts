@@ -129,6 +129,16 @@ function writeHtmlReport(
     writeFileSync(outPath, html, "utf-8");
     console.log(`\nShareable report written to ${outPath}`);
     console.log("Open it in a browser, attach it to an email, or print it to PDF. It's a single self-contained file.");
+    // Found by dogfooding on a real session (2026-08-31): this file
+    // reproduces rule text and quoted evidence verbatim, which is exactly
+    // what makes it useful — and means it inherits whatever is in the
+    // rules file. A real CLAUDE.md turned out to contain an employer
+    // name, an office email, and absolute paths. Home paths are redacted
+    // automatically; nothing else can be, so say so plainly at the moment
+    // the file is created rather than burying it in a policy page.
+    console.log(
+      "Read it before you send it: it quotes your rule text and session evidence verbatim, so anything sensitive in your CLAUDE.md is in there too. (Home paths are shortened to ~.)"
+    );
   } catch (err) {
     console.log(`\n(--html: couldn't write ${outPath} — ${err instanceof Error ? err.message : String(err)})`);
   }

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { tmpdir } from "node:os";
+import { tmpdir, homedir } from "node:os";
 import { generateHtmlReport, type HtmlReportMeta } from "../src/report/generateHtmlReport.js";
 import type { CheckResult } from "../src/types.js";
 
@@ -211,5 +211,44 @@ describe("generateHtmlReport", () => {
       expect(noCollide).toContain("Rule 1<");
       expect(noCollide).not.toContain("Rule 1 (project)");
     });
+  });
+});
+
+/**
+ * Home-path redaction. Found by dogfooding on a real session
+ * (2026-08-31): the shareable report — the one output explicitly designed
+ * to leave the machine — printed absolute paths like
+ * /Users/<realname>/Desktop/... in the project header AND inside quoted
+ * evidence. For anyone publishing under a pseudonym that is a leak in the
+ * worst possible artifact.
+ *
+ * Deliberately narrow: this removes the home prefix and nothing else. It
+ * is not a secret scrubber, and the CLI warns separately that rule text
+ * and evidence are reproduced verbatim.
+ */
+describe("absolute home paths never reach the shareable report", () => {
+  const home = homedir();
+
+  it("replaces the home directory in the project header", () => {
+    const html = generateHtmlReport([result()], meta({ projectPath: `${home}/Desktop/work/api` }));
+    expect(html).not.toContain(home);
+    expect(html).toContain("~/Desktop/work/api");
+  });
+
+  it("replaces the home directory inside quoted evidence", () => {
+    const html = generateHtmlReport([result({ evidence: `ran: cd ${home}/Desktop/secret-project && ls` })], meta());
+    expect(html).not.toContain(home);
+    expect(html).toContain("~/Desktop/secret-project");
+  });
+
+  it("replaces it in a rule title too", () => {
+    const html = generateHtmlReport([result({ ruleTitle: `Never touch ${home}/private` })], meta());
+    expect(html).not.toContain(home);
+  });
+
+  it("leaves unrelated absolute paths alone — this is not a path scrubber", () => {
+    const html = generateHtmlReport([result({ evidence: "wrote to /etc/hosts and /var/log/app.log" })], meta());
+    expect(html).toContain("/etc/hosts");
+    expect(html).toContain("/var/log/app.log");
   });
 });
