@@ -48,13 +48,30 @@ Published and live on npm, actively developed.
    - Lines containing no instruction at all — directory listings,
      reference tables, examples — aren't rules, and are reported as such
      instead of being checked.
-4. Prints a report — terminal table by default, or `--markdown` for
-   pasting into a PR or Slack message — showing what passed, what
-   failed, and a quoted line of evidence for each. Every report includes
-   a SHA-256 hash of the session file it checked, so anyone with that
-   file can confirm the report describes that exact file. (It proves the
-   report matches the file, not that the file is an unmodified record —
-   see SECURITY.md.)
+4. Prints a report — terminal table by default, `--markdown` for pasting
+   into a PR or Slack message, or `--html` for a shareable single file —
+   showing what passed, what failed, and a quoted line of evidence for
+   each. Every report includes a SHA-256 hash of the session file it
+   checked, so anyone with that file can confirm the report describes
+   that exact file. (It proves the report matches the file, not that the
+   file is an unmodified record — see SECURITY.md.)
+
+## Sharing a report
+
+`rulereceipt check --html` writes one self-contained HTML file. No
+external requests, no CDN, no fonts to fetch — so it opens correctly from
+an email attachment, offline, years later, and prints cleanly to PDF.
+
+It leads with what wasn't followed rather than burying it under passes,
+quotes the evidence for each result, and states plainly what it does not
+establish: it covers one session, it is not a compliance certification,
+and rules needing judgment are reported as needing review rather than
+guessed at. The session fingerprint and a runnable `rulereceipt verify`
+command are printed on the report itself, so the person receiving it can
+independently confirm it describes the session it claims to.
+
+Nothing is uploaded. The file is written to your working directory and
+goes wherever you choose to send it.
 
 ## Try it with zero setup
 
@@ -70,6 +87,8 @@ report so you can see the output shape immediately.
 ```bash
 rulereceipt check              # check the latest session in this project
 rulereceipt check --markdown   # same, formatted for pasting into a PR/Slack
+rulereceipt check --html       # write a shareable single-file HTML report you can send
+rulereceipt check --html report.html       # ...to a specific path
 rulereceipt check --llm        # opt-in: grade judgment rules with your own Claude key
 rulereceipt check --share      # opt-in: send anonymous pass/fail/unclear counts
 rulereceipt check --telemetry  # opt-in: send one random per-machine ID
