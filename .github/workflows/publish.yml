@@ -27,9 +27,16 @@ jobs:
           registry-url: "https://registry.npmjs.org"
           cache: npm
 
-      # trusted publishing needs a recent npm CLI (11.5.1+) -- don't rely
-      # on whatever version actions/setup-node's Node bundles
-      - run: npm install -g npm@latest
+      # Trusted publishing needs a recent npm CLI (11.5.1+) -- don't rely
+      # on whatever version actions/setup-node's Node bundles.
+      #
+      # Pinned exactly, not @latest. This is the step that publishes the
+      # package: @latest means whichever npm happens to be newest at
+      # publish time runs with id-token: write in scope, so a bad npm
+      # release lands straight in the release path with no review. A
+      # stale pin fails loudly and visibly; an unpinned one fails
+      # silently. Bump deliberately -- Dependabot does not track this.
+      - run: npm install -g npm@12.0.2
 
       # The tag is what triggers this workflow, but package.json is what
       # actually determines the published version. If they disagree, a
