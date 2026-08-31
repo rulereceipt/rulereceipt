@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -7,7 +8,11 @@ import { parseClaudeMd } from "../src/parsers/claudeMdParser.js";
 const REAL_GLOBAL_CLAUDE_MD = join(homedir(), ".claude", "CLAUDE.md");
 const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), "fixtures");
 
-describe("parseClaudeMd against the real global CLAUDE.md", () => {
+// Runs against the developer's actual global rules file — real, messy,
+// human-written input, which is the point. It doesn't exist on a CI
+// runner, so it's skipped there rather than failing: a test that can only
+// pass on one machine isn't a passing test, it's a false green.
+describe.skipIf(!existsSync(REAL_GLOBAL_CLAUDE_MD))("parseClaudeMd against the real global CLAUDE.md", () => {
   it("finds more than one rule", () => {
     const rules = parseClaudeMd(REAL_GLOBAL_CLAUDE_MD, "global");
     expect(rules.length).toBeGreaterThan(1);

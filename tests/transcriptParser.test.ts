@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { dirname, join } from "node:path";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, utimesSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { readLatestTranscript, parseLine, findLatestSessionFile } from "../src/parsers/transcriptParser.js";
 
@@ -92,7 +93,10 @@ describe("findLatestSessionFile across multiple Claude home directory variants",
   });
 });
 
-describe("readLatestTranscript against a real project's session history", () => {
+// Same reasoning as claudeMdParser's real-file suite: this reads actual
+// Claude Code session history from this machine. No such history exists
+// on a CI runner, so skip rather than fail.
+describe.skipIf(!findLatestSessionFile(REAL_CWD))("readLatestTranscript against a real project's session history", () => {
   it("returns a non-empty list of events for a project with real history", () => {
     const events = readLatestTranscript(REAL_CWD);
     expect(events.length).toBeGreaterThan(0);
