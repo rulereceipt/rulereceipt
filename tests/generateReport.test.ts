@@ -120,3 +120,68 @@ describe("generateMarkdownReport", () => {
     expect(output).not.toContain("| a | b |"); // the raw unescaped form
   });
 });
+
+/**
+ * Markdown table escaping. The original escaped only `|`, which broke a
+ * real table three ways — CodeQL flagged the backslash case
+ * (js/incomplete-sanitization); the unescaped rule title and the
+ * unhandled newline were found while fixing it. All three come from a
+ * user's own CLAUDE.md or their session text, so none are hypothetical.
+ */
+describe("markdown table cells cannot be broken by rule or evidence content", () => {
+  function md(over: Partial<CheckResult>): string {
+    const r: CheckResult = {
+      ruleId: "1",
+      ruleTitle: "A rule",
+      ruleSource: "project",
+      status: "PASS",
+      evidence: "some evidence",
+      ...over,
+    };
+    return generateMarkdownReport([r], { sessionFilePath: null, ruleCount: 1 });
+  }
+
+  /**
+   * Counts real column separators the way a markdown renderer does: a `|`
+   * is a separator unless preceded by an ODD number of backslashes.
+   *
+   * A naive /(?<!\\)\|/ is wrong here, and wrong in the exact case that
+   * matters — it treats the `|` in `\\|` as escaped when a renderer sees
+   * an escaped BACKSLASH followed by a live separator. That blind spot
+   * made this suite pass against the very bug CodeQL reported, which is
+   * why the red run for this fix was run before trusting it.
+   */
+  function separatorsInDataRow(markdown: string): number {
+    const row = markdown.split("\n").find((l) => l.startsWith("| ") && !l.startsWith("|---") && !l.includes("Status |"));
+    if (!row) throw new Error("no data row found");
+    let count = 0;
+    let backslashes = 0;
+    for (const ch of row) {
+      if (ch === "\\") backslashes++;
+      else {
+        if (ch === "|" && backslashes % 2 === 0) count++;
+        backslashes = 0;
+      }
+    }
+    return count;
+  }
+  const pipesInDataRow = separatorsInDataRow;
+
+  it("escapes a backslash before a pipe, so the row is not split", () => {
+    expect(pipesInDataRow(md({ evidence: "matched \\| in a regex" }))).toBe(4);
+  });
+
+  it("escapes a pipe in the RULE TITLE, not only in evidence", () => {
+    expect(pipesInDataRow(md({ ruleTitle: "Never run `cat x | sh`" }))).toBe(4);
+  });
+
+  it("keeps a newline in evidence from ending the table row", () => {
+    const out = md({ evidence: "line one\nline two" });
+    expect(pipesInDataRow(out)).toBe(4);
+    expect(out).toContain("<br>");
+  });
+
+  it("survives all three at once", () => {
+    expect(pipesInDataRow(md({ ruleTitle: "a | b", evidence: "x \\| y\nz | w" }))).toBe(4);
+  });
+});

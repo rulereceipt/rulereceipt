@@ -80,6 +80,32 @@ export function generateReport(results: CheckResult[], meta: ReportMeta): string
   return lines.join("\n");
 }
 
+/**
+ * Makes a value safe to place inside a markdown table cell.
+ *
+ * The previous version escaped only `|`, which broke a real table three
+ * separate ways (first found by CodeQL js/incomplete-sanitization, the
+ * other two while fixing it):
+ *
+ * 1. Backslash was not escaped, so evidence containing a literal `\|`
+ *    became `\\|` — rendering as a backslash followed by a live column
+ *    separator, splitting the row. Backslash must be escaped FIRST, or
+ *    it re-escapes the pipes added afterwards.
+ * 2. The rule TITLE was not escaped at all, so any rule whose title
+ *    contains a pipe broke the table. Titles come from a user's
+ *    CLAUDE.md, and pipes appear naturally in shell examples.
+ * 3. Newlines were not handled. stripControlChars deliberately keeps
+ *    `\n` so multi-line evidence stays readable in the terminal, but a
+ *    newline inside a table cell ends the row and destroys everything
+ *    below it. Rendered as a literal <br> instead.
+ */
+function escapeMarkdownCell(value: string): string {
+  return value
+    .replace(/\\/g, "\\\\")
+    .replace(/\|/g, "\\|")
+    .replace(/\r?\n/g, "<br>");
+}
+
 export function generateMarkdownReport(results: CheckResult[], meta: ReportMeta): string {
   const clean = results.map(sanitize);
   const lines: string[] = [];
@@ -88,8 +114,8 @@ export function generateMarkdownReport(results: CheckResult[], meta: ReportMeta)
   lines.push("| Status | Rule | Evidence |");
   lines.push("|---|---|---|");
   for (const r of clean) {
-    const evidence = (r.evidence || "").replace(/\|/g, "\\|");
-    lines.push(`| ${MARK[r.status]} ${r.status} | ${ruleLabel(r, clean)} | ${evidence} |`);
+    const evidence = escapeMarkdownCell(r.evidence || "");
+    lines.push(`| ${MARK[r.status]} ${r.status} | ${escapeMarkdownCell(ruleLabel(r, clean))} | ${evidence} |`);
   }
   lines.push("");
   const hash = computeTranscriptHash(meta.sessionFilePath);

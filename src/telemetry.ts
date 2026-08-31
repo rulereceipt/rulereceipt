@@ -60,6 +60,16 @@ export function isTelemetryEnabled(telemetryFlag: boolean): boolean {
  * session content, or even pass/fail counts (that's what opt-in --share is
  * for). A send failure must never affect the `check` command's own exit
  * code or output; this is best-effort and silent on failure.
+ *
+ * CodeQL flags this as js/file-access-to-http ("outbound network request
+ * depends on file data"), which is technically accurate and not a real
+ * issue: the file it reads is ~/.rulereceipt/telemetry-id, whose entire
+ * contents are a random UUID this tool generated and wrote itself. No
+ * user content, no path, and nothing derived from the session ever
+ * reaches this request. Reviewed and dismissed deliberately rather than
+ * left open — a permanently red alert list is one nobody reads. If the
+ * payload here ever grows beyond `{ id }`, that decision is void and
+ * this needs re-reviewing.
  */
 export async function sendTelemetryPing(): Promise<void> {
   const id = getOrCreateTelemetryId();
