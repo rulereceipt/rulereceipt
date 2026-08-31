@@ -513,7 +513,7 @@
     <div class="trace-stage">
       <div class="trace-panel">
         <div class="label-row"><span>rule adherence, this session</span><span id="trace-status">reading session…</span></div>
-        <canvas id="trace" role="img" aria-label="Rule adherence trace for this session: 8 rules passed, 1 rule (Rule 4, surface bad news first) failed, 1 rule (Rule 11) unclear, then held steady"></canvas>
+        <canvas id="trace" role="img" aria-label="Rule adherence trace for this session: 8 rules followed, 1 rule (Rule 4, surface bad news first) not followed, 1 rule (Rule 11) needing human judgment, then held steady"></canvas>
       </div>
     </div>
   </div>
@@ -540,9 +540,9 @@
             <span class="r-mark unclear">?</span>
             <span class="r-body">Rule 11 — Fails closed on error</span>
           </div>
-          <div class="r-evidence">evidence: no error occurred this session, nothing to verify against</div>
+          <div class="r-evidence">needs your judgment: no error occurred this session, so there is nothing to check against — a person has to decide</div>
         </div>
-        <div class="r-foot"><span>8 pass · 2 fail · 1 unclear</span><span>no rule text or results sent</span></div>
+        <div class="r-foot"><span>8 followed · 2 not followed · 1 needs your judgment</span><span>no rule text or results sent</span></div>
       </div>
     </div>
   </div>
@@ -904,7 +904,7 @@
       progress += 0.006;
       requestAnimationFrame(draw);
     } else {
-      statusEl.textContent = '8 pass · 2 fail · 1 unclear';
+      statusEl.textContent = '8 followed · 2 not followed · 1 needs your judgment';
     }
   }
 
