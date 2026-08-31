@@ -1,0 +1,58 @@
+version: 2
+
+# Dependabot security alerts were already enabled on this repository, but
+# those only fire once an advisory is published. This adds scheduled
+# version updates so dependencies don't drift years behind and then have
+# to be upgraded all at once under time pressure — which is how a
+# "routine" bump turns into a breaking change nobody has time to review.
+
+updates:
+  # The published CLI. Production dependencies here reach every person who
+  # installs the package, so these are the updates that actually matter.
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:00"
+    open-pull-requests-limit: 5
+    groups:
+      # One PR for the dev toolchain rather than five. These cannot reach
+      # a user who installs the package, so reviewing them individually
+      # buys nothing and just creates noise that trains you to skim.
+      dev-dependencies:
+        dependency-type: development
+        update-types: [minor, patch]
+    commit-message:
+      prefix: "deps"
+      prefix-development: "deps-dev"
+
+  # The landing site is a separate package with its own lockfile and its
+  # own CI job, so it needs its own entry — a single "/" entry would
+  # silently never update it.
+  - package-ecosystem: npm
+    directory: "/landing"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:00"
+    open-pull-requests-limit: 5
+    groups:
+      dev-dependencies:
+        dependency-type: development
+        update-types: [minor, patch]
+    commit-message:
+      prefix: "deps"
+      prefix-development: "deps-dev"
+
+  # The workflows themselves are a supply-chain surface: a compromised or
+  # abandoned action runs with repository permissions, and publish.yml in
+  # particular holds id-token: write for npm trusted publishing.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:00"
+    commit-message:
+      prefix: "ci"

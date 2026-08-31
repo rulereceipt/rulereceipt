@@ -12,13 +12,13 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>RuleReceipt — Privacy</title>
-<meta name="description" content="What RuleReceipt does with your data — an anonymous install count by default, and exactly what the opt-in --share and --llm flags send." />
+<meta name="description" content="What RuleReceipt does with your data — zero network calls by default, and exactly what the opt-in --telemetry, --share and --llm flags send." />
 <link rel="canonical" href="https://rulereceipt.dev/privacy" />
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23FAFAF7'/%3E%3Cpath d='M9 8h14v17l-3-2-3 2-3-2-3 2-2-2z' fill='none' stroke='%2317191C' stroke-width='1.6'/%3E%3Cpath d='M12 14h8M12 18h6' stroke='%2317805F' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E" />
 <meta property="og:type" content="website" />
 <meta property="og:url" content="https://rulereceipt.dev/privacy" />
 <meta property="og:title" content="RuleReceipt — Privacy" />
-<meta property="og:description" content="What RuleReceipt does with your data — an anonymous install count by default, and exactly what the opt-in --share and --llm flags send." />
+<meta property="og:description" content="What RuleReceipt does with your data — zero network calls by default, and exactly what the opt-in --telemetry, --share and --llm flags send." />
 <meta property="og:image" content="https://rulereceipt.dev/og-image.png" />
 <meta property="og:image:width" content="1200" />
 <meta property="og:image:height" content="630" />
@@ -26,7 +26,7 @@
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:image" content="https://rulereceipt.dev/og-image.png" />
 <meta name="twitter:title" content="RuleReceipt — Privacy" />
-<meta name="twitter:description" content="What RuleReceipt does with your data — an anonymous install count by default, and exactly what the opt-in --share and --llm flags send." />
+<meta name="twitter:description" content="What RuleReceipt does with your data — zero network calls by default, and exactly what the opt-in --telemetry, --share and --llm flags send." />
 <style>
   body { margin:0; background:#FAFAF7; color:#17191C; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:17px; line-height:1.6; }
   .wrap { max-width:620px; margin:0 auto; padding:60px 24px 80px; }
@@ -42,12 +42,14 @@
   <div class="wrap">
     <a class="back" href="/">&larr; RuleReceipt</a>
     <h1>Privacy</h1>
-    <div class="updated">Last updated 17 August 2026</div>
+    <div class="updated">Last updated 31 August 2026</div>
 
     <p>RuleReceipt is a command-line tool that runs on your own computer. This page explains, plainly, what that means for your data.</p>
 
     <h2>What RuleReceipt does with your data</h2>
     <p>Nothing, by default. RuleReceipt reads your CLAUDE.md/AGENTS.md file and your local Claude Code session transcript on your machine, and prints a report to your terminal. None of that content — no rule text, no file paths, no session content — is ever sent to us, stored by us, or seen by us. Plain <code>rulereceipt check</code> makes zero network calls.</p>
+
+    <p><strong>The shareable report is written locally, not uploaded.</strong> Passing <code>--html</code> writes a single self-contained file into your working directory and nothing else — no upload, no network call, no copy kept anywhere. That file does contain your rule text and evidence quoted from your session, because that's what makes it useful to send. It goes only where you choose to send it, and it's worth knowing what's in it before you forward it to someone.</p>
 
     <h2>Network calls RuleReceipt makes (all opt-in)</h2>
     <p><strong>Anonymous install count:</strong> pass <code>rulereceipt check --telemetry</code> and it sends one random ID — generated once per machine, stored locally, never tied to your name or email — so we can count real distinct installs instead of guessing. That's the entire payload: one ID, nothing else. Off by default; even with the flag, <code>DO_NOT_TRACK=1</code> or <code>RULERECEIPT_NO_TELEMETRY=1</code> in your environment forces it back off. A raw HTTP request inherently exposes your IP and the request time to whatever server receives it (ours or anyone's) — we don't store or use that, but we're not going to pretend it isn't technically visible either.</p>

@@ -1,0 +1,51 @@
+name: OpenSSF Scorecard
+
+# Publishes an independent, third-party security score for this repository
+# (branch protection, pinned dependencies, signed releases, SAST coverage,
+# token permissions, and so on).
+#
+# The reason to run it here rather than self-assess: this project asks
+# people to run a CLI against their own source and trust its output. "We
+# take security seriously" is worth nothing as a claim. A score produced
+# by someone else, from public evidence, that anyone can re-run and that
+# goes DOWN when we get sloppy, is worth something.
+
+on:
+  branch_protection_rule:
+  schedule:
+    - cron: "0 7 * * 1"
+  push:
+    branches: [main]
+
+permissions: read-all
+
+jobs:
+  analysis:
+    name: Scorecard analysis
+    runs-on: ubuntu-latest
+    permissions:
+      # Needed to upload results so they appear in the Security tab.
+      security-events: write
+      id-token: write
+      contents: read
+      actions: read
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Run analysis
+        uses: ossf/scorecard-action@v2
+        with:
+          results_file: results.sarif
+          results_format: sarif
+          # publish_results makes the score publicly retrievable, which is
+          # the entire point — a private score nobody can check is just a
+          # self-assessment with extra steps.
+          publish_results: true
+
+      - name: Upload to code scanning
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: results.sarif

@@ -1,0 +1,60 @@
+name: CodeQL
+
+# Static analysis on every change and weekly, so a vulnerability
+# introduced by a dependency-driven refactor or a slow-burning pattern
+# gets found even in a week where nothing was pushed.
+#
+# This exists because of what the tool is: RuleReceipt reads untrusted
+# input by design — a CLAUDE.md that may arrive with a cloned repo, and
+# session transcripts containing arbitrary text — and renders it into a
+# terminal, a markdown file, and an HTML document meant to be opened by
+# someone else. A security-adjacent tool shipping with no static analysis
+# is not a defensible position.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Mondays, 06:00 UTC. Off-hours, and early enough in the week that a
+    # finding has working days left in it.
+    - cron: "0 6 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: Analyze
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      packages: read
+      actions: read
+      contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: javascript-typescript
+            build-mode: none
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+          # security-and-quality is broader than the default security-only
+          # pack: it also flags correctness issues that become security
+          # issues later. Worth the extra noise for a tool like this.
+          queries: security-and-quality
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"

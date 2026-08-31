@@ -618,6 +618,8 @@
         <div class="trust-cell"><h3><span class="mark">—</span> We never touch settings.json</h3><p>Read-only, always. RuleReceipt only reads CLAUDE.md and your session transcript — it never writes to settings.json, never installs a hook, never changes anything without you asking.</p></div>
       </div>
       <div style="height:20px"></div>
+      <div class="security-note"><strong>You can verify the package you install came from the code you read.</strong> Every release is built and published by GitHub Actions and signed with npm provenance — no publishing token exists on anyone's laptop to be stolen. After installing, run <code>npm audit signatures</code> and npm will confirm the package was built from this public repository, at a specific commit. That's the appropriate standard for a tool whose whole job is verification, and it's checkable by you, not asserted by us.</div>
+      <div style="height:14px"></div>
       <div class="security-note"><strong>Worth saying directly, given the year it's been:</strong> malicious npm packages have specifically targeted Claude Code's hook system — planting code in <code>.claude/settings.json</code> that runs automatically on every session. RuleReceipt does none of that. It runs only when you type the command. Nothing automatic, nothing silent.</div>
       <div style="height:14px"></div>
       <div class="security-note"><strong>This isn't hypothetical.</strong> In July 2026, independent researchers found that a competing terminal coding agent was packaging entire codebases — including files never explicitly opened — into archives and uploading them to the vendor's cloud storage, with reports that the opt-out setting didn't reliably stop it. That's exactly the blind spot this tool exists to close: not "trust the agent," but see, with evidence, what it actually did.</div>
@@ -650,6 +652,29 @@
       </div>
 
       <p class="band-sub" style="font-size:0.82rem; margin-top:18px;">Figures above are dated on purpose — they're from specific 2026 studies and will age. The structural argument is what we'd stand behind regardless: an independent record beats a self-report, whatever the current numbers say.</p>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap-wide">
+      <h2>Send someone the result</h2>
+      <p class="band-sub">A terminal report can't leave the terminal. One flag writes a single file you can email, attach to a ticket, or print to PDF.</p>
+
+      <div class="install" id="copy-html" data-copy="npx rulereceipt check --html" data-loc="html-section" role="button" tabindex="0" title="Click to copy">
+        <span class="prompt">$</span>
+        <span class="cmd">npx rulereceipt check --html</span>
+      </div>
+
+      <div class="trust-grid" style="margin-top:26px;">
+        <div class="trust-cell"><h3><span class="mark">—</span> Opens anywhere, forever</h3><p>One self-contained file. No CDN, no fonts, no scripts, nothing loaded from the internet — so it still opens correctly from an email attachment, offline, years from now.</p></div>
+        <div class="trust-cell"><h3><span class="mark">—</span> Failures first, never buried</h3><p>What wasn't followed sits at the top, not underneath a comfortable list of passes. A report designed to be skimmed past isn't a report.</p></div>
+        <div class="trust-cell"><h3><span class="mark">—</span> It says what it can't prove</h3><p>It never says "compliant." It covers one session, and rules needing judgment are marked for human review rather than guessed at — printed on the report itself, not hidden in a policy page.</p></div>
+      </div>
+
+      <div style="height:20px"></div>
+      <div class="security-note"><strong>The person receiving it can check it's real.</strong> Every report carries a SHA-256 fingerprint of the session file it read, and the command to verify it. Hand someone a report and the session, and they can confirm the report describes that exact file, unaltered — they don't have to take the sender's word for it. An edited session produces a different fingerprint.</div>
+      <div style="height:14px"></div>
+      <div class="security-note"><strong>Still written locally, still nothing uploaded.</strong> The file lands in your working directory and goes only where you choose to send it. Same as every other part of this tool — no server of ours is involved.</div>
     </div>
   </section>
 

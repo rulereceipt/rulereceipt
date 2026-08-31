@@ -1,7 +1,19 @@
 # RuleReceipt
 
+[![CI](https://github.com/rulereceipt/rulereceipt/actions/workflows/ci.yml/badge.svg)](https://github.com/rulereceipt/rulereceipt/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/rulereceipt/rulereceipt/actions/workflows/codeql.yml/badge.svg)](https://github.com/rulereceipt/rulereceipt/actions/workflows/codeql.yml)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/rulereceipt/rulereceipt/badge)](https://scorecard.dev/viewer/?uri=github.com/rulereceipt/rulereceipt)
+[![npm](https://img.shields.io/npm/v/rulereceipt)](https://www.npmjs.com/package/rulereceipt)
+[![provenance](https://img.shields.io/badge/npm-provenance%20signed-blue)](https://www.npmjs.com/package/rulereceipt#provenance)
+
 Checks whether a Claude Code session actually followed the rules in your
 CLAUDE.md / AGENTS.md — with evidence, not just a vibe.
+
+Every release from 0.1.19 on is built and published by GitHub Actions and
+signed with [npm provenance](https://docs.npmjs.com/generating-provenance-statements),
+so you can verify the published package was built from this repository at
+a specific commit. No publishing token exists to be stolen. Check it
+yourself with `npm audit signatures` after installing.
 
 Licensed source-available software — see [LICENSE](./LICENSE) and
 [NOTICE.md](./NOTICE.md) before reusing this code.
