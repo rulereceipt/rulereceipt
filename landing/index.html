@@ -641,6 +641,14 @@
         <strong>Where the rules are heading.</strong> Singapore's <a href="https://www.imda.gov.sg/resources/press-releases-factsheets-and-speeches/press-releases/2026/new-model-ai-governance-framework-for-agentic-ai" target="_blank" rel="noopener">Model AI Governance Framework for Agentic AI</a> (January 2026, the first of its kind) asks for a verifiable identity per agent and an audit trail of which agent acted under whose authorization. It's voluntary guidance, not enforcement — and the EU AI Act's high-risk obligations were pushed to December 2027, not this year. We'd rather say that plainly than manufacture a deadline. The direction is clear even where the dates aren't.
       </div>
 
+      <div class="security-note" style="margin-top:26px;">
+        <strong>How we know it's accurate — because we got it wrong first.</strong> We ran this against a real session and it reported ten rule violations. Every one was wrong. Rather than patch them, we found the cause: <em>a text match can never prove someone did something</em> — searching a session for a banned command finds it whether the agent ran it, looked it up, or mentioned it in a note. So we rebuilt it to read what actually happened, and a text match can no longer report a failure at all. Where it isn't certain, it says so instead of guessing. The whole thing is written up, including the wrong turn we took fixing it: <a href="/postmortem">what we got wrong</a>.
+      </div>
+
+      <div class="security-note">
+        <strong>Tested against real rules files, not our own examples.</strong> 1,870 public CLAUDE.md, AGENTS.md, .cursorrules, Copilot, Gemini and other rules files — from React, PyTorch, Kubernetes and hundreds of other projects — covering 72,078 rules across 14 formats, with no crashes. When that corpus nearly doubled with formats the tool had never been tuned on, its behaviour barely moved. And it's tested the other way too: sessions that deliberately break a rule, to confirm it catches them, not just that it stays quiet on good ones.
+      </div>
+
       <p class="band-sub" style="font-size:0.82rem; margin-top:18px;">Figures above are dated on purpose — they're from specific 2026 studies and will age. The structural argument is what we'd stand behind regardless: an independent record beats a self-report, whatever the current numbers say.</p>
     </div>
   </section>
