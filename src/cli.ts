@@ -137,7 +137,9 @@ function writeHtmlReport(
     // automatically; nothing else can be, so say so plainly at the moment
     // the file is created rather than burying it in a policy page.
     console.log(
-      "Read it before you send it: it quotes your rule text and session evidence verbatim, so anything sensitive in your CLAUDE.md is in there too. (Home paths are shortened to ~.)"
+      "\n⚠ This report includes your rule text and session evidence VERBATIM.\n" +
+        "  Review it before sharing outside your team — only you know what's in your rules file.\n" +
+        "  Nothing is auto-redacted: this tool cannot tell which of your own rules are sensitive."
     );
   } catch (err) {
     console.log(`\n(--html: couldn't write ${outPath} — ${err instanceof Error ? err.message : String(err)})`);

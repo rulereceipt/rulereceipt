@@ -262,3 +262,60 @@ describe("classifyRule", () => {
     });
   });
 });
+
+/**
+ * An incident write-up is a record of something that happened. It is not
+ * a directive addressed to the agent, and enforcing it produces results
+ * that are worse than useless.
+ *
+ * Found by running the tool on a real session (2026-08-31). A section
+ * titled "Real incident (2026-08-28): Vercel had the same office/personal
+ * mixup" was classified as a REQUIRE rule whose pattern was an employer
+ * name lifted out of the narrative — so the report announced FOLLOWED
+ * because that name appeared somewhere in the session. The rule being
+ * "satisfied" was a sentence describing a past mistake.
+ *
+ * These sections do contain directives further down ("Verify with
+ * `vercel whoami` before every deploy"), which is why the existing
+ * directive test passes on them and why this needs its own signal: what
+ * the section IS, is announced by its title.
+ */
+describe("incident write-ups are records, not rules", () => {
+  it("does not enforce a dated incident report", () => {
+    const rule = makeRule(
+      "`vercel whoami` returned `tools-9274` under team `acme-ai` (office) — a completely separate login. Fix required a full re-auth. Verify with `vercel whoami` before every `vercel --prod` deploy.",
+      "Real incident (2026-08-28): Vercel had the same office/personal mixup"
+    );
+    expect(classifyRule(rule).kind).toBe("notARule");
+  });
+
+  it("does not enforce an incident report whose title states an outcome", () => {
+    const rule = makeRule(
+      "Every deployment from 2026-08-26 through 2026-08-29 was stuck Blocked. The real cause: the Git repository was never connected.",
+      "Real incident (2026-08-29): the actual deploy-blocker was never the email"
+    );
+    expect(classifyRule(rule).kind).toBe("notARule");
+  });
+
+  it("does not enforce a postmortem section", () => {
+    const rule = makeRule(
+      "The migration ran twice because the lock was released early. Always take the lock before starting.",
+      "Postmortem: what went wrong with the March rollout"
+    );
+    expect(classifyRule(rule).kind).toBe("notARule");
+  });
+
+  // The guard. A real directive must keep working even when it mentions
+  // an incident as its justification — that is how good rules are written.
+  it("STILL enforces a real rule that cites an incident as its reason", () => {
+    const rule = makeRule(
+      "After the incident on 2026-08-28, all work happens on a branch. Never commit directly to `main`.",
+      "Never commit directly to `main`"
+    );
+    expect(classifyRule(rule).kind).not.toBe("notARule");
+  });
+
+  it("STILL enforces a rule whose title is an ordinary directive", () => {
+    expect(classifyRule(makeRule("Always run `npm test` before pushing.", "Always run `npm test` before pushing")).kind).not.toBe("notARule");
+  });
+});

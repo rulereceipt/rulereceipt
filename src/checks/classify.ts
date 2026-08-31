@@ -142,7 +142,50 @@ const IMPERATIVE_INSTRUCTION =
  * with no instruction in it has nothing to check compliance against,
  * whatever its punctuation.
  */
+/**
+ * A section whose TITLE announces a record of something that happened —
+ * an incident, a postmortem, a retrospective. These are written to
+ * explain history, not to instruct the agent.
+ *
+ * Found by running this tool on a real session (2026-08-31): a section
+ * titled "Real incident (2026-08-28): Vercel had the same office/personal
+ * mixup" was enforced as a REQUIRE rule whose pattern was an employer
+ * name pulled out of the narrative, so the report announced FOLLOWED
+ * because that name appeared somewhere in the session. The rule being
+ * "satisfied" was a sentence describing a past mistake.
+ *
+ * The existing directive test cannot catch these, and correctly so: a
+ * good incident note ends with the lesson ("Verify with `vercel whoami`
+ * before every deploy"), so it genuinely does contain a directive. What
+ * the section IS gets announced by its title, which is where this looks.
+ *
+ * Kept to a small closed class of words that name a record of an event,
+ * in the same spirit as DIRECTIVE_LANGUAGE above — a bounded property of
+ * language, not an enumeration of document formats. Enumerating formats
+ * is the mistake this project already made once and wrote up publicly.
+ */
+const EVENT_RECORD_TITLE = /\b(incident|post-?mortem|retro(spective)?|outage|what went wrong)\b/i;
+
+/**
+ * A title that OPENS with an instruction is a rule, whatever it goes on
+ * to mention. "Never repeat the 2026-08-28 incident" is a directive that
+ * happens to name an incident; "Real incident (2026-08-28): ..." is a
+ * report that happens to contain the word never further along.
+ */
+const TITLE_OPENS_WITH_DIRECTIVE =
+  /^\s*[-*+\d.\s]*(never|always|must|do not|don't|dont|avoid|ensure|prefer|only|make sure|be sure)\b/i;
+
+function isEventRecord(rule: Rule): boolean {
+  if (TITLE_OPENS_WITH_DIRECTIVE.test(rule.title)) return false;
+  if (IMPERATIVE_INSTRUCTION.test(rule.title)) return false;
+  return EVENT_RECORD_TITLE.test(rule.title);
+}
+
 function isNotARule(rule: Rule): boolean {
+  // Checked before the directive test on purpose: an incident note that
+  // ends with its lesson contains a real directive, and would otherwise
+  // be enforced as though the history itself were the rule.
+  if (isEventRecord(rule)) return true;
   const combined = `${rule.title} ${rule.text}`;
   if (DIRECTIVE_LANGUAGE.test(combined)) return false;
   // Title and text are tested SEPARATELY: the imperative pattern is

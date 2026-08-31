@@ -77,11 +77,18 @@ function stripControlChars(value: string): string {
  * directory layout — that is a leak in the one artifact most likely to
  * leave the machine.
  *
- * This is a mechanical, judgment-free redaction: it removes the home
- * prefix and nothing else. It is NOT a general secret scrubber, and must
- * not be described as one. Rule text and evidence are still reproduced
- * verbatim, because that is what makes the report useful — which is why
- * the CLI warns the user to read the file before sending it.
+ * This is DISPLAY FORMATTING, not a safety mechanism, and the difference
+ * matters. It is a fixed, deterministic substitution of one known string
+ * — always correct, never guessing — and it makes paths easier to read as
+ * a side benefit. It protects nothing.
+ *
+ * Auto-detecting "sensitive" content and scrubbing it would be a losing
+ * game: it can never catch everything, and a partial scrub is worse than
+ * none because it invites the user to trust the output. Rule text and
+ * evidence are reproduced verbatim on purpose, because that is what makes
+ * the report worth sending. The real safeguard is the warning the CLI
+ * prints at write time, which puts the responsibility where it belongs —
+ * with the person who knows what is in their own rules file.
  */
 function redactHome(value: string): string {
   const home = homedir();
