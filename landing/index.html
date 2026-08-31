@@ -547,6 +547,29 @@
     </div>
   </div>
 
+  <section class="band">
+    <div class="wrap-wide">
+      <h2>Send someone the result</h2>
+      <p class="band-sub">A terminal report can't leave the terminal. One flag writes a single file you can email, attach to a ticket, or print to PDF.</p>
+
+      <div class="install" id="copy-html" data-copy="npx rulereceipt check --html" data-loc="html-section" role="button" tabindex="0" title="Click to copy">
+        <span class="prompt">$</span>
+        <span class="cmd">npx rulereceipt check --html</span>
+      </div>
+
+      <div class="trust-grid" style="margin-top:26px;">
+        <div class="trust-cell"><h3><span class="mark">—</span> Opens anywhere, forever</h3><p>One self-contained file. No CDN, no fonts, no scripts, nothing loaded from the internet — so it still opens correctly from an email attachment, offline, years from now.</p></div>
+        <div class="trust-cell"><h3><span class="mark">—</span> Failures first, never buried</h3><p>What wasn't followed sits at the top, not underneath a comfortable list of passes. A report designed to be skimmed past isn't a report.</p></div>
+        <div class="trust-cell"><h3><span class="mark">—</span> It says what it can't prove</h3><p>It never says "compliant." It covers one session, and rules needing judgment are marked for human review rather than guessed at — printed on the report itself, not hidden in a policy page.</p></div>
+      </div>
+
+      <div style="height:20px"></div>
+      <div class="security-note"><strong>The person receiving it can check it's real.</strong> Every report carries a SHA-256 fingerprint of the session file it read, and the command to verify it. Hand someone a report and the session, and they can confirm the report describes that exact file, unaltered — they don't have to take the sender's word for it. An edited session produces a different fingerprint.</div>
+      <div style="height:14px"></div>
+      <div class="security-note"><strong>Still written locally, still nothing uploaded.</strong> The file lands in your working directory and goes only where you choose to send it. Same as every other part of this tool — no server of ours is involved.</div>
+    </div>
+  </section>
+
   <div class="quote-block">
     <blockquote>It reads the rules. It doesn't always follow them.</blockquote>
     <div class="quote-cite">the exact problem behind every real example below</div>
@@ -648,33 +671,10 @@
       </div>
 
       <div class="security-note">
-        <strong>Tested against real rules files, not our own examples.</strong> 1,870 public CLAUDE.md, AGENTS.md, .cursorrules, Copilot, Gemini and other rules files — from React, PyTorch, Kubernetes and hundreds of other projects — covering 72,078 rules across 14 formats, with no crashes. When that corpus nearly doubled with formats the tool had never been tuned on, its behaviour barely moved. And it's tested the other way too: sessions that deliberately break a rule, to confirm it catches them, not just that it stays quiet on good ones.
+        <strong>Tested against real rules files, not our own examples.</strong> 559 public rules files — CLAUDE.md, AGENTS.md, .cursorrules, Copilot instructions, Windsurf and Gemini — from PyTorch, Kubernetes, Elasticsearch and hundreds of other projects, covering 23,704 parsed items and 8,808 real rules, with no crashes. When that corpus nearly doubled with formats the tool had never been tuned on, its behaviour barely moved. And it's tested the other way too: sessions that deliberately break a rule, to confirm it catches them, not just that it stays quiet on good ones.
       </div>
 
       <p class="band-sub" style="font-size:0.82rem; margin-top:18px;">Figures above are dated on purpose — they're from specific 2026 studies and will age. The structural argument is what we'd stand behind regardless: an independent record beats a self-report, whatever the current numbers say.</p>
-    </div>
-  </section>
-
-  <section class="band">
-    <div class="wrap-wide">
-      <h2>Send someone the result</h2>
-      <p class="band-sub">A terminal report can't leave the terminal. One flag writes a single file you can email, attach to a ticket, or print to PDF.</p>
-
-      <div class="install" id="copy-html" data-copy="npx rulereceipt check --html" data-loc="html-section" role="button" tabindex="0" title="Click to copy">
-        <span class="prompt">$</span>
-        <span class="cmd">npx rulereceipt check --html</span>
-      </div>
-
-      <div class="trust-grid" style="margin-top:26px;">
-        <div class="trust-cell"><h3><span class="mark">—</span> Opens anywhere, forever</h3><p>One self-contained file. No CDN, no fonts, no scripts, nothing loaded from the internet — so it still opens correctly from an email attachment, offline, years from now.</p></div>
-        <div class="trust-cell"><h3><span class="mark">—</span> Failures first, never buried</h3><p>What wasn't followed sits at the top, not underneath a comfortable list of passes. A report designed to be skimmed past isn't a report.</p></div>
-        <div class="trust-cell"><h3><span class="mark">—</span> It says what it can't prove</h3><p>It never says "compliant." It covers one session, and rules needing judgment are marked for human review rather than guessed at — printed on the report itself, not hidden in a policy page.</p></div>
-      </div>
-
-      <div style="height:20px"></div>
-      <div class="security-note"><strong>The person receiving it can check it's real.</strong> Every report carries a SHA-256 fingerprint of the session file it read, and the command to verify it. Hand someone a report and the session, and they can confirm the report describes that exact file, unaltered — they don't have to take the sender's word for it. An edited session produces a different fingerprint.</div>
-      <div style="height:14px"></div>
-      <div class="security-note"><strong>Still written locally, still nothing uploaded.</strong> The file lands in your working directory and goes only where you choose to send it. Same as every other part of this tool — no server of ours is involved.</div>
     </div>
   </section>
 
