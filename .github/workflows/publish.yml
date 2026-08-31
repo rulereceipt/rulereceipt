@@ -14,7 +14,7 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Node 22, not 20, and the two reasons are linked: Node 20 left
       # support in April 2026, and npm@latest (12.x) now REQUIRES Node
