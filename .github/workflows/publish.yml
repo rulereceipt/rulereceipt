@@ -14,14 +14,14 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # Node 22, not 20, and the two reasons are linked: Node 20 left
       # support in April 2026, and npm@latest (12.x) now REQUIRES Node
       # >=22.22.2. On Node 20 the `npm install -g npm@latest` step below
       # fails EBADENGINE and no publish happens at all (real failure,
       # 2026-08-31, run 33362264889).
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
           registry-url: "https://registry.npmjs.org"
