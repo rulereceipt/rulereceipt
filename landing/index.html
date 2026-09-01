@@ -564,6 +564,8 @@
       </div>
 
       <div style="height:20px"></div>
+      <div class="security-note"><strong>See one.</strong> <a href="/example-report" target="_blank" rel="noopener">Here is a real report</a>, produced by running the tool against a constructed session — two rules broken with the evidence quoted, one the tool refused to guess about, and three left for a human. <a href="/example-session.jsonl" download>The session file it read</a> is published next to it, so you can download both and run <code>rulereceipt verify</code> yourself. Nothing to install to check that.</div>
+      <div style="height:14px"></div>
       <div class="security-note"><strong>The person receiving it can check it's real.</strong> Every report carries a SHA-256 fingerprint of the session file it read, and the command to verify it. Hand someone a report and the session, and they can confirm the report describes that exact file, unaltered — they don't have to take the sender's word for it. An edited session produces a different fingerprint.</div>
       <div style="height:14px"></div>
       <div class="security-note"><strong>Still written locally, still nothing uploaded.</strong> The file lands in your working directory and goes only where you choose to send it. Same as every other part of this tool — no server of ours is involved.</div>

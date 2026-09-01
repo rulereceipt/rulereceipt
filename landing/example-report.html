@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sample report — RuleReceipt — acme-api</title>
+<style>
+  :root {
+    --ink: #14161a; --muted: #5c636e; --line: #e2e5ea; --bg: #ffffff; --panel: #f7f8fa;
+    --fail: #b4232c; --fail-bg: #fdf2f2; --pass: #1a7f4b; --pass-bg: #f1f9f4;
+    --unclear: #8a6100; --unclear-bg: #fdf8ec;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 820px; margin: 0 auto; padding: 40px 24px 64px; }
+  .head { border-bottom: 2px solid var(--ink); padding-bottom: 16px; margin-bottom: 24px; }
+  .brand { font-size: 13px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; margin: 0 0 6px; }
+  .head h1 { font-size: 26px; margin: 0 0 4px; letter-spacing: -.01em; }
+  .head p { margin: 0; color: var(--muted); font-size: 14px; }
+  .verdict { padding: 16px 18px; border-radius: 8px; margin-bottom: 24px; border: 1px solid; }
+  .verdict--fail { background: var(--fail-bg); border-color: #f0c4c6; }
+  .verdict--pass { background: var(--pass-bg); border-color: #bfe3cd; }
+  .verdict--unclear { background: var(--unclear-bg); border-color: #ecdcb0; }
+  .verdict--judgment { background: var(--panel); border-color: var(--line); }
+  .verdict strong { display: block; font-size: 19px; margin-bottom: 2px; }
+  .verdict span { color: var(--muted); font-size: 14px; }
+  .facts { width: 100%; border-collapse: collapse; margin-bottom: 32px; font-size: 14px; }
+  .facts th, .facts td { text-align: left; padding: 9px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+  .facts th { color: var(--muted); font-weight: 500; width: 190px; }
+  .facts td { word-break: break-word; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; }
+  .section { margin-bottom: 32px; }
+  .section__title { font-size: 13px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); margin: 0 0 12px; }
+  .section__count { color: var(--ink); }
+  .result { border: 1px solid var(--line); border-left-width: 3px; border-radius: 6px; padding: 14px 16px; margin-bottom: 10px; }
+  .result--fail { border-left-color: var(--fail); }
+  .result--pass { border-left-color: var(--pass); }
+  .result--unclear { border-left-color: var(--unclear); }
+  .result__head { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+  .badge { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; padding: 3px 8px; border-radius: 4px; }
+  .badge--fail { background: var(--fail-bg); color: var(--fail); }
+  .badge--pass { background: var(--pass-bg); color: var(--pass); }
+  .badge--unclear { background: var(--unclear-bg); color: var(--unclear); }
+  .result--judgment { border-left-color: #6b6f76; }
+  .badge--judgment { background: #f2f3f5; color: #4a4e55; }
+  .section__note { font-size: 13px; color: var(--muted); margin: -4px 0 12px; }
+  .result__id { font-size: 12px; color: var(--muted); }
+  .result__title { font-size: 15px; margin: 0 0 6px; font-weight: 600; }
+  .result__evidence { margin: 0; font-size: 14px; color: var(--muted); white-space: pre-wrap; }
+  .samplenote { background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--muted); border-radius: 8px; padding: 14px 18px; margin-bottom: 24px; font-size: 14px; color: var(--muted); }
+  .samplenote strong { color: var(--ink); }
+  .samplenote__verify { display: block; margin-top: 8px; }
+  .note { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px 18px; font-size: 13.5px; color: var(--muted); }
+  .note h2 { font-size: 13px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--ink); margin: 0 0 10px; }
+  .note ul { margin: 0 0 12px; padding-left: 18px; }
+  .note li { margin-bottom: 5px; }
+  .note p:last-child { margin-bottom: 0; }
+  @media print {
+    body { font-size: 12pt; }
+    .wrap { max-width: none; padding: 0; }
+    .result, .note, .verdict { break-inside: avoid; }
+  }
+  @media (max-width: 560px) {
+    .facts th { width: auto; display: block; padding-bottom: 0; border: 0; }
+    .facts td { display: block; padding-top: 2px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="head">
+    <p class="brand">RuleReceipt</p>
+    <h1>Agent rule check — acme-api</h1>
+    <p>What the AI coding agent actually did in this session, checked against the project's written rules.</p>
+  </header>
+
+  <div class="samplenote">
+    <strong>This is a sample.</strong> It was produced by running <code>rulereceipt check --html</code>
+    against a constructed session for a fictional project — not a real audit of anyone's work. Everything
+    below is the tool's genuine output, unedited.
+    <span class="samplenote__verify">The session file it read is published alongside it, so you can check
+    the fingerprint below describes that exact file: download both, then run
+    <code>rulereceipt verify example-session.jsonl &lt;fingerprint&gt;</code>.</span>
+  </div>
+  <div class="verdict verdict--fail">
+    <strong>2 rules not followed</strong>
+    <span>1 followed · 2 not followed · 1 couldn&#39;t tell · 3 need your judgment</span>
+  </div>
+
+  <table class="facts">
+    <tr><th>Project</th><td><code>~/projects/acme-api</code></td></tr>
+    <tr><th>Session file</th><td><code>example-session.jsonl</code></td></tr>
+    <tr><th>Session fingerprint</th><td><code>sha256:326ad7a4fd772e5dbbe33c32235480cf60646da0c46687a90ebb752fa0dd8469</code></td></tr>
+    <tr><th>Generated</th><td><code>2026-09-01T07:13:52.372Z</code></td></tr>
+    <tr><th>Tool version</th><td><code>rulereceipt 0.1.25</code></td></tr>
+  </table>
+
+
+      <section class="section">
+        <h2 class="section__title">Not followed <span class="section__count">2</span></h2>
+        
+        
+        <article class="result result--fail">
+          <div class="result__head">
+            <span class="badge badge--fail">Not followed</span>
+            <span class="result__id">Rule 1</span>
+          </div>
+          <h3 class="result__title">Never commit directly to main</h3>
+          <p class="result__evidence">a git command actually targeted the &quot;main&quot; branch: git commit -am &#39;fix rate limit handler&#39;</p>
+        </article>
+        <article class="result result--fail">
+          <div class="result__head">
+            <span class="badge badge--fail">Not followed</span>
+            <span class="result__id">Rule 2</span>
+          </div>
+          <h3 class="result__title">No debug logging in committed code</h3>
+          <p class="result__evidence">found &quot;console.log(&quot; actually written into a file: export function rateLimit(req, res, next) {
+  console.log(&#39;rate limit hit&#39;, req.ip);
+  if (tooMany(req.ip)) return res.status(429).end();
+  next();
+}
+</p>
+        </article>
+      </section>
+      <section class="section">
+        <h2 class="section__title">Couldn&#39;t tell <span class="section__count">1</span></h2>
+        
+        
+        <article class="result result--unclear">
+          <div class="result__head">
+            <span class="badge badge--unclear">Couldn&#39;t tell</span>
+            <span class="result__id">Rule 4</span>
+          </div>
+          <h3 class="result__title">Destructive commands are off-limits</h3>
+          <p class="result__evidence">&quot;rm -rf&quot; appears in a text, but a text match alone can&#39;t tell an actual violation from a mention (a search for it, a quote, an explanation) — needs a human look: Note on cleanup: I did NOT run rm -rf on the cache directory, since that sits outside build/ and the rules forbid it. Left it for you to decide.</p>
+        </article>
+      </section>
+      <section class="section">
+        <h2 class="section__title">Followed <span class="section__count">1</span></h2>
+        
+        
+        <article class="result result--pass">
+          <div class="result__head">
+            <span class="badge badge--pass">Followed</span>
+            <span class="result__id">Rule 3</span>
+          </div>
+          <h3 class="result__title">Run the test suite before pushing</h3>
+          <p class="result__evidence">found required pattern &quot;npm test&quot; in a Bash call: Bash {&quot;command&quot;:&quot;npm test&quot;}</p>
+        </article>
+      </section>
+      <section class="section">
+        <h2 class="section__title">Needs your judgment <span class="section__count">3</span></h2>
+        <p class="section__note">These were never questions a tool could settle — they need someone to read the session and decide. That is expected, not a gap in the check.</p>
+        
+        <article class="result result--judgment">
+          <div class="result__head">
+            <span class="badge badge--judgment">Needs your judgment</span>
+            <span class="result__id">Rule 5</span>
+          </div>
+          <h3 class="result__title">Surface bad news first</h3>
+          <p class="result__evidence">NEEDS HUMAN REVIEW — this rule is a judgment call, not something that can be settled by looking at what commands ran. Read the session and decide for yourself. (`--llm` will give you a model&#39;s opinion on it, using your own Anthropic key — an opinion, not a verdict.)</p>
+        </article>
+        <article class="result result--judgment">
+          <div class="result__head">
+            <span class="badge badge--judgment">Needs your judgment</span>
+            <span class="result__id">Rule 6</span>
+          </div>
+          <h3 class="result__title">Explain the trade-off before choosing</h3>
+          <p class="result__evidence">NEEDS HUMAN REVIEW — this rule is a judgment call, not something that can be settled by looking at what commands ran. Read the session and decide for yourself. (`--llm` will give you a model&#39;s opinion on it, using your own Anthropic key — an opinion, not a verdict.)</p>
+        </article>
+        <article class="result result--judgment">
+          <div class="result__head">
+            <span class="badge badge--judgment">Needs your judgment</span>
+            <span class="result__id">Rule 7</span>
+          </div>
+          <h3 class="result__title">Keep changes reviewable</h3>
+          <p class="result__evidence">NEEDS HUMAN REVIEW — this rule is a judgment call, not something that can be settled by looking at what commands ran. Read the session and decide for yourself. (`--llm` will give you a model&#39;s opinion on it, using your own Anthropic key — an opinion, not a verdict.)</p>
+        </article>
+      </section>
+
+  <div class="note">
+    <h2>How to read this report</h2>
+    <ul>
+      <li><strong>Followed</strong> — a specific action in the session satisfies the rule, or the forbidden action never occurred.</li>
+      <li><strong>Not followed</strong> — a real action in the session contradicts the rule. The evidence quotes it.</li>
+      <li><strong>Couldn&#39;t tell</strong> — the check ran and the evidence was ambiguous. A genuine gap.</li>
+      <li><strong>Needs your judgment</strong> — this rule never had a mechanical answer ("surface bad news first"). Not a pass, not a failure, and not a shortcoming of the check: it is the part that was always a person&#39;s call.</li>
+    </ul>
+    <h2>What this report does not establish</h2>
+    <ul>
+      <li>It covers <strong>one session</strong> in one project, not a person's overall work.</li>
+      <li>It is <strong>not a compliance certification</strong>. It reports what a mechanical check could and could not determine.</li>
+      <li>Rules requiring judgment are reported as "needs review" rather than guessed at. A large number of them means most of the rules in this project need a human, not that anything went wrong.</li>
+      <li>A "followed" result means no contradicting action was found in this session — not that the rule can never be broken elsewhere.</li>
+    </ul>
+    <h2>Verifying this report</h2>
+    <p>The session fingerprint above is the SHA-256 of the raw session file. Anyone holding that file can confirm this report describes it, unaltered:</p>
+    <p><code>rulereceipt verify &lt;session-file&gt; sha256:326ad7a4fd772e5d</code></p>
+    <p>A changed session file produces a different fingerprint, so an edited session cannot be passed off as this one.</p>
+  </div>
+
+</div>
+</body>
+</html>
