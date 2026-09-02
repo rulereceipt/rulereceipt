@@ -27,29 +27,55 @@
 <meta name="twitter:image" content="https://rulereceipt.dev/og-image.png" />
 <meta name="twitter:title" content="RuleReceipt — see what your AI agent actually did" />
 <meta name="twitter:description" content="Checks a coding agent's session against your own rules and shows precisely what was followed, what wasn't, and why — with evidence. Runs locally, nothing stored." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap" />
 <style>
   :root {
-    --bg: #FAFAF7;
-    --bg-deep: #F1F0EA;
+    /* Warm neutral ground. Every grey is biased toward the accent's hue
+       rather than sitting on the pure-grey axis, so the page reads as one
+       temperature instead of cool type floating on a warm background. */
+    --bg: #FAF9F5;
+    --bg-deep: #F0EEE6;
     --panel: #FFFFFF;
-    --panel-line: #E7E5DC;
-    --panel-line-strong: #D3D0C3;
-    --paper: #17191C;
-    --paper-dim: #6B6F76;
-    --amber: #DD6A1F;
-    --amber-dim: #B85818;
+    --panel-line: #E8E6DC;
+    --panel-line-strong: #DEDCD1;
+    --paper: #141413;
+    --paper-dim: #55534E;
+    --paper-faint: #7A756E;
+
+    /* THE one interface accent: links, prompts, eyebrows, CTAs.
+       --amber is for display sizes; --amber-dim is the text-safe one
+       (5.3:1 on --bg, so it passes AA as body-copy link colour). */
+    --amber: #C4551F;
+    --amber-dim: #AD4A17;
+
+    /* Verdict colours. These three carry meaning and nothing else uses
+       them — see the colour rule below. */
     --cyan: #17805F;
     --red: #C2402C;
-    --font-display: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --judge: #7A756E;
+
+    --font-display: 'Newsreader', 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
     --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
   }
 
-  /* Light, restrained, one accent color — no dark "instrument panel"
-     costume. Still committed to one deliberate look (light) rather than
-     a light/dark toggle, since the whole point here is calm and clean,
-     not a technical-instrument aesthetic. Background and colors painted
-     explicitly regardless of host theme. */
+  /* ---------- the colour rule ----------
+     Green and red are reserved. On this page they only ever mean a
+     verdict: green = a rule was followed, red = a rule was not, grey =
+     needs a person. Nothing decorative or navigational is allowed to use
+     them.
+
+     This was a real defect, not a preference: green was previously both
+     the "rule passed" mark AND the colour of every hyperlink, so the
+     colour that is supposed to carry the product's core distinction also
+     meant "clickable" — which drains it of meaning exactly where it
+     matters. Terracotta now does all the interface work, and the report's
+     three colours are only ever seen next to a verdict.
+
+     One deliberate look (light), painted explicitly rather than
+     inheriting the host theme. */
 
   * { box-sizing: border-box; }
 
@@ -66,19 +92,43 @@
     -webkit-font-smoothing: antialiased;
   }
 
-  a { color: var(--cyan); }
+  a { color: var(--amber-dim); }
 
   .wrap { max-width: 760px; margin: 0 auto; padding: 0 24px; }
   .wrap-wide { max-width: 1000px; margin: 0 auto; padding: 0 24px; }
 
+  /* Sticky, frosted. The page is long and the only two persistent
+     affordances — the wordmark and the source link — were scrolling away
+     within one screen. Glass here is doing a job: the bar has to sit over
+     moving content without hiding it. The hairline is withheld until the
+     page has actually scrolled, so it reads as flat paper at rest. */
   header.top {
+    position: sticky;
+    top: 0;
+    z-index: 60;
+    background: rgba(250, 249, 245, 0.72);
+    -webkit-backdrop-filter: saturate(1.7) blur(14px);
+    backdrop-filter: saturate(1.7) blur(14px);
+    border-bottom: 1px solid transparent;
+    transition: border-color 0.2s ease, background 0.2s ease;
+  }
+  header.top.scrolled {
+    background: rgba(250, 249, 245, 0.88);
+    border-bottom-color: var(--panel-line);
+  }
+  /* No backdrop-filter (older Firefox, and anything with it disabled):
+     fall back to an opaque bar rather than unreadable text over content. */
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    header.top { background: var(--bg); }
+  }
+  .top-inner {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 26px 0 0;
+    padding: 15px 24px;
   }
   .wordmark {
-    font-family: var(--font-display);
+    font-family: var(--font-sans);
     font-weight: 800;
     font-size: 1.2rem;
     letter-spacing: 0.02em;
@@ -110,16 +160,15 @@
     font-size: 0.72rem;
     letter-spacing: 0.1em;
     text-transform: uppercase;
-    color: var(--cyan);
+    color: var(--amber-dim);
     margin-bottom: 18px;
   }
   h1 {
     font-family: var(--font-display);
-    font-weight: 800;
-    text-transform: uppercase;
-    font-size: clamp(1.9rem, 5vw, 3.1rem);
-    line-height: 1.04;
-    letter-spacing: 0.01em;
+    font-weight: 600;
+    font-size: clamp(2.1rem, 5.4vw, 3.5rem);
+    line-height: 1.08;
+    letter-spacing: -0.02em;
     margin: 0 0 22px;
     text-wrap: balance;
     color: var(--paper);
@@ -251,17 +300,18 @@
   .r-mark { width: 14px; flex: none; font-weight: 700; }
   .r-mark.pass { color: var(--cyan); }
   .r-mark.fail { color: var(--red); }
-  .r-mark.unclear { color: var(--amber); }
+  .r-mark.unclear { color: var(--judge); }
   .r-body { color: var(--paper); }
   .r-evidence { margin: 4px 0 0 24px; color: var(--paper-dim); font-size: 0.72rem; }
   .r-rule { border-top: 1px dashed var(--panel-line); margin: 14px 0; }
   .r-foot {
     padding: 12px 18px;
     border-top: 1px solid var(--panel-line);
-    font-size: 0.72rem;
+    font-size: 0.7rem;
     color: var(--paper-dim);
     display: flex;
-    justify-content: space-between;
+    justify-content: center;
+    white-space: nowrap;
     font-variant-numeric: tabular-nums;
   }
 
@@ -283,11 +333,11 @@
     max-width: 620px;
     font-family: var(--font-display);
     font-weight: 600;
-    font-size: clamp(1.25rem, 3vw, 1.7rem);
-    line-height: 1.32;
+    font-size: clamp(1.35rem, 3.2vw, 1.85rem);
+    line-height: 1.34;
     color: var(--paper);
     text-wrap: balance;
-    letter-spacing: 0.01em;
+    letter-spacing: -0.01em;
   }
   blockquote span { color: var(--amber); }
   .quote-cite { font-family: var(--font-mono); font-size: 0.72rem; color: var(--paper-dim); margin-top: 16px; }
@@ -312,7 +362,7 @@
   }
   .issue-row { display: grid; gap: 10px; }
   .issue { font-family: var(--font-mono); font-size: 0.85rem; color: var(--paper-dim); display: flex; gap: 10px; }
-  .issue .num { color: var(--cyan); flex: none; }
+  .issue .num { color: var(--amber-dim); flex: none; }
   .evidence-divider { border-top: 1px solid var(--panel-line); margin: 18px 0; }
   .founder-note { color: var(--paper-dim); font-size: 0.95rem; margin: 0; }
 
@@ -320,11 +370,10 @@
   section.band { padding: 54px 0; border-top: 1px solid var(--panel-line); }
   h2 {
     font-family: var(--font-display);
-    text-transform: uppercase;
-    font-weight: 800;
-    font-size: 1.6rem;
-    letter-spacing: 0.01em;
-    margin: 0 0 8px;
+    font-weight: 600;
+    font-size: clamp(1.55rem, 2.6vw, 1.95rem);
+    letter-spacing: -0.015em;
+    margin: 0 0 10px;
     text-wrap: balance;
   }
   /* 540px + text-wrap:balance produced short, evenly-matched lines with
@@ -333,14 +382,14 @@
   .band-sub { color: var(--paper-dim); margin: 0 0 34px; max-width: 860px; }
 
   .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; }
-  .step .n { font-family: var(--font-mono); color: var(--cyan); font-size: 0.85rem; margin-bottom: 10px; }
+  .step .n { font-family: var(--font-mono); color: var(--amber-dim); font-size: 0.85rem; margin-bottom: 10px; }
   .step h3 { font-family: var(--font-sans); font-weight: 600; font-size: 1.02rem; margin: 0 0 8px; color: var(--paper); }
   .step p { color: var(--paper-dim); margin: 0; font-size: 0.95rem; }
 
   .trust-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--panel-line); border: 1px solid var(--panel-line); border-radius: 16px; overflow: hidden; }
   .trust-cell { background: var(--bg-deep); padding: 26px 22px; }
   .trust-cell h3 { font-family: var(--font-sans); font-weight: 600; font-size: 1.02rem; margin: 0 0 10px; color: var(--paper); display:flex; align-items:center; gap:8px; }
-  .trust-cell h3 .mark { color: var(--cyan); }
+  .trust-cell h3 .mark { color: var(--amber-dim); }
   .trust-cell p { margin: 0; color: var(--paper-dim); font-size: 0.95rem; }
 
   .security-note {
@@ -353,12 +402,70 @@
     border-radius: 14px;
   }
   .security-note strong { color: var(--paper); }
+
+  /* The verification claim is the strongest thing this product can say, and
+     it was previously one clause inside a paragraph of four. Given its own
+     surface, with the actual hash shown rather than described. */
+  .fingerprint {
+    background: var(--panel);
+    border: 1px solid var(--panel-line-strong);
+    border-radius: 18px;
+    padding: 28px 30px;
+    box-shadow: 0 1px 2px rgba(20,20,19,0.04), 0 18px 36px -26px rgba(20,20,19,0.28);
+  }
+  .fp-label {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--amber-dim);
+    margin-bottom: 12px;
+  }
+  .fingerprint h3 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 1.35rem;
+    letter-spacing: -0.01em;
+    margin: 0 0 10px;
+    color: var(--paper);
+  }
+  .fingerprint p { color: var(--paper-dim); font-size: 0.95rem; margin: 0; }
+  .fingerprint em { color: var(--paper); font-style: normal; font-weight: 600; }
+  .fp-hash {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 18px 0 14px;
+    padding: 14px 16px;
+    background: var(--bg-deep);
+    border: 1px solid var(--panel-line);
+    border-radius: 12px;
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    cursor: pointer;
+    overflow-x: auto;
+    transition: border-color 0.15s ease;
+  }
+  .fp-hash:hover { border-color: var(--amber); }
+  .fp-hash:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+  .fp-key { color: var(--amber-dim); flex: none; }
+  .fp-val { color: var(--paper); word-break: break-all; }
+  .fp-foot { font-size: 0.86rem; }
+  .fingerprint code {
+    font-family: var(--font-mono);
+    background: var(--bg-deep);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 0.88em;
+    color: var(--paper);
+  }
+  @media (max-width: 560px) { .fp-val { font-size: 0.72rem; } }
   .security-note code { color: var(--amber); }
 
   .pricing { display: flex; gap: 22px; flex-wrap: wrap; }
   .price-card { flex: 1 1 220px; background: var(--panel); border: 1px solid var(--panel-line-strong); padding: 24px 22px; border-radius: 16px; box-shadow: 0 1px 2px rgba(23,25,28,0.04), 0 12px 28px -18px rgba(23,25,28,0.18); }
   .price-card.accent { border-color: var(--amber); }
-  .price-card .amount { font-family: var(--font-display); font-weight: 800; font-size: 1.9rem; color: var(--paper); margin: 4px 0 10px; text-transform: uppercase; }
+  .price-card .amount { font-family: var(--font-display); font-weight: 600; font-size: 2.1rem; color: var(--paper); margin: 4px 0 10px; font-variant-numeric: tabular-nums; }
   .price-card .amount small { font-family: var(--font-sans); font-size: 0.85rem; color: var(--paper-dim); font-weight: 400; text-transform: none; }
   .price-card p { color: var(--paper-dim); font-size: 0.95rem; margin: 0; }
 
@@ -408,16 +515,19 @@
   .link-cta {
     font-family: var(--font-mono);
     font-size: 0.85rem;
-    color: var(--cyan);
-    border: 1px solid var(--cyan);
-    padding: 10px 18px;
-    border-radius: 8px;
+    color: var(--paper);
+    background: var(--panel);
+    border: 1px solid var(--panel-line-strong);
+    padding: 12px 20px;
+    border-radius: 12px;
     display: inline-block;
     text-decoration: none;
-    font-weight: 600;
-    margin-top: 14px;
+    font-weight: 500;
+    margin-top: 18px;
+    transition: border-color 0.15s ease, transform 0.15s ease;
   }
-  .link-cta:hover { background: var(--cyan); color: #FFF9F2; }
+  .link-cta:hover { border-color: var(--amber); transform: translateY(-1px); }
+  .link-cta .arw { color: var(--amber-dim); }
 
   .quote-marquee-wrap {
     overflow: hidden;
@@ -507,24 +617,94 @@
   footer .cmd-repeat { font-family: var(--font-mono); font-size: 1rem; color: var(--paper); margin-bottom: 10px; }
   footer .fine { color: var(--paper-dim); font-size: 0.85rem; }
 
+  /* Footer social row. Inline SVG, no icon font and no external request —
+     the page should not pull a third-party asset just to draw three
+     glyphs, least of all this page. */
+  .social-row {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 22px;
+  }
+  .social-row a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border: 1px solid var(--panel-line-strong);
+    border-radius: 12px;
+    background: var(--panel);
+    color: var(--paper-dim);
+    transition: color 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+  }
+  .social-row a:hover {
+    color: var(--amber-dim);
+    border-color: var(--amber);
+    transform: translateY(-2px);
+  }
+  .social-row a:focus-visible {
+    outline: 2px solid var(--amber);
+    outline-offset: 2px;
+  }
+  .social-row svg { width: 18px; height: 18px; display: block; }
+
   @media (max-width: 720px) {
     .steps, .trust-grid { grid-template-columns: 1fr; }
   }
 
+  .will-reveal {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  .revealed {
+    opacity: 1;
+    transform: none;
+    transition: opacity 0.6s cubic-bezier(0.22, 0.61, 0.36, 1), transform 0.6s cubic-bezier(0.22, 0.61, 0.36, 1);
+  }
+
+  /* The mark draws itself once, on load — the page's one piece of
+     decorative motion, and it draws the thing the product makes. */
+  .hero-mark { display: block; margin: 0 auto 22px; width: 46px; height: 46px; color: var(--paper); }
+  .hero-mark path, .hero-mark polyline {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .hero-mark .tick { stroke: var(--cyan); stroke-width: 2; }
+  .hero-mark .draw {
+    stroke-dasharray: var(--len);
+    stroke-dashoffset: var(--len);
+    animation: draw-in 1.1s cubic-bezier(0.65, 0, 0.35, 1) forwards;
+  }
+  .hero-mark .tick { animation-delay: 0.85s; }
+  @keyframes draw-in { to { stroke-dashoffset: 0; } }
+
   @media (prefers-reduced-motion: reduce) {
     .led { animation: none !important; }
+    .will-reveal { opacity: 1 !important; transform: none !important; }
+    .hero-mark .draw { animation: none; stroke-dashoffset: 0; }
   }
 </style>
 </head>
 <body>
 
-  <div class="wrap">
-    <header class="top">
+  <header class="top">
+    <div class="wrap top-inner">
       <div class="wordmark"><span class="led"></span> RuleReceipt</div>
       <a class="top-cta" href="https://github.com/rulereceipt/rulereceipt" target="_blank" rel="noopener">source on GitHub</a>
-    </header>
+    </div>
+  </header>
 
+  <div class="wrap">
     <div class="hero">
+      <svg class="hero-mark" viewBox="0 0 40 40" aria-hidden="true" focusable="false">
+        <path class="draw" style="--len:118" d="M10 6h20v28l-3.3-2.4-3.3 2.4-3.4-2.4-3.3 2.4-3.4-2.4L10 34z"/>
+        <path class="draw" style="--len:12" d="M15 14h10"/>
+        <polyline class="draw tick" style="--len:16" points="15,21 18.5,24.5 25,17"/>
+      </svg>
       <div class="eyebrow">for Claude Code &middot; runs locally</div>
       <h1>See exactly what your<br><span>agent actually did</span></h1>
       <p class="sub">Your agent's session, checked against your own rules. What it followed. What it skipped.</p>
@@ -532,8 +712,7 @@
         <span class="prompt">$</span>
         <span class="cmd">npx rulereceipt check</span>
       </div>
-      <p style="margin-top:16px; font-size:0.9rem;">Not ready to run anything? <a href="/check">Paste your CLAUDE.md here</a> and see how much of it a tool could even check — in your browser, nothing uploaded.</p>
-      <p style="margin-top:10px; font-size:0.85rem;"><a href="https://github.com/rulereceipt/rulereceipt" target="_blank" rel="noopener">Read the source on GitHub</a> before you run it — reasonable, given what this tool is for.</p>
+      <p style="margin-top:16px; font-size:0.9rem;">Quick check, nothing to install &mdash; <a href="/check">paste your CLAUDE.md</a> and see how much of it is checkable. Runs in your browser, nothing uploaded.</p>
     </div>
 
     <div class="trace-stage">
@@ -568,7 +747,7 @@
           </div>
           <div class="r-evidence">needs your judgment: no error occurred this session, so there is nothing to check against — a person has to decide</div>
         </div>
-        <div class="r-foot"><span>full run: 8 followed · 2 not followed · 1 needs your judgment</span><span>no rule text or results sent</span></div>
+        <div class="r-foot"><span>full run: 8 followed · 2 not followed · 1 needs your judgment</span></div>
       </div>
     </div>
   </div>
@@ -576,7 +755,7 @@
 
   <div class="quote-block">
     <blockquote>It reads the rules. It doesn't always follow them.</blockquote>
-    <div class="quote-cite">the exact problem behind every real example below</div>
+    <div class="quote-cite">the problem, with receipts</div>
     <div class="evidence-card">
       <div class="evidence-label">Not unique to Claude — a structural limit of how LLMs process long instructions, documented, not guessed</div>
       <div class="issue-row">
@@ -593,7 +772,7 @@
 
   <section class="band">
     <div class="wrap-wide">
-      <h2>Send someone the result</h2>
+      <h2>Hand someone the receipt</h2>
       <p class="band-sub">One flag writes a single file you can email, attach to a ticket, or print to PDF.</p>
 
       <div class="install" id="copy-html" data-copy="npx rulereceipt check --html" data-loc="html-section" role="button" tabindex="0" title="Click to copy">
@@ -603,14 +782,23 @@
 
       <div class="trust-grid" style="margin-top:26px;">
         <div class="trust-cell"><h3><span class="mark">—</span> Opens anywhere, forever</h3><p>One self-contained file. No CDN, no fonts, no scripts, nothing loaded from the internet — so it still opens correctly from an email attachment, offline, years from now.</p></div>
-        <div class="trust-cell"><h3><span class="mark">—</span> Failures first, never buried</h3><p>What wasn't followed sits at the top, not underneath a comfortable list of passes. A report designed to be skimmed past isn't a report.</p></div>
+        <div class="trust-cell"><h3><span class="mark">—</span> Failures first, never buried</h3><p>What wasn't followed sits at the top, not underneath a comfortable list of passes. A report designed to be skimmed isn't a report.</p></div>
         <div class="trust-cell"><h3><span class="mark">—</span> It says what it can't prove</h3><p>It never says "compliant." It covers one session, and rules needing judgment are marked for human review rather than guessed at — printed on the report itself, not hidden in a policy page.</p></div>
       </div>
 
       <div style="height:20px"></div>
       <div class="security-note"><strong>See one.</strong> <a href="/example-report" target="_blank" rel="noopener">Here is a real report</a>, produced by running the tool against a constructed session — two rules broken with the evidence quoted, one the tool refused to guess about, and three left for a human. <a href="/example-session.jsonl" download>The session file it read</a> is published next to it, so you can download both and run <code>rulereceipt verify</code> yourself. One command to check that.</div>
       <div style="height:14px"></div>
-      <div class="security-note"><strong>The person receiving it can check it's real.</strong> Every report carries a SHA-256 fingerprint of the session file it read, and the command to verify it. Hand someone a report and the session, and they can confirm the report describes that exact file, unaltered — they don't have to take the sender's word for it. An edited session produces a different fingerprint.</div>
+      <div class="fingerprint">
+        <div class="fp-label">every report is signed to the exact bytes it read</div>
+        <h3>The person receiving it can check it's real.</h3>
+        <p>Hand someone the report and the session file, and they can confirm the report describes <em>that exact file</em>, unaltered. They don't have to take the sender's word for it &mdash; and an edited session produces a different fingerprint.</p>
+        <div class="fp-hash" data-copy="326ad7a4fd772e5dbbe33c32235480cf60646da0c46687a90ebb752fa0dd8469" data-loc="fingerprint" role="button" tabindex="0" title="Click to copy the full hash">
+          <span class="fp-key">sha256</span>
+          <span class="fp-val">326ad7a4fd772e5dbbe33c32235480cf60646da0c46687a90ebb752fa0dd8469</span>
+        </div>
+        <p class="fp-foot">That is the real fingerprint of <a href="/example-session.jsonl" download>the session file published on this site</a>. Download it and run <code>shasum -a 256</code> &mdash; you should get exactly the string above.</p>
+      </div>
       <div style="height:14px"></div>
       <div class="security-note"><strong>Still written locally, still nothing uploaded.</strong> The file lands in your working directory and goes only where you choose to send it. Same as every other part of this tool — no server of ours is involved.</div>
     </div>
@@ -618,7 +806,7 @@
 
   <section class="band" style="padding-top:0;">
     <div class="wrap-wide">
-      <h2 style="text-align:center;">Developers already saying this, in public</h2>
+      <h2 style="text-align:center;">In their own words</h2>
       <p class="band-sub" style="text-align:center;">Real quotes, real links — click through and read the full thing yourself.</p>
     </div>
     <div class="quote-marquee-wrap">
@@ -697,9 +885,9 @@
       <h2>What we don't do</h2>
       <p class="band-sub">The privacy story, stated plainly, not buried in a policy page.</p>
       <div class="trust-grid">
-        <div class="trust-cell"><h3><span class="mark">—</span> Nothing leaves without you asking</h3><p>Checks run locally, always — zero network calls by default. <code>--llm</code>, <code>--share</code>, and an anonymous install count (<code>--telemetry</code>) are separate, off-by-default opt-ins you turn on yourself. Full detail in <a href="/privacy">Privacy</a>.</p></div>
-        <div class="trust-cell"><h3><span class="mark">—</span> We don't see your data</h3><p>No server of ours sits in the path of your actual checks — no account, no login, nothing of ours to breach. What you check stays yours, always.</p></div>
-        <div class="trust-cell"><h3><span class="mark">—</span> We never touch settings.json</h3><p>Read-only, always. RuleReceipt only reads CLAUDE.md and your session transcript — it never writes to settings.json, never installs a hook, never changes anything without you asking.</p></div>
+        <div class="trust-cell"><h3><span class="mark">—</span> Offline by default</h3><p><code>--llm</code>, <code>--share</code> and <code>--telemetry</code> are opt-in and off until you turn them on. <a href="/privacy">Full detail</a>.</p></div>
+        <div class="trust-cell"><h3><span class="mark">—</span> No account, no server, no login</h3><p>Nothing of ours sits in the path of a check &mdash; so there is nothing of ours to breach.</p></div>
+        <div class="trust-cell"><h3><span class="mark">—</span> Read-only, always</h3><p>It never writes a file, installs a hook, or changes a setting. Not <code>settings.json</code>, not anything.</p></div>
       </div>
       <div style="height:20px"></div>
       <div class="security-note"><strong>You can verify the package you install came from the code you read.</strong> Every release is built and published by GitHub Actions and signed with npm provenance — no publishing token exists on anyone's laptop to be stolen. After installing, run <code>npm audit signatures</code> and npm will confirm the package was built from this public repository, at a specific commit. That's the appropriate standard for a tool whose whole job is verification, and it's checkable by you, not asserted by us.</div>
@@ -708,7 +896,7 @@
       <div style="height:14px"></div>
       <div class="security-note"><strong>Worth saying directly, given the year it's been:</strong> malicious npm packages have specifically targeted Claude Code's hook system — planting code in <code>.claude/settings.json</code> that runs automatically on every session. RuleReceipt does none of that. It runs only when you type the command. Nothing automatic, nothing silent.</div>
       <div style="height:14px"></div>
-      <div class="security-note"><strong>This isn't hypothetical.</strong> In July 2026, independent researchers found that a competing terminal coding agent was packaging entire codebases — including files never explicitly opened — into archives and uploading them to the vendor's cloud storage, with reports that the opt-out setting didn't reliably stop it. That's exactly the blind spot this tool exists to close: not "trust the agent," but see, with evidence, what it actually did.</div>
+      <div class="security-note"><strong>This isn't hypothetical.</strong> In July 2026, independent researchers found that a competing terminal coding agent was packaging entire codebases — including files never explicitly opened — into archives and uploading them to the vendor's cloud storage, with reports that the opt-out setting didn't reliably stop it. That's the blind spot this tool closes: don't trust the agent &mdash; check what it actually did.</div>
     </div>
   </section>
 
@@ -717,7 +905,7 @@
       <div style="text-align:center;">
         <h2 style="margin-bottom:10px;">Why an outside check</h2>
         <p class="band-sub" style="margin:0 auto; max-width:60ch;">An agent grading its own work has the same problem a company auditing its own books does. That's structural &mdash; it doesn't go away as models improve.</p>
-        <a href="/why" class="link-cta">The evidence, and how we know this is accurate &rarr;</a>
+        <a href="/why" class="link-cta">The evidence, and how we know this is accurate <span class="arw">&rarr;</span></a>
       </div>
     </div>
   </section>
@@ -728,11 +916,11 @@
         <div>
           <div class="dpa-eyebrow">for teams closing bigger deals</div>
           <h2>Signing a deal with a bigger company?</h2>
-          <p class="band-sub">Vendor security reviews ask how you actually develop. Here's a real answer.</p>
+          <p class="band-sub">Vendor security reviews ask how you develop. Here's an answer you can back up.</p>
           <p style="color:var(--paper-dim); font-size:0.88rem; margin-top:16px; font-style:italic;">A public repo, a forgotten <code>.env</code>, one deploy is all it takes to expose client data — and nobody finds out until it's too late.</p>
         </div>
         <div class="dpa-side">
-          <p>Secrets. PII. Input validation. Auth checks. Encryption in transit. What reviewers actually ask — checked against the session, whenever you run it.</p>
+          <p>Secrets. PII. Input validation. Auth checks. Encryption in transit. What reviewers ask — checked against the session, whenever you run it.</p>
           <p>A starting point we built, not a certification. Adjust it to your reviewer.</p>
           <p>Protects the company from what a session did silently — and protects the dev, too. Evidence, not blame.</p>
           <a href="/templates/security-focused-CLAUDE.md" class="dpa-cta">view the template &rarr;</a>
@@ -747,7 +935,7 @@
       <p class="band-sub">The CLI is free and stays free. A paid team tier is coming.</p>
       <div class="pricing">
         <div class="price-card accent"><div>The CLI</div><div class="amount">Free</div><p>Unlimited checks, no card, no account. This is the whole tool, not a trial of it — and it stays free.</p></div>
-        <div class="price-card"><div>For teams</div><div class="amount">Coming soon</div><p>Trends across your team over time, not one terminal run at a time. Priced when it's real.</p></div>
+        <div class="price-card"><div>For teams</div><div class="amount">Coming soon</div><p>Trends across your team, not one terminal run. Priced when it's real.</p></div>
       </div>
     </div>
   </section>
@@ -755,7 +943,7 @@
   <section class="band">
     <div class="wrap-wide">
       <h2>Questions</h2>
-      <p class="band-sub">Straight answers, including where the answer is "not yet."</p>
+      <p class="band-sub">Straight answers, including "not yet."</p>
       <div class="faq-columns">
           <details class="faq-item">
             <summary>Does this work with Cursor or other AI agents?</summary>
@@ -796,7 +984,7 @@
           </details>
           <details class="faq-item">
             <summary>Can my team or manager use this too?</summary>
-            <p>Yes — same tool, no team plan needed for this. A developer runs it after a session and shares the report directly (a markdown output is built for pasting into a PR or Slack). It's how an engineering lead sees whether the team's agent-assisted work actually followed standards, without a new dashboard to roll out.</p>
+            <p>Yes — same tool, no team plan needed for this. A developer runs it after a session and shares the report directly (a markdown output is built for pasting into a PR or Slack). It's how an engineering lead sees whether the team's agent-assisted work followed standards, without a new dashboard to roll out.</p>
           </details>
           <details class="faq-item">
             <summary>Can this help with a vendor security review or DPA?</summary>
@@ -810,7 +998,7 @@
     <div class="signup-stage">
       <div class="signup-card">
         <h3>Get notified before pricing changes</h3>
-        <p>No account needed to use the tool — this is only if you want a heads-up before the free period ends. No spam, one email when it matters.</p>
+        <p>No account needed to use the tool — this is only if you want a heads-up before the free period ends. One email when team pricing goes live. That's it.</p>
         <form class="signup-form" id="signup-form">
           <input type="email" id="signup-email" placeholder="you@example.com" required>
           <button type="submit">Notify me</button>
@@ -825,10 +1013,18 @@
       <div class="cmd-repeat" id="copy-footer" data-copy="npx rulereceipt check" data-loc="footer" role="button" tabindex="0" title="Click to copy">npx rulereceipt check</div>
       <div class="fine">Your machine. Your rules. Your receipt.</div>
       <div class="fine" style="margin-top:14px">
-        <a href="/about">About</a> · <a href="/postmortem">What we got wrong</a> · <a href="https://github.com/rulereceipt/rulereceipt" target="_blank" rel="noopener">Source on GitHub</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a> · <a href="/unsubscribe">Unsubscribe</a>
+        <a href="/about">About</a> · <a href="/postmortem">What we got wrong</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a> · <a href="/unsubscribe">Unsubscribe</a>
       </div>
-      <div class="fine" style="margin-top:10px">
-        <a href="mailto:hello@rulereceipt.dev">hello@rulereceipt.dev</a>
+      <div class="social-row">
+        <a href="https://github.com/rulereceipt/rulereceipt" target="_blank" rel="noopener" aria-label="RuleReceipt on GitHub" title="Source on GitHub">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5a12 12 0 0 0-3.79 23.4c.6.11.82-.26.82-.58v-2.2c-3.34.72-4.04-1.42-4.04-1.42-.55-1.38-1.33-1.75-1.33-1.75-1.09-.74.08-.73.08-.73 1.2.09 1.84 1.24 1.84 1.24 1.07 1.83 2.81 1.3 3.5.99.1-.78.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.13-.3-.54-1.52.11-3.18 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 6.01 0c2.29-1.55 3.3-1.23 3.3-1.23.65 1.66.24 2.88.12 3.18.77.84 1.23 1.91 1.23 3.22 0 4.61-2.8 5.62-5.48 5.92.43.37.81 1.1.81 2.22v3.29c0 .32.22.7.83.58A12 12 0 0 0 12 .5Z"/></svg>
+        </a>
+        <a href="https://x.com/RuleReceipt" target="_blank" rel="noopener" aria-label="RuleReceipt on X" title="@RuleReceipt on X">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.53 3h3.06l-6.69 7.64L21.75 21h-6.16l-4.83-6.3L5.24 21H2.18l7.15-8.17L2.25 3h6.32l4.36 5.77L17.53 3Zm-1.07 16.15h1.7L7.62 4.76H5.8l10.66 14.39Z"/></svg>
+        </a>
+        <a href="mailto:hello@rulereceipt.dev" aria-label="Email hello@rulereceipt.dev" title="hello@rulereceipt.dev">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="4.5" width="19" height="15" rx="2.5"/><path d="m3 7 8.4 5.8a1.5 1.5 0 0 0 1.7 0L21.5 7"/></svg>
+        </a>
       </div>
     </div>
   </footer>
@@ -958,13 +1154,44 @@
 </script>
 
 <script>
+  // Hairline under the sticky bar, only once the page has actually moved.
+  (function () {
+    var bar = document.querySelector('header.top');
+    if (!bar) return;
+    var onScroll = function () {
+      bar.classList.toggle('scrolled', window.scrollY > 8);
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+  })();
+
+  // Scroll reveal. The hidden state is applied by script, never in the
+  // stylesheet — if this file fails to load or IntersectionObserver is
+  // missing, every section stays visible instead of the page going blank.
+  (function () {
+    if (!('IntersectionObserver' in window)) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    var targets = document.querySelectorAll('section.band, .readout-stage, .quote-block, .trace-stage');
+    if (!targets.length) return;
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (!entry.isIntersecting) return;
+        entry.target.classList.add('revealed');
+        io.unobserve(entry.target);
+      });
+    }, { rootMargin: '0px 0px -8% 0px', threshold: 0.04 });
+    targets.forEach(function (el) {
+      el.classList.add('will-reveal');
+      io.observe(el);
+    });
+  })();
+
   document.querySelectorAll('[data-copy]').forEach(function (el) {
     function doCopy() {
       var text = el.getAttribute('data-copy');
       navigator.clipboard.writeText(text).catch(function () {});
       if (window.posthog) posthog.capture('copy_install_command', { location: el.getAttribute('data-loc') });
-      var cmdSpan = el.querySelector('.cmd');
-      var target = cmdSpan || el;
+      var target = el.querySelector('.cmd, .fp-val') || el;
       var original = target.textContent;
       target.textContent = 'copied!';
       clearTimeout(el._copyTimer);

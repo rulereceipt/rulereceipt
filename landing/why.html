@@ -24,67 +24,279 @@
 <meta property="og:image:height" content="630" />
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:image" content="https://rulereceipt.dev/og-image.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap" />
 <style>
-  body { margin:0; background:#FAFAF7; color:#17191C; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:17px; line-height:1.6; }
-  .wrap { max-width:680px; margin:0 auto; padding:60px 24px 90px; }
-  a { color:#17805F; }
-  h1 { font-size:1.9rem; margin-bottom:8px; line-height:1.2; }
-  .updated { color:#6B6F76; font-size:0.85rem; margin-bottom:36px; }
-  h2 { font-size:1.2rem; margin-top:42px; }
-  h3 { font-size:1.02rem; margin-top:28px; }
-  p { color:#3A3D42; }
-  .back { display:inline-block; margin-bottom:30px; font-size:0.85rem; }
-  .lede { font-size:1.1rem; color:#17191C; }
-  code { font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace; background:#F1F0EA; padding:1px 6px; border-radius:4px; font-size:0.9em; }
-  pre { background:#17191C; color:#FAFAF7; padding:16px 18px; border-radius:10px; overflow-x:auto; font-size:0.88rem; }
-  pre code { background:none; padding:0; color:inherit; }
-  .bug { border:1px solid #E7E5DC; border-radius:12px; padding:18px 22px; margin:18px 0; background:#FFFFFF; }
-  .bug .tag { font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace; font-size:0.72rem; letter-spacing:0.06em; text-transform:uppercase; color:#DD6A1F; margin-bottom:8px; }
-  .before-after { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin:14px 0; }
-  @media (max-width:560px) { .before-after { grid-template-columns:1fr; } }
-  .before-after .col { padding:12px 14px; border-radius:8px; font-size:0.88rem; }
-  .before-after .before { background:#FBEEEA; }
-  .before-after .after { background:#EAF3EE; }
-  .before-after .label { font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace; font-size:0.7rem; text-transform:uppercase; letter-spacing:0.06em; color:#6B6F76; margin-bottom:6px; }
-  .stat-row { display:flex; gap:24px; margin:20px 0; flex-wrap:wrap; }
-  .stat { font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace; }
-  .stat .num { font-size:1.8rem; font-weight:700; }
-  .stat .label { font-size:0.78rem; color:#6B6F76; text-transform:uppercase; letter-spacing:0.05em; }
+  /* Same system as the landing page: warm neutrals, one terracotta accent,
+     and green/red reserved so they only ever mean a verdict. */
+  :root {
+    --bg: #FAF9F5;
+    --bg-deep: #F0EEE6;
+    --panel: #FFFFFF;
+    --panel-line: #E8E6DC;
+    --panel-line-strong: #DEDCD1;
+    --paper: #141413;
+    --paper-dim: #55534E;
+    --paper-faint: #7A756E;
+    --amber: #C4551F;
+    --amber-dim: #AD4A17;
+    --cyan: #17805F;
+    --red: #C2402C;
+    --font-display: 'Newsreader', 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--paper);
+    font-family: var(--font-sans);
+    font-size: 17px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--amber-dim); }
+
+  .wrap { max-width: 720px; margin: 0 auto; padding: 0 24px; }
+
+  /* ---------- masthead ---------- */
+  .back {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    text-decoration: none;
+  }
+  .back:hover { text-decoration: underline; }
+
+  header.page {
+    padding: 34px 0 0;
+    border-bottom: 1px solid var(--panel-line);
+    margin-bottom: 44px;
+  }
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    color: var(--amber-dim);
+    margin: 30px 0 12px;
+  }
+  h1 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: clamp(2rem, 5vw, 2.9rem);
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    margin: 0 0 16px;
+    text-wrap: balance;
+  }
+  .deck {
+    font-size: 1.15rem;
+    line-height: 1.5;
+    color: var(--paper-dim);
+    margin: 0 0 34px;
+    max-width: 34em;
+  }
+
+  /* ---------- sections ---------- */
+  section { margin-bottom: 54px; }
+  h2 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 1.6rem;
+    letter-spacing: -0.015em;
+    margin: 0 0 6px;
+    text-wrap: balance;
+  }
+  .sec-sub {
+    color: var(--paper-faint);
+    font-size: 0.92rem;
+    margin: 0 0 24px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--panel-line);
+  }
+  p { color: var(--paper-dim); margin: 0 0 18px; }
+  .lede { font-size: 1.08rem; color: var(--paper); }
+  strong { color: var(--paper); font-weight: 600; }
+  em { font-style: italic; }
+
+  /* ---------- evidence cards ---------- */
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--panel-line-strong);
+    border-radius: 16px;
+    padding: 24px 26px;
+    margin-bottom: 18px;
+    box-shadow: 0 1px 2px rgba(20,20,19,0.03), 0 14px 30px -24px rgba(20,20,19,0.22);
+  }
+  .card h3 {
+    font-family: var(--font-sans);
+    font-weight: 600;
+    font-size: 1.02rem;
+    margin: 0 0 10px;
+    color: var(--paper);
+  }
+  .card p { font-size: 0.95rem; margin: 0 0 12px; }
+  .card p:last-child { margin-bottom: 0; }
+  .card ul { margin: 0; padding-left: 20px; color: var(--paper-dim); font-size: 0.95rem; }
+  .card li { margin-bottom: 8px; }
+  .card li:last-child { margin-bottom: 0; }
+  .src {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--paper-faint);
+    margin: 0 0 10px;
+  }
+  blockquote {
+    margin: 14px 0;
+    padding-left: 16px;
+    border-left: 2px solid var(--panel-line-strong);
+    font-family: var(--font-display);
+    font-size: 1.08rem;
+    line-height: 1.45;
+    color: var(--paper);
+  }
+
+  /* ---------- measured figures ---------- */
+  .stat-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 1px;
+    background: var(--panel-line);
+    border: 1px solid var(--panel-line);
+    border-radius: 14px;
+    overflow: hidden;
+    margin: 4px 0 18px;
+  }
+  .stat { background: var(--bg-deep); padding: 18px 16px; }
+  .stat .num {
+    font-family: var(--font-mono);
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--paper);
+    font-variant-numeric: tabular-nums;
+    display: block;
+    line-height: 1.1;
+  }
+  .stat .label {
+    font-size: 0.76rem;
+    color: var(--paper-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-top: 6px;
+    display: block;
+  }
+
+  code {
+    font-family: var(--font-mono);
+    background: var(--bg-deep);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 0.88em;
+    color: var(--paper);
+  }
+
+  .footnote {
+    font-size: 0.86rem;
+    color: var(--paper-faint);
+    border-top: 1px solid var(--panel-line);
+    padding-top: 18px;
+    margin-top: 8px;
+  }
+
+  footer.page {
+    border-top: 1px solid var(--panel-line);
+    padding: 26px 0 70px;
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+  }
+  footer.page a { text-decoration: none; }
+  footer.page a:hover { text-decoration: underline; }
 </style>
 </head>
 <body>
   <div class="wrap">
-    <a class="back" href="/">&larr; RuleReceipt</a>
-    <h1>Why an outside check</h1>
-    <div class="updated">The case for an independent record, and how we know this tool is accurate</div>
-  
-    
-      <h2>Why an outside check</h2>
-      <p class="band-sub">An agent grading its own work has the same problem a company auditing its own books does. That's structural — it doesn't go away as models improve.</p>
+    <header class="page">
+      <a class="back" href="/">&larr; RuleReceipt</a>
+      <div class="eyebrow">the case for an independent record</div>
+      <h1>Why an outside check</h1>
+      <p class="deck">An agent grading its own work has the same problem a company auditing its own books does. That is structural &mdash; it does not go away as models improve.</p>
+    </header>
 
-      <div class="security-note" style="margin-top:8px;">
-        <strong>Anthropic makes the architectural case themselves.</strong> Their April 2026 paper <a href="https://www.anthropic.com/research/trustworthy-agents" target="_blank" rel="noopener">Trustworthy agents in practice</a> splits agent security into four layers — model, harness, tools, environment — and notes that <em>"a well-trained model can still be exploited through a poorly configured harness, an overly permissive tool, or an exposed environment."</em> Three of those four layers belong to whoever deploys the agent, not the model vendor. They describe what's needed as <em>"the kind of infrastructure no single company can build alone."</em>
+    <section>
+      <h2>The argument isn't ours</h2>
+      <p class="sec-sub">Three independent sources, each pointing at the same gap.</p>
+
+      <div class="card">
+        <div class="src">Anthropic &middot; April 2026</div>
+        <h3>The vendor makes the architectural case themselves</h3>
+        <p>Their paper <a href="https://www.anthropic.com/research/trustworthy-agents" target="_blank" rel="noopener">Trustworthy agents in practice</a> splits agent security into four layers &mdash; model, harness, tools, environment.</p>
+        <blockquote>&ldquo;A well-trained model can still be exploited through a poorly configured harness, an overly permissive tool, or an exposed environment.&rdquo;</blockquote>
+        <p><strong>Three of those four layers belong to whoever deploys the agent</strong>, not to the model vendor. They describe what is needed as &ldquo;the kind of infrastructure no single company can build alone.&rdquo;</p>
       </div>
 
-      <div class="security-note">
-        <strong>The gap is measured, not assumed.</strong> A <a href="https://cloudsecurityalliance.org/press-releases/2026/04/16/more-than-half-of-organizations-experience-ai-agent-scope-violations-cloud-security-alliance-study-finds" target="_blank" rel="noopener">Cloud Security Alliance study published April 2026</a> found <strong>53%</strong> of organizations had AI agents exceed their intended permissions — and only <strong>8%</strong> said it never happens. In the same research, more than two-thirds reported they can't clearly tell an agent's actions apart from a human's. That last one is the whole problem in a sentence: you can't review what you can't distinguish.
+      <div class="card">
+        <div class="src">Cloud Security Alliance &middot; April 2026</div>
+        <h3>The gap is measured, not assumed</h3>
+        <div class="stat-row">
+          <div class="stat"><span class="num">53%</span><span class="label">had agents exceed intended permissions</span></div>
+          <div class="stat"><span class="num">8%</span><span class="label">said it never happens</span></div>
+          <div class="stat"><span class="num">2 in 3</span><span class="label">can't tell agent actions from human ones</span></div>
+        </div>
+        <p>From <a href="https://cloudsecurityalliance.org/press-releases/2026/04/16/more-than-half-of-organizations-experience-ai-agent-scope-violations-cloud-security-alliance-study-finds" target="_blank" rel="noopener">a survey of organisations running AI agents</a>. That last figure is the whole problem in a sentence: <strong>you cannot review what you cannot distinguish.</strong></p>
       </div>
 
-      <div class="security-note">
-        <strong>Where the rules are heading.</strong> Singapore's <a href="https://www.imda.gov.sg/resources/press-releases-factsheets-and-speeches/press-releases/2026/new-model-ai-governance-framework-for-agentic-ai" target="_blank" rel="noopener">Model AI Governance Framework for Agentic AI</a> (January 2026, the first of its kind) asks for a verifiable identity per agent and an audit trail of which agent acted under whose authorization. It's voluntary guidance, not enforcement — and the EU AI Act's high-risk obligations were pushed to December 2027, not this year. We'd rather say that plainly than manufacture a deadline. The direction is clear even where the dates aren't.
+      <div class="card">
+        <div class="src">Singapore IMDA &middot; January 2026</div>
+        <h3>Where the rules are heading</h3>
+        <p>The <a href="https://www.imda.gov.sg/resources/press-releases-factsheets-and-speeches/press-releases/2026/new-model-ai-governance-framework-for-agentic-ai" target="_blank" rel="noopener">Model AI Governance Framework for Agentic AI</a> &mdash; the first of its kind &mdash; asks for two things:</p>
+        <ul>
+          <li>A verifiable identity per agent.</li>
+          <li>An audit trail of which agent acted under whose authorization.</li>
+        </ul>
+        <p style="margin-top:12px;">We'd rather be straight about the limits of that: it is voluntary guidance, not enforcement, and the EU AI Act's high-risk obligations were pushed to <strong>December 2027</strong>, not this year. The direction is clear even where the dates aren't &mdash; and we're not going to manufacture a deadline out of it.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>How we know this tool is accurate</h2>
+      <p class="sec-sub">Because we got it wrong first, in public, and then measured the fix.</p>
+
+      <div class="card">
+        <h3>Every failure it first reported was a false alarm</h3>
+        <p>We ran this against a real session and it reported ten rule violations. <strong>Every one was wrong.</strong> Rather than patch them one by one, we found the cause:</p>
+        <blockquote>A text match can never prove someone did something.</blockquote>
+        <p>Searching a session for a banned command finds it whether the agent ran it, looked it up, or mentioned it in a note. So we rebuilt it to read what actually happened, and <strong>a text match can no longer report a failure at all</strong>. Where it isn't certain, it says so instead of guessing.</p>
+        <p>The whole thing is written up, including the wrong turn we took while fixing it: <a href="/postmortem">what we got wrong</a>.</p>
       </div>
 
-      <div class="security-note" style="margin-top:26px;">
-        <strong>How we know it's accurate — because we got it wrong first.</strong> We ran this against a real session and it reported ten rule violations. Every one was wrong. Rather than patch them, we found the cause: <em>a text match can never prove someone did something</em> — searching a session for a banned command finds it whether the agent ran it, looked it up, or mentioned it in a note. So we rebuilt it to read what actually happened, and a text match can no longer report a failure at all. Where it isn't certain, it says so instead of guessing. The whole thing is written up, including the wrong turn we took fixing it: <a href="/postmortem">what we got wrong</a>.
+      <div class="card">
+        <h3>Tested against real rules files, not our own examples</h3>
+        <div class="stat-row">
+          <div class="stat"><span class="num">559</span><span class="label">public rules files</span></div>
+          <div class="stat"><span class="num">23,704</span><span class="label">items parsed</span></div>
+          <div class="stat"><span class="num">8,803</span><span class="label">real rules</span></div>
+          <div class="stat"><span class="num">0</span><span class="label">crashes</span></div>
+        </div>
+        <p>CLAUDE.md, AGENTS.md, <code>.cursorrules</code>, Copilot instructions, Windsurf and Gemini files &mdash; from PyTorch, Kubernetes, Elasticsearch and hundreds of other projects.</p>
+        <p>When that corpus grew roughly fourteen-fold, into formats the classifier had never been tuned on, its behaviour barely moved. That stability is the actual argument: <strong>directives are a property of language, not of file format.</strong></p>
+        <p>And it is tested in the other direction too &mdash; sessions built to deliberately break a rule, to confirm it catches them, not merely that it stays quiet on well-behaved ones.</p>
       </div>
+    </section>
 
-      <div class="security-note">
-        <strong>Tested against real rules files, not our own examples.</strong> 559 public rules files — CLAUDE.md, AGENTS.md, .cursorrules, Copilot instructions, Windsurf and Gemini — from PyTorch, Kubernetes, Elasticsearch and hundreds of other projects, covering 23,704 parsed items and 8,808 real rules, with no crashes. When that corpus nearly doubled with formats the tool had never been tuned on, its behaviour barely moved. And it's tested the other way too: sessions that deliberately break a rule, to confirm it catches them, not just that it stays quiet on good ones.
-      </div>
-
-      <p class="band-sub" style="font-size:0.82rem; margin-top:18px;">Figures above are dated on purpose — they're from specific 2026 studies and will age. The structural argument is what we'd stand behind regardless: an independent record beats a self-report, whatever the current numbers say.</p>
-    
-    <p style="margin-top:40px;"><a class="back" href="/">&larr; Back to RuleReceipt</a> &nbsp;·&nbsp; <a href="/postmortem">What we got wrong</a></p>
+    <p class="footnote">The figures above are dated on purpose &mdash; they come from specific 2026 studies and they will age. The structural argument is what we would stand behind regardless: an independent record beats a self-report, whatever the current numbers say.</p>
   </div>
+
+  <footer class="page">
+    <div class="wrap">
+      <a href="/">&larr; Back to RuleReceipt</a> &nbsp;&middot;&nbsp; <a href="/postmortem">What we got wrong</a>
+    </div>
+  </footer>
 </body>
 </html>

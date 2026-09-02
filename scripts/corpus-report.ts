@@ -12,7 +12,7 @@
  */
 import { readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { parseClaudeMd } from "../src/parsers/claudeMdParser.js";
+import { parseClaudeMd } from "../src/parsers/readClaudeMd.js";
 import { classifyRule } from "../src/checks/classify.js";
 
 const args = process.argv.slice(2).filter((a) => !a.startsWith("--"));
