@@ -266,6 +266,17 @@
   }
 
   /* ---------- pull quote ---------- */
+  .position-line {
+    max-width: 760px; margin: 40px auto 0; padding: 0 24px;
+    text-align: center;
+  }
+  .position-line p {
+    font-size: 1.12rem; line-height: 1.5; color: var(--paper);
+    margin: 0; text-wrap: balance;
+  }
+  .position-line strong { color: var(--amber); font-weight: 700; }
+  .position-line .qual { display: block; margin-top: 10px; font-size: 0.9rem; color: var(--paper-dim); }
+
   .quote-block { padding: 10px 0 56px; text-align: center; }
   blockquote {
     margin: 0 auto;
@@ -547,6 +558,29 @@
     </div>
   </div>
 
+
+  <div class="position-line">
+    <p>Every other tool in this space helps you <em>write</em> better rules. <strong>This one tells you whether they were followed.</strong>
+    <span class="qual">Nothing to sign up for. Nothing sent anywhere. It reads a session you already have.</span></p>
+  </div>
+
+  <div class="quote-block">
+    <blockquote>It reads the rules. It doesn't always follow them.</blockquote>
+    <div class="quote-cite">the exact problem behind every real example below</div>
+    <div class="evidence-card">
+      <div class="evidence-label">Not unique to Claude — a structural limit of how LLMs process long instructions, documented, not guessed</div>
+      <div class="issue-row">
+        <div class="issue"><span class="num">#18660</span><span>CLAUDE.md instructions are read but not reliably followed</span></div>
+        <div class="issue"><span class="num">#15443</span><span>Claude ignores explicit instructions while claiming to understand them</span></div>
+        <div class="issue"><span class="num">#24318</span><span>Claude ignores explicit user instructions and acts without approval</span></div>
+        <div class="issue"><span class="num">→</span><span>A known limit of how LLMs process long instruction files, not a Claude-specific flaw — in Claude Code specifically, content starts getting selectively skipped after around 80 lines</span></div>
+      </div>
+      <div class="evidence-divider"></div>
+      <div class="evidence-label">Sometimes the cost isn't a bug report — it's real data</div>
+      <p style="color:var(--paper-dim); font-size:0.92rem; margin:0 0 16px;">A developer told Claude explicitly: <em>"Don't deploy. No cp to /opt/proxypilot, no service restarts."</em> Claude ran a <code>cp</code> command over the live production directory anyway, corrupting the database — then deleted it entirely trying to "fix" the corruption. Recoverable only because a daily backup happened to exist. <a href="https://tim-schipper.nl/en/blog/the-day-claude-deleted-my-database" target="_blank" rel="noopener">Read the full account &rarr;</a></p>
+    </div>
+  </div>
+
   <section class="band">
     <div class="wrap-wide">
       <h2>Send someone the result</h2>
@@ -571,23 +605,6 @@
       <div class="security-note"><strong>Still written locally, still nothing uploaded.</strong> The file lands in your working directory and goes only where you choose to send it. Same as every other part of this tool — no server of ours is involved.</div>
     </div>
   </section>
-
-  <div class="quote-block">
-    <blockquote>It reads the rules. It doesn't always follow them.</blockquote>
-    <div class="quote-cite">the exact problem behind every real example below</div>
-    <div class="evidence-card">
-      <div class="evidence-label">Not unique to Claude — a structural limit of how LLMs process long instructions, documented, not guessed</div>
-      <div class="issue-row">
-        <div class="issue"><span class="num">#18660</span><span>CLAUDE.md instructions are read but not reliably followed</span></div>
-        <div class="issue"><span class="num">#15443</span><span>Claude ignores explicit instructions while claiming to understand them</span></div>
-        <div class="issue"><span class="num">#24318</span><span>Claude ignores explicit user instructions and acts without approval</span></div>
-        <div class="issue"><span class="num">→</span><span>A known limit of how LLMs process long instruction files, not a Claude-specific flaw — in Claude Code specifically, content starts getting selectively skipped after around 80 lines</span></div>
-      </div>
-      <div class="evidence-divider"></div>
-      <div class="evidence-label">Sometimes the cost isn't a bug report — it's real data</div>
-      <p style="color:var(--paper-dim); font-size:0.92rem; margin:0 0 16px;">A developer told Claude explicitly: <em>"Don't deploy. No cp to /opt/proxypilot, no service restarts."</em> Claude ran a <code>cp</code> command over the live production directory anyway, corrupting the database — then deleted it entirely trying to "fix" the corruption. Recoverable only because a daily backup happened to exist. <a href="https://tim-schipper.nl/en/blog/the-day-claude-deleted-my-database" target="_blank" rel="noopener">Read the full account &rarr;</a></p>
-    </div>
-  </div>
 
   <section class="band" style="padding-top:0;">
     <div class="wrap-wide">
