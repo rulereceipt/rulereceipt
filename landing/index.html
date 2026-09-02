@@ -512,22 +512,30 @@
   }
   .dpa-cta:hover { background: var(--amber-dim); }
 
+  /* Terracotta, outlined. Was solid green — green is reserved for
+     verdicts now, and a flooded button outshouted the hero's own action.
+     Hover warms the fill rather than inverting it. */
   .link-cta {
     font-family: var(--font-mono);
     font-size: 0.85rem;
-    color: var(--paper);
+    color: var(--amber-dim);
     background: var(--panel);
-    border: 1px solid var(--panel-line-strong);
+    border: 1px solid var(--amber);
     padding: 12px 20px;
     border-radius: 12px;
     display: inline-block;
     text-decoration: none;
-    font-weight: 500;
+    font-weight: 600;
     margin-top: 18px;
-    transition: border-color 0.15s ease, transform 0.15s ease;
+    transition: background 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
   }
-  .link-cta:hover { border-color: var(--amber); transform: translateY(-1px); }
-  .link-cta .arw { color: var(--amber-dim); }
+  .link-cta:hover {
+    background: #FBF0E8;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px -10px rgba(196,85,31,0.55);
+  }
+  .link-cta:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; }
+  .link-cta .arw { color: var(--amber); }
 
   .quote-marquee-wrap {
     overflow: hidden;
