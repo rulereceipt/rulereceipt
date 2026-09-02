@@ -1,0 +1,49 @@
+name: A result looks wrong
+description: A rule was reported as followed, not followed, or unclear — and you think that's incorrect.
+labels: ["accuracy"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This is the most useful kind of report for this project. Every accuracy
+        fix so far came from someone running it on a real, messy file rather
+        than from us thinking harder about it.
+
+        **Before you paste anything:** rule text and evidence are quoted
+        verbatim, so check for anything private — internal repo names, paths,
+        credentials. Redact freely; the shape of the problem matters more than
+        the exact strings.
+  - type: textarea
+    id: rule
+    attributes:
+      label: The rule, as written in your CLAUDE.md / AGENTS.md
+      description: Copy it exactly, including the heading it sits under. The heading affects classification.
+      render: markdown
+    validations:
+      required: true
+  - type: dropdown
+    id: reported
+    attributes:
+      label: What was reported
+      options: ["Followed", "Not followed", "Couldn't tell", "Needs your judgment", "Not checked (treated as documentation)"]
+    validations:
+      required: true
+  - type: input
+    id: expected
+    attributes:
+      label: What you expected instead
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: The evidence line the report printed, if any
+      render: shell
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: "Output of: rulereceipt --version"
+      placeholder: "0.1.25"
+    validations:
+      required: true

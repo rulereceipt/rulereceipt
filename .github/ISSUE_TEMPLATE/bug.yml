@@ -1,0 +1,33 @@
+name: Something broke
+description: A crash, a hang, or output that makes no sense.
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: The command you ran and what came back. Redact anything private.
+      render: shell
+    validations:
+      required: true
+  - type: input
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version and OS
+      placeholder: "rulereceipt 0.1.25, macOS 15, node 22"
+    validations:
+      required: true
+  - type: checkboxes
+    id: setup
+    attributes:
+      label: Anything unusual about the setup
+      options:
+        - label: Claude Code stores sessions somewhere non-standard (I use --transcript)
+        - label: Monorepo, or rules files at more than one level
+        - label: A hosted or enterprise Claude Code variant
