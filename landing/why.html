@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<script>
+    !function(t,e){var o,n,p,r;e.__SV||(window.posthog && window.posthog.__loaded)||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}p||((p=t.createElement("script")).type="text/javascript",p.crossOrigin="anonymous",p.async=!0,p.src=s.api_host.replace(".i.posthog.com","-assets.i.posthog.com")+"/static/array.js",p.onerror=function(){p=null},(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r));var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+".people (stub)"},o="Sn Cn init Hn Un Gn Yi zn Kn qn capture Vn kn calculateEventProperties es register register_once register_for_session unregister unregister_for_session os Bn ss getFeatureFlag getFeatureFlagPayload getFeatureFlagResult getAllFeatureFlags isFeatureEnabled reloadFeatureFlags updateFlags updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures on onFeatureFlags onSurveysLoaded onSessionId getSurveys getActiveMatchingSurveys renderSurvey displaySurvey cancelPendingSurvey canRenderSurvey canRenderSurveyAsync ls identify setPersonProperties unsetPersonProperties group resetGroups setPersonPropertiesForFlags resetPersonPropertiesForFlags setGroupPropertiesForFlags resetGroupPropertiesForFlags reset us shutdown setIdentity clearIdentity get_distinct_id getGroups get_session_id get_session_replay_url alias set_config startSessionRecording stopSessionRecording sessionRecordingStarted captureException addExceptionStep captureLog startExceptionAutocapture stopExceptionAutocapture loadToolbar get_property getSessionProperty rs Xn createPersonProfile setInternalOrTestUser ns $n vs opt_in_capturing opt_out_capturing has_opted_in_capturing has_opted_out_capturing get_explicit_consent_status is_capturing clear_opt_in_out_capturing Jn debug tr At getPageViewId captureTraceFeedback captureTraceMetric Ln".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
+    posthog.init('phc_A4TBtMr58tNcGFEnoC82pPqzrKxXRGw84B8RVd8JK2nW', {
+        api_host: 'https://us.i.posthog.com',
+        defaults: '2026-05-30',
+        person_profiles: 'identified_only',
+    })
+</script>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>RuleReceipt — Why an outside check</title>
+<meta name="description" content="Why an independent check of an AI agent\'s work beats a self-report — the measured evidence, where the rules are heading, and how we know this tool is accurate." />
+<link rel="canonical" href="https://rulereceipt.dev/why" />
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23FAFAF7'/%3E%3Cpath d='M9 8h14v17l-3-2-3 2-3-2-3 2-2-2z' fill='none' stroke='%2317191C' stroke-width='1.6'/%3E%3Cpath d='M12 14h8M12 18h6' stroke='%2317805F' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E" />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="https://rulereceipt.dev/why" />
+<meta property="og:title" content="RuleReceipt — Why an outside check" />
+<meta property="og:description" content="Why an independent check of an AI agent\'s work beats a self-report — measured evidence, not assertion." />
+<meta property="og:image" content="https://rulereceipt.dev/og-image.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:image" content="https://rulereceipt.dev/og-image.png" />
+<style>
+  body { margin:0; background:#FAFAF7; color:#17191C; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:17px; line-height:1.6; }
+  .wrap { max-width:680px; margin:0 auto; padding:60px 24px 90px; }
+  a { color:#17805F; }
+  h1 { font-size:1.9rem; margin-bottom:8px; line-height:1.2; }
+  .updated { color:#6B6F76; font-size:0.85rem; margin-bottom:36px; }
+  h2 { font-size:1.2rem; margin-top:42px; }
+  h3 { font-size:1.02rem; margin-top:28px; }
+  p { color:#3A3D42; }
+  .back { display:inline-block; margin-bottom:30px; font-size:0.85rem; }
+  .lede { font-size:1.1rem; color:#17191C; }
+  code { font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace; background:#F1F0EA; padding:1px 6px; border-radius:4px; font-size:0.9em; }
+  pre { background:#17191C; color:#FAFAF7; padding:16px 18px; border-radius:10px; overflow-x:auto; font-size:0.88rem; }
+  pre code { background:none; padding:0; color:inherit; }
+  .bug { border:1px solid #E7E5DC; border-radius:12px; padding:18px 22px; margin:18px 0; background:#FFFFFF; }
+  .bug .tag { font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace; font-size:0.72rem; letter-spacing:0.06em; text-transform:uppercase; color:#DD6A1F; margin-bottom:8px; }
+  .before-after { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin:14px 0; }
+  @media (max-width:560px) { .before-after { grid-template-columns:1fr; } }
+  .before-after .col { padding:12px 14px; border-radius:8px; font-size:0.88rem; }
+  .before-after .before { background:#FBEEEA; }
+  .before-after .after { background:#EAF3EE; }
+  .before-after .label { font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace; font-size:0.7rem; text-transform:uppercase; letter-spacing:0.06em; color:#6B6F76; margin-bottom:6px; }
+  .stat-row { display:flex; gap:24px; margin:20px 0; flex-wrap:wrap; }
+  .stat { font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace; }
+  .stat .num { font-size:1.8rem; font-weight:700; }
+  .stat .label { font-size:0.78rem; color:#6B6F76; text-transform:uppercase; letter-spacing:0.05em; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <a class="back" href="/">&larr; RuleReceipt</a>
+    <h1>Why an outside check</h1>
+    <div class="updated">The case for an independent record, and how we know this tool is accurate</div>
+  
+    
+      <h2>Why an outside check</h2>
+      <p class="band-sub">An agent grading its own work has the same problem a company auditing its own books does. That's structural — it doesn't go away as models improve.</p>
+
+      <div class="security-note" style="margin-top:8px;">
+        <strong>Anthropic makes the architectural case themselves.</strong> Their April 2026 paper <a href="https://www.anthropic.com/research/trustworthy-agents" target="_blank" rel="noopener">Trustworthy agents in practice</a> splits agent security into four layers — model, harness, tools, environment — and notes that <em>"a well-trained model can still be exploited through a poorly configured harness, an overly permissive tool, or an exposed environment."</em> Three of those four layers belong to whoever deploys the agent, not the model vendor. They describe what's needed as <em>"the kind of infrastructure no single company can build alone."</em>
+      </div>
+
+      <div class="security-note">
+        <strong>The gap is measured, not assumed.</strong> A <a href="https://cloudsecurityalliance.org/press-releases/2026/04/16/more-than-half-of-organizations-experience-ai-agent-scope-violations-cloud-security-alliance-study-finds" target="_blank" rel="noopener">Cloud Security Alliance study published April 2026</a> found <strong>53%</strong> of organizations had AI agents exceed their intended permissions — and only <strong>8%</strong> said it never happens. In the same research, more than two-thirds reported they can't clearly tell an agent's actions apart from a human's. That last one is the whole problem in a sentence: you can't review what you can't distinguish.
+      </div>
+
+      <div class="security-note">
+        <strong>Where the rules are heading.</strong> Singapore's <a href="https://www.imda.gov.sg/resources/press-releases-factsheets-and-speeches/press-releases/2026/new-model-ai-governance-framework-for-agentic-ai" target="_blank" rel="noopener">Model AI Governance Framework for Agentic AI</a> (January 2026, the first of its kind) asks for a verifiable identity per agent and an audit trail of which agent acted under whose authorization. It's voluntary guidance, not enforcement — and the EU AI Act's high-risk obligations were pushed to December 2027, not this year. We'd rather say that plainly than manufacture a deadline. The direction is clear even where the dates aren't.
+      </div>
+
+      <div class="security-note" style="margin-top:26px;">
+        <strong>How we know it's accurate — because we got it wrong first.</strong> We ran this against a real session and it reported ten rule violations. Every one was wrong. Rather than patch them, we found the cause: <em>a text match can never prove someone did something</em> — searching a session for a banned command finds it whether the agent ran it, looked it up, or mentioned it in a note. So we rebuilt it to read what actually happened, and a text match can no longer report a failure at all. Where it isn't certain, it says so instead of guessing. The whole thing is written up, including the wrong turn we took fixing it: <a href="/postmortem">what we got wrong</a>.
+      </div>
+
+      <div class="security-note">
+        <strong>Tested against real rules files, not our own examples.</strong> 559 public rules files — CLAUDE.md, AGENTS.md, .cursorrules, Copilot instructions, Windsurf and Gemini — from PyTorch, Kubernetes, Elasticsearch and hundreds of other projects, covering 23,704 parsed items and 8,808 real rules, with no crashes. When that corpus nearly doubled with formats the tool had never been tuned on, its behaviour barely moved. And it's tested the other way too: sessions that deliberately break a rule, to confirm it catches them, not just that it stays quiet on good ones.
+      </div>
+
+      <p class="band-sub" style="font-size:0.82rem; margin-top:18px;">Figures above are dated on purpose — they're from specific 2026 studies and will age. The structural argument is what we'd stand behind regardless: an independent record beats a self-report, whatever the current numbers say.</p>
+    
+    <p style="margin-top:40px;"><a class="back" href="/">&larr; Back to RuleReceipt</a> &nbsp;·&nbsp; <a href="/postmortem">What we got wrong</a></p>
+  </div>
+</body>
+</html>
