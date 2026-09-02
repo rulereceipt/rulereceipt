@@ -388,8 +388,7 @@
 
   .trust-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--panel-line); border: 1px solid var(--panel-line); border-radius: 16px; overflow: hidden; }
   .trust-cell { background: var(--bg-deep); padding: 26px 22px; }
-  .trust-cell h3 { font-family: var(--font-sans); font-weight: 600; font-size: 1.02rem; margin: 0 0 10px; color: var(--paper); display:flex; align-items:center; gap:8px; }
-  .trust-cell h3 .mark { color: var(--amber-dim); }
+  .trust-cell h3 { font-family: var(--font-sans); font-weight: 600; font-size: 1.02rem; margin: 0 0 10px; color: var(--amber-dim); }
   .trust-cell p { margin: 0; color: var(--paper-dim); font-size: 0.95rem; }
 
   .security-note {
@@ -789,9 +788,9 @@
       </div>
 
       <div class="trust-grid" style="margin-top:26px;">
-        <div class="trust-cell"><h3><span class="mark">—</span> Opens anywhere, forever</h3><p>One self-contained file. No CDN, no fonts, no scripts, nothing loaded from the internet — so it still opens correctly from an email attachment, offline, years from now.</p></div>
-        <div class="trust-cell"><h3><span class="mark">—</span> Failures first, never buried</h3><p>What wasn't followed sits at the top, not underneath a comfortable list of passes. A report designed to be skimmed isn't a report.</p></div>
-        <div class="trust-cell"><h3><span class="mark">—</span> It says what it can't prove</h3><p>It never says "compliant." It covers one session, and rules needing judgment are marked for human review rather than guessed at — printed on the report itself, not hidden in a policy page.</p></div>
+        <div class="trust-cell"><h3>Opens anywhere, forever</h3><p>One self-contained file. No CDN, no fonts, no scripts, nothing loaded from the internet — so it still opens correctly from an email attachment, offline, years from now.</p></div>
+        <div class="trust-cell"><h3>Failures first, never buried</h3><p>What wasn't followed sits at the top, not underneath a comfortable list of passes. A report designed to be skimmed isn't a report.</p></div>
+        <div class="trust-cell"><h3>It says what it can't prove</h3><p>It never says "compliant." It covers one session, and rules needing judgment are marked for human review rather than guessed at — printed on the report itself, not hidden in a policy page.</p></div>
       </div>
 
       <div style="height:20px"></div>
@@ -893,9 +892,9 @@
       <h2>What we don't do</h2>
       <p class="band-sub">The privacy story, stated plainly, not buried in a policy page.</p>
       <div class="trust-grid">
-        <div class="trust-cell"><h3><span class="mark">—</span> Offline by default</h3><p><code>--llm</code>, <code>--share</code> and <code>--telemetry</code> are opt-in and off until you turn them on. <a href="/privacy">Full detail</a>.</p></div>
-        <div class="trust-cell"><h3><span class="mark">—</span> No account, no server, no login</h3><p>Nothing of ours sits in the path of a check &mdash; so there is nothing of ours to breach.</p></div>
-        <div class="trust-cell"><h3><span class="mark">—</span> Read-only, always</h3><p>It never writes a file, installs a hook, or changes a setting. Not <code>settings.json</code>, not anything.</p></div>
+        <div class="trust-cell"><h3>Offline by default</h3><p><code>--llm</code>, <code>--share</code> and <code>--telemetry</code> are opt-in and off until you turn them on. <a href="/privacy">Full detail</a>.</p></div>
+        <div class="trust-cell"><h3>No account, no server, no login</h3><p>Nothing of ours sits in the path of a check &mdash; so there is nothing of ours to breach.</p></div>
+        <div class="trust-cell"><h3>Read-only, always</h3><p>It never writes a file, installs a hook, or changes a setting. Not <code>settings.json</code>, not anything.</p></div>
       </div>
       <div style="height:20px"></div>
       <div class="security-note"><strong>You can verify the package you install came from the code you read.</strong> Every release is built and published by GitHub Actions and signed with npm provenance — no publishing token exists on anyone's laptop to be stolen. After installing, run <code>npm audit signatures</code> and npm will confirm the package was built from this public repository, at a specific commit. That's the appropriate standard for a tool whose whole job is verification, and it's checkable by you, not asserted by us.</div>
@@ -1006,7 +1005,7 @@
     <div class="signup-stage">
       <div class="signup-card">
         <h3>Get notified before pricing changes</h3>
-        <p>No account needed to use the tool — this is only if you want a heads-up before the free period ends. One email when team pricing goes live. That's it.</p>
+        <p>No account needed to use the tool. One email when team pricing goes live.</p>
         <form class="signup-form" id="signup-form">
           <input type="email" id="signup-email" placeholder="you@example.com" required>
           <button type="submit">Notify me</button>
