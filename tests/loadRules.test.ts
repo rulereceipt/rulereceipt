@@ -128,3 +128,90 @@ describe("loadRules collects global CLAUDE.md from every .claude*-prefixed home 
     });
   });
 });
+
+/**
+ * Claude Code loads more than a bare CLAUDE.md, and every location it
+ * loads is a place a real rule can live.
+ *
+ * Found 2026-09-02 by comparing the tool against the documented load
+ * order: a project with four rules files produced "1 rules checked · all
+ * passed". Three files were invisible, and nothing said so — the worst
+ * shape of failure this tool can have, because a clean report on rules it
+ * never read is more misleading than no report at all.
+ *
+ * Per the docs, Claude Code reads (broadest to most specific):
+ *   ~/.claude/CLAUDE.md, ~/.claude/rules/*.md,
+ *   ./CLAUDE.md, ./.claude/CLAUDE.md, ./.claude/rules/*.md,
+ *   ./CLAUDE.local.md, and the same set at each level up the tree.
+ *
+ * Managed enterprise policy paths are deliberately NOT covered: they are
+ * machine-wide, org-deployed, and cannot be tested here without inventing
+ * a location. That gap is stated rather than silently left.
+ */
+describe("reads every rules-file location Claude Code actually loads", () => {
+  let dir: string;
+  const realHome = homeState.current;
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), "rulereceipt-locations-"));
+    writeFileSync(join(dir, ".git"), ""); // stop the upward walk here
+  });
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+    homeState.current = realHome;
+  });
+
+  const has = (rules: ReturnType<typeof loadRules>, marker: string) =>
+    rules.some((r) => r.title.includes(marker) || r.text.includes(marker));
+
+  it("reads .claude/CLAUDE.md — the documented in-project location", () => {
+    mkdirSync(join(dir, ".claude"), { recursive: true });
+    writeFileSync(join(dir, ".claude", "CLAUDE.md"), "## Rule\n- dotclaude-marker\n");
+    expect(has(loadRules(dir), "dotclaude-marker")).toBe(true);
+  });
+
+  it("reads CLAUDE.local.md — personal overrides for one repo", () => {
+    writeFileSync(join(dir, "CLAUDE.local.md"), "## Rule\n- local-marker\n");
+    expect(has(loadRules(dir), "local-marker")).toBe(true);
+  });
+
+  it("reads .claude/rules/*.md — team rules split into files", () => {
+    mkdirSync(join(dir, ".claude", "rules"), { recursive: true });
+    writeFileSync(join(dir, ".claude", "rules", "testing.md"), "## Rule\n- teamrules-marker\n");
+    writeFileSync(join(dir, ".claude", "rules", "style.md"), "## Rule\n- stylerules-marker\n");
+    const rules = loadRules(dir);
+    expect(has(rules, "teamrules-marker")).toBe(true);
+    expect(has(rules, "stylerules-marker")).toBe(true);
+  });
+
+  it("reads ~/.claude/rules/*.md — personal rules across all projects", () => {
+    const home = mkdtempSync(join(tmpdir(), "rulereceipt-locations-home-"));
+    homeState.current = home;
+    try {
+      mkdirSync(join(home, ".claude", "rules"), { recursive: true });
+      writeFileSync(join(home, ".claude", "rules", "habits.md"), "## Rule\n- globalrules-marker\n");
+      expect(has(loadRules(dir), "globalrules-marker")).toBe(true);
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  // The whole point: all of them together, none silently dropped.
+  it("reads ALL of them in one project, not just the first it finds", () => {
+    writeFileSync(join(dir, "CLAUDE.md"), "## Rule\n- root-marker\n");
+    mkdirSync(join(dir, ".claude", "rules"), { recursive: true });
+    writeFileSync(join(dir, ".claude", "CLAUDE.md"), "## Rule\n- dotclaude-marker\n");
+    writeFileSync(join(dir, ".claude", "rules", "a.md"), "## Rule\n- teamrules-marker\n");
+    writeFileSync(join(dir, "CLAUDE.local.md"), "## Rule\n- local-marker\n");
+    const rules = loadRules(dir);
+    for (const m of ["root-marker", "dotclaude-marker", "teamrules-marker", "local-marker"]) {
+      expect(has(rules, m), `missing ${m}`).toBe(true);
+    }
+  });
+
+  it("ignores non-markdown files sitting in a rules directory", () => {
+    mkdirSync(join(dir, ".claude", "rules"), { recursive: true });
+    writeFileSync(join(dir, ".claude", "rules", "notes.txt"), "## Rule\n- txt-marker\n");
+    expect(has(loadRules(dir), "txt-marker")).toBe(false);
+  });
+});

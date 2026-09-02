@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+<head>
+<script>
+    !function(t,e){var o,n,p,r;e.__SV||(window.posthog && window.posthog.__loaded)||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}p||((p=t.createElement("script")).type="text/javascript",p.crossOrigin="anonymous",p.async=!0,p.src=s.api_host.replace(".i.posthog.com","-assets.i.posthog.com")+"/static/array.js",p.onerror=function(){p=null},(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r));var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+".people (stub)"},o="Sn Cn init Hn Un Gn Yi zn Kn qn capture Vn kn calculateEventProperties es register register_once register_for_session unregister unregister_for_session os Bn ss getFeatureFlag getFeatureFlagPayload getFeatureFlagResult getAllFeatureFlags isFeatureEnabled reloadFeatureFlags updateFlags updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures on onFeatureFlags onSurveysLoaded onSessionId getSurveys getActiveMatchingSurveys renderSurvey displaySurvey cancelPendingSurvey canRenderSurvey canRenderSurveyAsync ls identify setPersonProperties unsetPersonProperties group resetGroups setPersonPropertiesForFlags resetPersonPropertiesForFlags setGroupPropertiesForFlags resetGroupPropertiesForFlags reset us shutdown setIdentity clearIdentity get_distinct_id getGroups get_session_id get_session_replay_url alias set_config startSessionRecording stopSessionRecording sessionRecordingStarted captureException addExceptionStep captureLog startExceptionAutocapture stopExceptionAutocapture loadToolbar get_property getSessionProperty rs Xn createPersonProfile setInternalOrTestUser ns $n vs opt_in_capturing opt_out_capturing has_opted_in_capturing has_opted_out_capturing get_explicit_consent_status is_capturing clear_opt_in_out_capturing Jn debug tr At getPageViewId captureTraceFeedback captureTraceMetric Ln".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
+    posthog.init('phc_A4TBtMr58tNcGFEnoC82pPqzrKxXRGw84B8RVd8JK2nW', {
+        api_host: 'https://us.i.posthog.com',
+        defaults: '2026-05-30',
+        person_profiles: 'identified_only',
+    })
+</script>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>How much of your CLAUDE.md can a tool actually check?</title>
+<meta name="description" content="Paste your CLAUDE.md or AGENTS.md and see how much of it contains an actual instruction. Runs entirely in your browser — the file never leaves the page." />
+<link rel="canonical" href="https://rulereceipt.dev/check" />
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23FAFAF7'/%3E%3Cpath d='M9 8h14v17l-3-2-3 2-3-2-3 2-2-2z' fill='none' stroke='%2317191C' stroke-width='1.6'/%3E%3Cpath d='M12 14h8M12 18h6' stroke='%2317805F' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E" />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="https://rulereceipt.dev/check" />
+<meta property="og:title" content="How much of your CLAUDE.md can a tool actually check?" />
+<meta property="og:description" content="A CLAUDE.md carries context as well as rules. See how much of yours is instructions a tool could actually verify. Runs in your browser, nothing uploaded." />
+<meta property="og:image" content="https://rulereceipt.dev/og-image.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:image" content="https://rulereceipt.dev/og-image.png" />
+<meta name="twitter:title" content="How much of your CLAUDE.md can a tool actually check?" />
+<meta name="twitter:description" content="A CLAUDE.md carries context as well as rules. See how much of yours is instructions a tool could actually verify. Runs in your browser, nothing uploaded." />
+<style>
+  :root {
+    --bg:#FAFAF7; --panel:#FFFFFF; --line:#E7E5DC; --line-strong:#D3D0C3;
+    --ink:#17191C; --dim:#6B6F76; --amber:#DD6A1F; --cyan:#17805F; --red:#C2402C;
+    --font:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);font-size:17px;line-height:1.55;-webkit-font-smoothing:antialiased;}
+  .wrap{max-width:800px;margin:0 auto;padding:0 24px 90px;}
+  .back{display:inline-block;margin:34px 0 26px;font-size:0.85rem;color:var(--cyan);text-decoration:none;}
+  .back:hover{text-decoration:underline;}
+  h1{font-size:clamp(1.7rem,4vw,2.4rem);line-height:1.12;margin:0 0 14px;letter-spacing:-0.01em;text-wrap:balance;}
+  .sub{color:var(--dim);font-size:1.04rem;margin:0 0 8px;max-width:62ch;}
+  .privacy{font-family:var(--mono);font-size:0.78rem;color:var(--cyan);margin:0 0 26px;}
+
+  textarea{width:100%;min-height:230px;font-family:var(--mono);font-size:0.84rem;line-height:1.5;padding:16px;border:1px solid var(--line-strong);border-radius:12px;background:var(--panel);color:var(--ink);resize:vertical;}
+  textarea:focus{outline:2px solid var(--cyan);outline-offset:1px;}
+  .row{display:flex;gap:10px;align-items:center;margin-top:12px;flex-wrap:wrap;}
+  button{font-family:var(--font);font-size:0.9rem;font-weight:600;border:none;background:var(--ink);color:var(--bg);padding:11px 22px;border-radius:9px;cursor:pointer;}
+  button:hover{background:#000;}
+  button.ghost{background:transparent;color:var(--dim);border:1px solid var(--line-strong);font-weight:400;}
+  button.ghost:hover{border-color:var(--amber);color:var(--ink);}
+  .hint{font-size:0.8rem;color:var(--dim);}
+
+  .out{display:none;margin-top:34px;}
+  .out.on{display:block;}
+  .headline{background:var(--panel);border:1px solid var(--line-strong);border-left:3px solid var(--amber);border-radius:12px;padding:24px 26px;}
+  .big{font-family:var(--mono);font-size:clamp(2.2rem,7vw,3.2rem);font-weight:600;line-height:1;letter-spacing:-0.02em;}
+  .big span{color:var(--amber);}
+  .headline p{margin:12px 0 0;color:var(--dim);font-size:0.95rem;}
+  .headline .vs{color:var(--ink);}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-top:16px;}
+  .cell{background:var(--panel);padding:16px 18px;}
+  .cell .n{font-family:var(--mono);font-size:1.5rem;font-weight:600;}
+  .cell .k{font-size:0.8rem;color:var(--dim);margin-top:3px;}
+  .cell.ok .n{color:var(--cyan);}
+  .cell.hm .n{color:var(--dim);}
+
+  .samples{margin-top:20px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px;}
+  .samples h2{font-family:var(--mono);font-size:0.72rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--dim);margin:0 0 10px;font-weight:500;}
+  .samples ul{margin:0 0 18px;padding-left:18px;}
+  .samples li{font-size:0.88rem;color:var(--dim);margin-bottom:5px;}
+  .samples li:last-child{margin-bottom:0;}
+  .samples ul:last-child{margin-bottom:0;}
+
+  .after{margin-top:26px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px;font-size:0.9rem;color:var(--dim);}
+  .after strong{color:var(--ink);}
+  .after code{font-family:var(--mono);font-size:0.84rem;color:var(--amber);}
+  .after a{color:var(--cyan);}
+  .foot{margin-top:34px;font-size:0.82rem;color:var(--dim);border-top:1px solid var(--line);padding-top:18px;}
+  .foot a{color:var(--cyan);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="/">&larr; RuleReceipt</a>
+
+  <h1>How much of your CLAUDE.md can a tool actually check?</h1>
+  <p class="sub">A CLAUDE.md is project memory, not just a rulebook &mdash; stack, commands, folder layout and conventions all belong in it. But only the parts that are actual instructions can be verified afterwards. Across 559 real public files, 62.9% of the contents carried no instruction at all. Paste yours and see the split.</p>
+  <p class="privacy">&#9679; Runs entirely in your browser. Your file is never uploaded, stored, or sent anywhere.</p>
+
+  <label for="src" class="hint">Paste a CLAUDE.md, AGENTS.md, .cursorrules, or any rules file</label>
+  <textarea id="src" spellcheck="false" placeholder="# Project rules&#10;&#10;## 1. Never commit directly to main&#10;All work happens on a feature branch.&#10;&#10;## Directory layout&#10;- src/ — source files&#10;- dist/ — build output"></textarea>
+
+  <div class="row">
+    <button id="go">Check it</button>
+    <button id="demo" class="ghost">Use an example</button>
+    <span class="hint" id="status"></span>
+  </div>
+
+  <div class="out" id="out">
+    <div class="headline">
+      <div class="big"><span id="pct">0%</span> of your file is context, not instructions</div>
+      <p><span id="counts"></span> &mdash; <span class="vs" id="vs"></span></p>
+    </div>
+
+    <div class="grid">
+      <div class="cell"><div class="n" id="n-parsed">0</div><div class="k">items parsed</div></div>
+      <div class="cell hm"><div class="n" id="n-notrules">0</div><div class="k">context &amp; docs</div></div>
+      <div class="cell"><div class="n" id="n-real">0</div><div class="k">instructions</div></div>
+      <div class="cell ok"><div class="n" id="n-check">0</div><div class="k">checkable mechanically</div></div>
+      <div class="cell hm"><div class="n" id="n-judge">0</div><div class="k">need a human</div></div>
+    </div>
+
+    <div class="samples" id="samples"></div>
+
+    <div class="after">
+      <strong>What this doesn&rsquo;t tell you.</strong> It counts what your file contains, not whether your agent followed any of it. That needs the actual session:
+      <br><br>
+      <code>npx rulereceipt check</code>
+      <br><br>
+      Free, runs locally, no account. There&rsquo;s a <a href="/example-report">sample report</a> and the session it was generated from, so you can verify one before installing anything.
+    </div>
+  </div>
+
+  <div class="foot">
+    Context is not waste &mdash; a CLAUDE.md is meant to carry stack, commands and layout, and Claude Code loads all of it. The split matters for a different reason: only instructions can be checked after the fact, and a long file spends attention on both. Same classifier the CLI uses, compiled to run in the page &mdash; so this and the tool agree by construction. It looks for whether a line contains a directive, not for a particular file format. Method and known gaps: <a href="/postmortem">what we got wrong</a>.
+  </div>
+</div>
+
+<script type="module">
+  import { analyze, CORPUS } from "/checker.js";
+
+  const $ = (id) => document.getElementById(id);
+  const src = $("src"), out = $("out"), status = $("status");
+
+  const EXAMPLE = `# Engineering rules
+
+## 1. Never commit directly to main
+All work happens on a feature branch.
+
+## 2. No debug logging in committed code
+Never leave a \`console.log(\` call in code that gets committed.
+
+## 3. Surface bad news first
+Lead every status update with what is broken, then what worked.
+
+## Directory layout
+- \`src/\` — source files
+- \`dist/\` — build output
+- \`tests/\` — test files
+
+## Useful commands
+| Command | What it does |
+|---|---|
+| npm test | runs the suite |
+| npm run build | compiles to dist/ |
+`;
+
+  function render(r) {
+    $("pct").textContent = r.notRulesPct + "%";
+    $("counts").textContent = r.notRules + " of " + r.parsed + " items carry no instruction";
+    const diff = Math.round((r.notRulesPct - CORPUS.notRulesPct) * 10) / 10;
+    $("vs").textContent = diff === 0
+      ? "exactly the average across " + CORPUS.files + " real files"
+      : (Math.abs(diff) + " points " + (diff > 0 ? "more" : "less") + " than the " + CORPUS.notRulesPct + "% average across " + CORPUS.files + " real files");
+
+    $("n-parsed").textContent = r.parsed;
+    $("n-notrules").textContent = r.notRules;
+    $("n-real").textContent = r.realRules;
+    $("n-check").textContent = r.checkable;
+    $("n-judge").textContent = r.judgment;
+
+    let html = "";
+    if (r.notRuleSamples.length) {
+      html += "<h2>Counted as context, not an instruction</h2><ul>" +
+        r.notRuleSamples.map((s) => "<li>" + esc(s) + "</li>").join("") + "</ul>";
+    }
+    if (r.judgmentSamples.length) {
+      html += "<h2>Instructions, but no tool can verify them</h2><ul>" +
+        r.judgmentSamples.map((s) => "<li>" + esc(s) + "</li>").join("") + "</ul>";
+    }
+    $("samples").innerHTML = html;
+    $("samples").style.display = html ? "block" : "none";
+    out.classList.add("on");
+  }
+
+  function esc(s) {
+    return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").slice(0, 140);
+  }
+
+  function run() {
+    const text = src.value;
+    if (!text.trim()) { status.textContent = "Paste a file first."; return; }
+    const r = analyze(text);
+    if (r.parsed === 0) { status.textContent = "Nothing recognisable in there — is it a rules file?"; return; }
+    status.textContent = "";
+    render(r);
+    // Counts that a check happened and the two headline numbers. Never the
+    // file, never a rule, never a single line of the text — the page's
+    // promise depends on that and this is the only outbound call it makes.
+    try {
+      window.posthog && window.posthog.capture("claudemd_checked", {
+        items_parsed: r.parsed,
+        not_rules_pct: r.notRulesPct,
+      });
+    } catch (e) { /* analytics must never break the tool */ }
+  }
+
+  $("go").addEventListener("click", run);
+  $("demo").addEventListener("click", () => { src.value = EXAMPLE; run(); });
+  src.addEventListener("keydown", (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") run();
+  });
+</script>
+</body>
+</html>

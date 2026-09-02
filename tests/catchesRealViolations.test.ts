@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { parseClaudeMd } from "../src/parsers/claudeMdParser.js";
+import { parseClaudeMd } from "../src/parsers/readClaudeMd.js";
 import { readTranscriptFromFile } from "../src/parsers/transcriptParser.js";
 import { classifyRules } from "../src/checks/classify.js";
 import { runDeterministicChecks } from "../src/checks/deterministicChecks.js";

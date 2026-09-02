@@ -5,7 +5,7 @@ import { Command } from "commander";
 import { join, dirname, resolve, isAbsolute } from "node:path";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { parseClaudeMd } from "./parsers/claudeMdParser.js";
+import { parseClaudeMd } from "./parsers/readClaudeMd.js";
 import { readLatestTranscript, readTranscriptFromFile, findLatestSessionFile } from "./parsers/transcriptParser.js";
 import { loadRules } from "./rules.js";
 import { classifyRules } from "./checks/classify.js";

@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { parseClaudeMd } from "../src/parsers/claudeMdParser.js";
+import { parseClaudeMd } from "../src/parsers/readClaudeMd.js";
 
 const REAL_GLOBAL_CLAUDE_MD = join(homedir(), ".claude", "CLAUDE.md");
 const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), "fixtures");

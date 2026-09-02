@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import type { Rule } from "../types.js";
 
 /**
@@ -71,14 +70,16 @@ function normalizeSetextHeaders(lines: string[]): string[] {
   return out;
 }
 
-export function parseClaudeMd(filePath: string, source: "global" | "project"): Rule[] {
-  let raw: string;
-  try {
-    raw = readFileSync(filePath, "utf-8");
-  } catch {
-    return [];
-  }
-
+/**
+ * The actual parser, taking text rather than a path.
+ *
+ * Split out from parseClaudeMd so the parsing logic carries no filesystem
+ * dependency and can run anywhere a string can — including a browser, for
+ * the client-side checker on the site. That checker's privacy claim
+ * ("your file never leaves the page") is only true because nothing in
+ * this function or in classify.ts touches Node APIs; keep it that way.
+ */
+export function parseClaudeMdText(raw: string, source: "global" | "project"): Rule[] {
   const lines = normalizeSetextHeaders(raw.split("\n"));
   const rules: Rule[] = [];
 
