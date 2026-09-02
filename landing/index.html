@@ -521,18 +521,19 @@
   <div class="wrap">
     <header class="top">
       <div class="wordmark"><span class="led"></span> RuleReceipt</div>
-      <div class="top-cta">early access — free</div>
+      <a class="top-cta" href="https://github.com/rulereceipt/rulereceipt" target="_blank" rel="noopener">source on GitHub</a>
     </header>
 
     <div class="hero">
-      <div class="eyebrow">for AI coding agents</div>
+      <div class="eyebrow">for Claude Code &middot; runs locally</div>
       <h1>See exactly what your<br><span>agent actually did</span></h1>
       <p class="sub">Your agent's session, checked against your own rules. What it followed. What it skipped.</p>
       <div class="install" id="copy-hero" data-copy="npx rulereceipt check" data-loc="hero" role="button" tabindex="0" title="Click to copy">
         <span class="prompt">$</span>
         <span class="cmd">npx rulereceipt check</span>
       </div>
-      <p style="margin-top:14px; font-size:0.85rem;"><a href="https://github.com/rulereceipt/rulereceipt" target="_blank" rel="noopener">Read the source on GitHub</a> before you run it — reasonable, given what this tool is for.</p>
+      <p style="margin-top:16px; font-size:0.9rem;">Not ready to run anything? <a href="/check">Paste your CLAUDE.md here</a> and see how much of it a tool could even check — in your browser, nothing uploaded.</p>
+      <p style="margin-top:10px; font-size:0.85rem;"><a href="https://github.com/rulereceipt/rulereceipt" target="_blank" rel="noopener">Read the source on GitHub</a> before you run it — reasonable, given what this tool is for.</p>
     </div>
 
     <div class="trace-stage">
@@ -547,7 +548,7 @@
     <div class="readout-stage">
       <div class="readout">
         <div class="r-top">
-          <span>sample session · 11 rules</span>
+          <span>sample session · 3 of 11 rules shown</span>
           <span class="live"><span class="led"></span>local only</span>
         </div>
         <div class="r-body-wrap">
@@ -567,16 +568,11 @@
           </div>
           <div class="r-evidence">needs your judgment: no error occurred this session, so there is nothing to check against — a person has to decide</div>
         </div>
-        <div class="r-foot"><span>8 followed · 2 not followed · 1 needs your judgment</span><span>no rule text or results sent</span></div>
+        <div class="r-foot"><span>full run: 8 followed · 2 not followed · 1 needs your judgment</span><span>no rule text or results sent</span></div>
       </div>
     </div>
   </div>
 
-
-  <div class="position-line">
-    <p>Every other tool in this space helps you <em>write</em> better rules. <strong>This one tells you whether they were followed.</strong>
-    <span class="qual">Nothing to sign up for. Nothing sent anywhere. It reads a session you already have.</span></p>
-  </div>
 
   <div class="quote-block">
     <blockquote>It reads the rules. It doesn't always follow them.</blockquote>
@@ -598,7 +594,7 @@
   <section class="band">
     <div class="wrap-wide">
       <h2>Send someone the result</h2>
-      <p class="band-sub">A terminal report can't leave the terminal. One flag writes a single file you can email, attach to a ticket, or print to PDF.</p>
+      <p class="band-sub">One flag writes a single file you can email, attach to a ticket, or print to PDF.</p>
 
       <div class="install" id="copy-html" data-copy="npx rulereceipt check --html" data-loc="html-section" role="button" tabindex="0" title="Click to copy">
         <span class="prompt">$</span>
@@ -612,7 +608,7 @@
       </div>
 
       <div style="height:20px"></div>
-      <div class="security-note"><strong>See one.</strong> <a href="/example-report" target="_blank" rel="noopener">Here is a real report</a>, produced by running the tool against a constructed session — two rules broken with the evidence quoted, one the tool refused to guess about, and three left for a human. <a href="/example-session.jsonl" download>The session file it read</a> is published next to it, so you can download both and run <code>rulereceipt verify</code> yourself. Nothing to install to check that.</div>
+      <div class="security-note"><strong>See one.</strong> <a href="/example-report" target="_blank" rel="noopener">Here is a real report</a>, produced by running the tool against a constructed session — two rules broken with the evidence quoted, one the tool refused to guess about, and three left for a human. <a href="/example-session.jsonl" download>The session file it read</a> is published next to it, so you can download both and run <code>rulereceipt verify</code> yourself. One command to check that.</div>
       <div style="height:14px"></div>
       <div class="security-note"><strong>The person receiving it can check it's real.</strong> Every report carries a SHA-256 fingerprint of the session file it read, and the command to verify it. Hand someone a report and the session, and they can confirm the report describes that exact file, unaltered — they don't have to take the sender's word for it. An edited session produces a different fingerprint.</div>
       <div style="height:14px"></div>
