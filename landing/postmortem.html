@@ -24,32 +24,46 @@
 <meta property="og:image:height" content="630" />
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:image" content="https://rulereceipt.dev/og-image.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap" />
 <style>
-  body { margin:0; background:#FAFAF7; color:#17191C; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:17px; line-height:1.6; }
+  body { margin:0; background:#FAF9F5; color:#141413; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:17px; line-height:1.6; }
   .wrap { max-width:680px; margin:0 auto; padding:60px 24px 90px; }
-  a { color:#17805F; }
+  a { color:#AD4A17; }
   h1 { font-size:1.9rem; margin-bottom:8px; line-height:1.2; }
-  .updated { color:#6B6F76; font-size:0.85rem; margin-bottom:36px; }
+  .updated { color:#7A756E; font-size:0.85rem; margin-bottom:36px; }
   h2 { font-size:1.2rem; margin-top:42px; }
   h3 { font-size:1.02rem; margin-top:28px; }
-  p { color:#3A3D42; }
+  p { color:#55534E; }
   .back { display:inline-block; margin-bottom:30px; font-size:0.85rem; }
-  .lede { font-size:1.1rem; color:#17191C; }
-  code { font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace; background:#F1F0EA; padding:1px 6px; border-radius:4px; font-size:0.9em; }
-  pre { background:#17191C; color:#FAFAF7; padding:16px 18px; border-radius:10px; overflow-x:auto; font-size:0.88rem; }
+  .lede { font-size:1.1rem; color:#141413; }
+  code { font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace; background:#F0EEE6; padding:1px 6px; border-radius:4px; font-size:0.9em; }
+  pre { background:#141413; color:#FAF9F5; padding:16px 18px; border-radius:10px; overflow-x:auto; font-size:0.88rem; }
   pre code { background:none; padding:0; color:inherit; }
-  .bug { border:1px solid #E7E5DC; border-radius:12px; padding:18px 22px; margin:18px 0; background:#FFFFFF; }
-  .bug .tag { font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace; font-size:0.72rem; letter-spacing:0.06em; text-transform:uppercase; color:#DD6A1F; margin-bottom:8px; }
+  .bug { border:1px solid #E8E6DC; border-radius:12px; padding:18px 22px; margin:18px 0; background:#FFFFFF; }
+  .bug .tag { font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace; font-size:0.72rem; letter-spacing:0.06em; text-transform:uppercase; color:#C4551F; margin-bottom:8px; }
   .before-after { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin:14px 0; }
   @media (max-width:560px) { .before-after { grid-template-columns:1fr; } }
   .before-after .col { padding:12px 14px; border-radius:8px; font-size:0.88rem; }
   .before-after .before { background:#FBEEEA; }
   .before-after .after { background:#EAF3EE; }
-  .before-after .label { font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace; font-size:0.7rem; text-transform:uppercase; letter-spacing:0.06em; color:#6B6F76; margin-bottom:6px; }
+  .before-after .label { font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace; font-size:0.7rem; text-transform:uppercase; letter-spacing:0.06em; color:#7A756E; margin-bottom:6px; }
   .stat-row { display:flex; gap:24px; margin:20px 0; flex-wrap:wrap; }
   .stat { font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace; }
   .stat .num { font-size:1.8rem; font-weight:700; }
-  .stat .label { font-size:0.78rem; color:#6B6F76; text-transform:uppercase; letter-spacing:0.05em; }
+  .stat .label { font-size:0.78rem; color:#7A756E; text-transform:uppercase; letter-spacing:0.05em; }
+
+  /* ---- shared design system (see index.html for the colour rule) ----
+     Green and red mean a verdict and nothing else; terracotta does all
+     interface work. These pages were left on the old palette when the
+     landing page moved, so green still meant "clickable" here. */
+  h1, h2 {
+    font-family: 'Newsreader', 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    text-transform: none;
+  }
 </style>
 </head>
 <body>

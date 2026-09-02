@@ -26,24 +26,27 @@
 <meta name="twitter:image" content="https://rulereceipt.dev/og-image.png" />
 <meta name="twitter:title" content="How much of your CLAUDE.md can a tool actually check?" />
 <meta name="twitter:description" content="A CLAUDE.md carries context as well as rules. See how much of yours is instructions a tool could actually verify. Runs in your browser, nothing uploaded." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap" />
 <style>
   :root {
-    --bg:#FAFAF7; --panel:#FFFFFF; --line:#E7E5DC; --line-strong:#D3D0C3;
-    --ink:#17191C; --dim:#6B6F76; --amber:#DD6A1F; --cyan:#17805F; --red:#C2402C;
+    --bg:#FAF9F5; --panel:#FFFFFF; --line:#E8E6DC; --line-strong:#DEDCD1;
+    --ink:#141413; --dim:#7A756E; --amber:#C4551F; --cyan:#17805F; --red:#C2402C;
     --font:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
     --mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;
   }
   *{box-sizing:border-box;}
   body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);font-size:17px;line-height:1.55;-webkit-font-smoothing:antialiased;}
   .wrap{max-width:800px;margin:0 auto;padding:0 24px 90px;}
-  .back{display:inline-block;margin:34px 0 26px;font-size:0.85rem;color:var(--cyan);text-decoration:none;}
+  .back{display:inline-block;margin:34px 0 26px;font-size:0.85rem;color:#AD4A17;text-decoration:none;}
   .back:hover{text-decoration:underline;}
   h1{font-size:clamp(1.7rem,4vw,2.4rem);line-height:1.12;margin:0 0 14px;letter-spacing:-0.01em;text-wrap:balance;}
   .sub{color:var(--dim);font-size:1.04rem;margin:0 0 8px;max-width:62ch;}
-  .privacy{font-family:var(--mono);font-size:0.78rem;color:var(--cyan);margin:0 0 26px;}
+  .privacy{font-family:var(--mono);font-size:0.78rem;color:#AD4A17;margin:0 0 26px;}
 
   textarea{width:100%;min-height:230px;font-family:var(--mono);font-size:0.84rem;line-height:1.5;padding:16px;border:1px solid var(--line-strong);border-radius:12px;background:var(--panel);color:var(--ink);resize:vertical;}
-  textarea:focus{outline:2px solid var(--cyan);outline-offset:1px;}
+  textarea:focus{outline:2px solid #AD4A17;outline-offset:1px;}
   .row{display:flex;gap:10px;align-items:center;margin-top:12px;flex-wrap:wrap;}
   button{font-family:var(--font);font-size:0.9rem;font-weight:600;border:none;background:var(--ink);color:var(--bg);padding:11px 22px;border-radius:9px;cursor:pointer;}
   button:hover{background:#000;}
@@ -76,9 +79,20 @@
   .after{margin-top:26px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px;font-size:0.9rem;color:var(--dim);}
   .after strong{color:var(--ink);}
   .after code{font-family:var(--mono);font-size:0.84rem;color:var(--amber);}
-  .after a{color:var(--cyan);}
+  .after a{color:#AD4A17;}
   .foot{margin-top:34px;font-size:0.82rem;color:var(--dim);border-top:1px solid var(--line);padding-top:18px;}
-  .foot a{color:var(--cyan);}
+  .foot a{color:#AD4A17;}
+
+  /* ---- shared design system (see index.html for the colour rule) ----
+     Green and red mean a verdict and nothing else; terracotta does all
+     interface work. These pages were left on the old palette when the
+     landing page moved, so green still meant "clickable" here. */
+  h1, h2 {
+    font-family: 'Newsreader', 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    text-transform: none;
+  }
 </style>
 </head>
 <body>

@@ -19,15 +19,18 @@
 <meta name="twitter:image" content="https://rulereceipt.dev/og-image.png" />
 <meta name="twitter:title" content="RuleReceipt — About" />
 <meta name="twitter:description" content="Why RuleReceipt exists — a tool that checks whether an AI coding agent actually followed your rules, built after hitting the same problem firsthand." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap" />
 <style>
   :root {
-    --bg: #FAFAF7;
+    --bg: #FAF9F5;
     --panel: #FFFFFF;
-    --panel-line: #E7E5DC;
-    --panel-line-strong: #D3D0C3;
-    --paper: #17191C;
-    --paper-dim: #6B6F76;
-    --amber: #DD6A1F;
+    --panel-line: #E8E6DC;
+    --panel-line-strong: #DEDCD1;
+    --paper: #141413;
+    --paper-dim: #7A756E;
+    --amber: #C4551F;
     --cyan: #17805F;
     --font-display: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
@@ -43,7 +46,7 @@
     -webkit-font-smoothing: antialiased;
   }
   .wrap { max-width: 640px; margin: 0 auto; padding: 0 24px 100px; }
-  a { color: var(--cyan); }
+  a { color: #AD4A17; }
   header.top { display: flex; align-items: center; justify-content: space-between; padding: 26px 0 0; }
   .wordmark { font-weight: 800; font-size: 1.05rem; letter-spacing: 0.02em; text-transform: uppercase; color: var(--paper); text-decoration: none; }
   .back { display: inline-block; margin-bottom: 30px; font-size: 0.88rem; }
@@ -77,6 +80,17 @@
     font-size: 0.85rem;
     background: var(--panel);
   }
+
+  /* ---- shared design system (see index.html for the colour rule) ----
+     Green and red mean a verdict and nothing else; terracotta does all
+     interface work. These pages were left on the old palette when the
+     landing page moved, so green still meant "clickable" here. */
+  h1, h2 {
+    font-family: 'Newsreader', 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    text-transform: none;
+  }
 </style>
 </head>
 <body>
@@ -106,8 +120,8 @@
         <rect x="12" y="36" width="84" height="60" fill="#E8B48C"/>
 
         <!-- eyes -->
-        <rect x="36" y="48" width="12" height="12" fill="#17191C"/>
-        <rect x="72" y="48" width="12" height="12" fill="#17191C"/>
+        <rect x="36" y="48" width="12" height="12" fill="#141413"/>
+        <rect x="72" y="48" width="12" height="12" fill="#141413"/>
 
         <!-- mouth -->
         <rect x="36" y="72" width="48" height="12" fill="#C2402C" opacity="0.75"/>
