@@ -155,7 +155,13 @@ if (argv.includes("--score")) {
 
   console.log(`Population : ${pool.length} real rules`);
   console.log(`Sample     : ${sample.length} drawn (seed ${SEED})`);
-  console.log(`Labelled   : ${n} by hand\n`);
+  const by = argv.includes("--by-model") ? "by a model (NOT ground truth)" : "by hand";
+  console.log(`Labelled   : ${n} ${by}\n`);
+  if (argv.includes("--by-model")) {
+    console.log(`  These labels were produced by a model, not a person. A model labelling`);
+    console.log(`  and a model checking share blind spots, so this is an estimate with no`);
+    console.log(`  measured error rate. Say so wherever it is quoted.\n`);
+  }
   console.log(`Enforceability, 95% Wilson intervals:\n`);
   for (const key of ["toolCallPredicate", "artifactGateable", "proseOnly"]) {
     const [lo, hi] = wilson(counts[key], n);
