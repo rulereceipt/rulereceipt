@@ -22,3 +22,6 @@ tests/fixtures/real-sessions/
 /PLAN.md
 /rule_file_corpus.md
 /corpus/
+
+# research artifact — regenerated from the seed, not source
+/enforceability-sample.jsonl
