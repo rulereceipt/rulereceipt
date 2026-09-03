@@ -24,4 +24,4 @@ tests/fixtures/real-sessions/
 /corpus/
 
 # research artifact — regenerated from the seed, not source
-/enforceability-sample.jsonl
+/enforceability-worksheet.txt

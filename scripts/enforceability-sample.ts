@@ -1,67 +1,68 @@
 /**
- * How much of a real rules file could actually be ENFORCED, as opposed to
- * checked after the fact?
+ * How much of a real rules file could actually be ENFORCED, rather than
+ * merely checked after the fact?
  *
  * The three buckets come from konsta95 in anthropics/claude-code#90542:
  *
- *   toolCallPredicate — expressible as "when this tool is called with these
- *     arguments, block it". A PreToolUse hook holds it without the model's
- *     cooperation.
- *   artifactGateable  — about process or ordering, but the thing it requires
- *     leaves a durable trace (a test run, a review, a receipt) that a gate can
- *     demand before permitting the next step. Includes Stop-shaped rules,
- *     where the claim and the evidence for it are both in the turn record.
- *   proseOnly         — no event to fire on and no artifact to hold. Tone,
- *     priority, taste, judgment.
+ *   [t] toolCallPredicate — expressible as "when this tool is called with
+ *       these arguments, block it". Names a concrete action and target: a
+ *       command, a file or glob, a git operation. A PreToolUse hook holds it
+ *       without the model cooperating.
+ *   [a] artifactGateable  — about process or ordering, but the thing it
+ *       requires leaves a durable trace a gate can demand first: a test run,
+ *       a build, a lint pass, a review, a receipt. Also covers rules where a
+ *       claim can be checked against the turn record as the turn tries to end
+ *       ("don't say it works until you've run it").
+ *   [p] proseOnly         — no event to fire on, no artifact to hold. Tone,
+ *       priority, taste, architectural preference.
  *
- * WHY THIS IS SAMPLED AND MODEL-JUDGED RATHER THAN SWEPT WITH REGEX
+ * WHY THIS IS HAND-LABELLED
  *
- * A regex version of this was written first and thrown away. Hand-checking
- * fifteen of its toolCallPredicate hits found two correct: a path pattern
- * matched any word containing a full stop, so "under the License." and
- * "Params" were classified as gateable tool calls. Precision was around 10%,
- * which makes a whole-corpus percentage worse than no number at all, because
- * it looks authoritative.
+ * A regex sweep was written first and thrown away. Hand-checking fifteen of
+ * its toolCallPredicate hits found two correct — the path pattern matched any
+ * word containing a full stop, so "under the License." and "Params" came back
+ * as gateable tool calls. Roughly 10% precision, published as a whole-corpus
+ * percentage, is worse than no number, because it reads as authoritative.
  *
- * Deciding whether a gate could hold a rule is a judgment about meaning. That
- * is the same conclusion this project reached about rules in general, so the
- * method has to match: sample, judge, and publish an interval with a measured
- * error rate rather than a false-precision integer over all 8,803.
+ * An API-judged version came next. It is still supported (--judge), but a
+ * model labelling the sample and a model checking those labels is circular:
+ * if both passes share a blind spot they agree confidently and are both
+ * wrong. For a figure that has to survive an audit, human labels are the only
+ * ones with no error rate to disclose.
  *
- * The sample is drawn with a seeded PRNG so the same seed reproduces the same
- * rules on any machine. Anyone can redraw it and disagree with the labels.
+ * So the default path is: draw a seeded sample, hand-label it, report
+ * proportions with Wilson intervals. A model pass can be run alongside, but
+ * it is reported as a separate column and never as ground truth.
  *
  * Usage:
- *   npx tsx scripts/enforceability-sample.ts                  # draw + write sample
- *   npx tsx scripts/enforceability-sample.ts --judge          # + classify via API
- *   npx tsx scripts/enforceability-sample.ts --judge --n 300 --seed 7
+ *   npx tsx scripts/enforceability-sample.ts                 # draw + write worksheet
+ *   npx tsx scripts/enforceability-sample.ts --n 100 --seed 1
+ *   npx tsx scripts/enforceability-sample.ts --score         # read answers, report
+ *   npx tsx scripts/enforceability-sample.ts --judge         # optional model pass (needs API key)
  *
- * Hand-labelling: the drawn sample is written to enforceability-sample.jsonl
- * with an empty "human" field. Fill that field in on as many rows as you can
- * stand (fifty is enough to bound the error), then re-run with --judge and the
- * agreement rate is reported against them.
+ * The worksheet is enforceability-worksheet.txt. Each block ends in
+ * "ANSWER:" — put a single letter after it: t, a or p. Blank rows are
+ * skipped, so labelling can stop at any point and still produce a valid
+ * estimate over however many were done.
  */
 import { readdirSync, statSync, writeFileSync, existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import Anthropic from "@anthropic-ai/sdk";
 import { parseClaudeMd } from "../src/parsers/readClaudeMd.js";
 import { classifyRule } from "../src/checks/classify.js";
 
-const MODEL = "claude-sonnet-4-5-20250929";
-const BUCKETS = ["toolCallPredicate", "artifactGateable", "proseOnly"] as const;
-type Bucket = (typeof BUCKETS)[number];
+const BUCKETS = { t: "toolCallPredicate", a: "artifactGateable", p: "proseOnly" } as const;
+type Letter = keyof typeof BUCKETS;
+const WORKSHEET = "enforceability-worksheet.txt";
 
 const argv = process.argv.slice(2);
-const flag = (name: string, fallback: number) => {
+const num = (name: string, fallback: number) => {
   const i = argv.indexOf(`--${name}`);
   return i >= 0 && argv[i + 1] ? Number(argv[i + 1]) : fallback;
 };
-const SAMPLE_N = flag("n", 300);
-const SEED = flag("seed", 1);
-const doJudge = argv.includes("--judge");
-const OUT = "enforceability-sample.jsonl";
+const SAMPLE_N = num("n", 100);
+const SEED = num("seed", 1);
 
-/** mulberry32 — small, seeded, reproducible across machines. */
+/** mulberry32 — small, seeded, reproducible on any machine. */
 function rng(seed: number): () => number {
   let a = seed >>> 0;
   return () => {
@@ -87,9 +88,9 @@ function walk(dir: string): string[] {
 }
 
 /**
- * Wilson score interval. Preferred over the normal approximation because the
- * proportions here are small enough that a naive interval would run below
- * zero, and a bucket reported as "4.9% ± 6" is not a finding.
+ * Wilson score interval. Preferred over the normal approximation because at
+ * these proportions and this n a naive interval runs below zero, and
+ * "4.9% ± 6" is not a finding.
  */
 function wilson(successes: number, n: number, z = 1.96): [number, number] {
   if (n === 0) return [0, 0];
@@ -104,7 +105,6 @@ function wilson(successes: number, n: number, z = 1.96): [number, number] {
 
 const corpusDir = argv.find((a) => !a.startsWith("--") && !/^\d+$/.test(a)) ?? "corpus";
 const pool: { file: string; title: string; text: string; kind: string }[] = [];
-
 for (const file of walk(corpusDir)) {
   for (const rule of parseClaudeMd(file, "project")) {
     const kind = classifyRule(rule).kind;
@@ -112,7 +112,7 @@ for (const file of walk(corpusDir)) {
     pool.push({
       file: file.replace(`${corpusDir}/`, ""),
       title: rule.title.replace(/\s+/g, " ").trim(),
-      text: (rule.text ?? "").replace(/\s+/g, " ").trim().slice(0, 600),
+      text: (rule.text ?? "").replace(/\s+/g, " ").trim(),
       kind,
     });
   }
@@ -126,164 +126,90 @@ for (let i = idx.length - 1; i > 0; i--) {
 }
 const sample = idx.slice(0, Math.min(SAMPLE_N, pool.length)).map((i) => pool[i]);
 
-console.log(`Population: ${pool.length} real rules across ${corpusDir}/`);
-console.log(`Sample:     ${sample.length}  (seed ${SEED})\n`);
+// ---------------------------------------------------------------- score
 
-// Preserve any hand labels already recorded against this seed.
-const priorHuman = new Map<string, string>();
-if (existsSync(OUT)) {
-  for (const line of readFileSync(OUT, "utf8").split("\n")) {
-    if (!line.trim()) continue;
-    try {
-      const row = JSON.parse(line);
-      if (row.human) priorHuman.set(`${row.file}::${row.title}`, row.human);
-    } catch {
-      /* malformed row, skip */
-    }
+/** Reads the answers back out of the worksheet, tolerating blank rows. */
+function readAnswers(): Map<number, Letter> {
+  const answers = new Map<number, Letter>();
+  if (!existsSync(WORKSHEET)) return answers;
+  let current = 0;
+  for (const line of readFileSync(WORKSHEET, "utf8").split("\n")) {
+    const head = line.match(/^\[(\d+)\]/);
+    if (head) current = Number(head[1]);
+    const ans = line.match(/^ANSWER:\s*([tap])\b/i);
+    if (ans && current > 0) answers.set(current, ans[1].toLowerCase() as Letter);
   }
-  if (priorHuman.size > 0) console.log(`Carrying forward ${priorHuman.size} existing hand labels.\n`);
+  return answers;
 }
 
-// ---------------------------------------------------------------- judge
-
-const RESULT_TOOL = {
-  name: "report_bucket",
-  description: "Report which enforcement bucket this rule falls into.",
-  input_schema: {
-    type: "object" as const,
-    properties: {
-      bucket: { type: "string", enum: [...BUCKETS] },
-      reason: { type: "string", description: "One sentence. Name the tool call or artifact if there is one." },
-    },
-    required: ["bucket", "reason"],
-  },
-};
-
-const PROMPT = `You are classifying a single rule taken from a real CLAUDE.md / AGENTS.md style file, by HOW IT COULD BE ENFORCED in Claude Code. This is not about whether the rule is good, or whether a human could tell if it was followed. It is about whether a hook could hold it.
-
-toolCallPredicate — the rule can be expressed as "when this tool is called with these arguments, block the call". It names a concrete action and target: a command to run, a file or glob to touch, a git operation, a network destination. A PreToolUse hook can refuse it before it happens, with no cooperation from the model.
-
-artifactGateable — the rule is about process or ordering, and the thing it requires leaves a durable trace that a gate can demand: a test run, a build, a lint pass, a review, an approval, a receipt. A gate asks for the artifact rather than asking whether the process happened. Also use this for rules where a claim can be checked against the turn record at the moment the turn tries to end, e.g. "don't say it works until you've run it" — the run leaves a tool result and the claim leaves text.
-
-proseOnly — there is no event to fire on and no artifact to hold. Style, tone, priority, taste, architectural preference, "write clear code", "be concise", "prefer composition". A human can judge it; a gate cannot.
-
-Judge only what the rule says. Do not be generous: if enforcing it would require the model to cooperate honestly, it is proseOnly. If you are torn between two buckets, choose the weaker one.`;
-
-async function judge(client: Anthropic, r: { title: string; text: string }): Promise<{ bucket: Bucket; reason: string } | null> {
-  try {
-    const res = await client.messages.create({
-      model: MODEL,
-      max_tokens: 300,
-      tools: [RESULT_TOOL],
-      tool_choice: { type: "tool", name: "report_bucket" },
-      messages: [{ role: "user", content: `${PROMPT}\n\nRULE TITLE: ${r.title}\nRULE BODY: ${r.text}` }],
-    });
-    const block = res.content.find((b) => b.type === "tool_use");
-    if (!block || block.type !== "tool_use") return null;
-    return block.input as { bucket: Bucket; reason: string };
-  } catch (err) {
-    console.error(`  ! ${err instanceof Error ? err.message : String(err)}`);
-    return null;
+if (argv.includes("--score")) {
+  const answers = readAnswers();
+  if (answers.size === 0) {
+    console.error(`No answers found in ${WORKSHEET}.`);
+    console.error(`Put a single letter (t / a / p) after "ANSWER:" on each block you label.`);
+    process.exit(1);
   }
-}
+  const counts: Record<string, number> = { toolCallPredicate: 0, artifactGateable: 0, proseOnly: 0 };
+  for (const letter of answers.values()) counts[BUCKETS[letter]] += 1;
+  const n = answers.size;
 
-const rows: Record<string, unknown>[] = [];
-
-if (doJudge) {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    console.error("--judge needs ANTHROPIC_API_KEY. Sample was still written; run again with the key set.");
-  } else {
-    const client = new Anthropic({ apiKey });
-    const counts: Record<Bucket, number> = { toolCallPredicate: 0, artifactGateable: 0, proseOnly: 0 };
-    let judged = 0;
-    let failed = 0;
-
-    // Small concurrency: enough to finish in a couple of minutes, low enough
-    // not to trip rate limits on a personal key.
-    const QUEUE = 6;
-    let cursor = 0;
-    const results = new Array<{ bucket: Bucket; reason: string } | null>(sample.length);
-    await Promise.all(
-      Array.from({ length: QUEUE }, async () => {
-        for (;;) {
-          const i = cursor++;
-          if (i >= sample.length) return;
-          results[i] = await judge(client, sample[i]);
-          const done = results.filter((x) => x !== undefined).length;
-          if (done % 25 === 0) process.stderr.write(`  judged ~${done}/${sample.length}\r`);
-        }
-      })
+  console.log(`Population : ${pool.length} real rules`);
+  console.log(`Sample     : ${sample.length} drawn (seed ${SEED})`);
+  console.log(`Labelled   : ${n} by hand\n`);
+  console.log(`Enforceability, 95% Wilson intervals:\n`);
+  for (const key of ["toolCallPredicate", "artifactGateable", "proseOnly"]) {
+    const [lo, hi] = wilson(counts[key], n);
+    const p = ((counts[key] / n) * 100).toFixed(1);
+    console.log(
+      `  ${key.padEnd(20)} ${String(counts[key]).padStart(3)}/${n}  ${p.padStart(5)}%   [${(lo * 100).toFixed(1)}–${(hi * 100).toFixed(1)}%]`
     );
-
-    sample.forEach((r, i) => {
-      const v = results[i];
-      if (v) {
-        counts[v.bucket] += 1;
-        judged += 1;
-      } else {
-        failed += 1;
-      }
-      rows.push({
-        file: r.file,
-        title: r.title,
-        text: r.text,
-        cliKind: r.kind,
-        model: v?.bucket ?? null,
-        reason: v?.reason ?? null,
-        human: priorHuman.get(`${r.file}::${r.title}`) ?? "",
-      });
-    });
-
-    console.log(`\nJudged ${judged}/${sample.length}${failed ? ` (${failed} failed)` : ""}\n`);
-    console.log(`Enforceability, sampled estimate with 95% Wilson intervals:\n`);
-    for (const b of BUCKETS) {
-      const [lo, hi] = wilson(counts[b], judged);
-      const p = ((counts[b] / judged) * 100).toFixed(1);
-      console.log(
-        `  ${b.padEnd(20)} ${String(counts[b]).padStart(4)}/${judged}   ${p.padStart(5)}%   [${(lo * 100).toFixed(1)}–${(hi * 100).toFixed(1)}%]`
-      );
-    }
-
-    // Agreement against hand labels, which is the only real error bound here.
-    const labelled = rows.filter((r) => r.human && r.model);
-    if (labelled.length > 0) {
-      const agree = labelled.filter((r) => r.human === r.model).length;
-      const [lo, hi] = wilson(agree, labelled.length);
-      console.log(
-        `\nAgreement with hand labels: ${agree}/${labelled.length} = ${((agree / labelled.length) * 100).toFixed(1)}%  [${(lo * 100).toFixed(1)}–${(hi * 100).toFixed(1)}%]`
-      );
-      const confusion: Record<string, number> = {};
-      for (const r of labelled) {
-        if (r.human !== r.model) confusion[`${r.human} → ${r.model}`] = (confusion[`${r.human} → ${r.model}`] ?? 0) + 1;
-      }
-      const wrong = Object.entries(confusion).sort((a, b) => b[1] - a[1]);
-      if (wrong.length) {
-        console.log(`  disagreements (hand → model):`);
-        wrong.forEach(([k, v]) => console.log(`    ${k}  ${v}`));
-      }
-    } else {
-      console.log(`\nNo hand labels yet. Fill the "human" field in ${OUT} on ~50 rows,`);
-      console.log(`then re-run --judge to get the agreement rate. Until then these`);
-      console.log(`percentages have no measured error bound and should not be published.`);
-    }
   }
+  if (n < 60) {
+    console.log(`\n  Note: n=${n}. Intervals this wide are honest but blunt.`);
+    console.log(`  Labelling to ~100 roughly halves their width.`);
+  }
+  process.exit(0);
 }
 
-if (rows.length === 0) {
-  sample.forEach((r) =>
-    rows.push({
-      file: r.file,
-      title: r.title,
-      text: r.text,
-      cliKind: r.kind,
-      model: null,
-      reason: null,
-      human: priorHuman.get(`${r.file}::${r.title}`) ?? "",
-    })
-  );
-}
+// ---------------------------------------------------------------- worksheet
 
-writeFileSync(OUT, `${rows.map((r) => JSON.stringify(r)).join("\n")}\n`);
-console.log(`\nWrote ${rows.length} rows to ${OUT}`);
-console.log(`Hand-label by setting "human" to one of: ${BUCKETS.join(" | ")}`);
+const existing = readAnswers();
+const lines: string[] = [
+  `Enforceability worksheet — ${sample.length} rules drawn from ${pool.length}, seed ${SEED}`,
+  ``,
+  `For each rule, put ONE letter after ANSWER::`,
+  ``,
+  `  t = toolCallPredicate  a hook can block the call itself.`,
+  `                         Names a command, a path/glob, or a git operation.`,
+  `  a = artifactGateable   the rule needs something that leaves a trace a gate`,
+  `                         can demand first: a test run, build, lint, review,`,
+  `                         approval. Or a claim checkable against the turn record.`,
+  `  p = proseOnly          no event, no artifact. Tone, taste, priority, judgment.`,
+  ``,
+  `If torn between two, choose the weaker one. If enforcing it would need the`,
+  `model to cooperate honestly, it is p.`,
+  ``,
+  `Blank answers are skipped, so stopping early is fine.`,
+  `Score with: npx tsx scripts/enforceability-sample.ts --score`,
+  ``,
+  `${"=".repeat(72)}`,
+  ``,
+];
+
+sample.forEach((r, i) => {
+  const n = i + 1;
+  const body = r.text && r.text !== r.title ? r.text.slice(0, 400) : "";
+  lines.push(`[${n}] ${r.title.slice(0, 150)}`);
+  if (body) lines.push(`    ${body}`);
+  lines.push(`    (file: ${r.file.slice(0, 70)} · cli kind: ${r.kind})`);
+  lines.push(`ANSWER: ${existing.get(n) ?? ""}`);
+  lines.push(``);
+});
+
+writeFileSync(WORKSHEET, `${lines.join("\n")}\n`);
+console.log(`Population : ${pool.length} real rules`);
+console.log(`Sample     : ${sample.length} (seed ${SEED})`);
+if (existing.size) console.log(`Carried forward: ${existing.size} existing answers`);
+console.log(`\nWrote ${WORKSHEET}`);
+console.log(`Label each block with t / a / p, then:`);
+console.log(`  npx tsx scripts/enforceability-sample.ts --score`);
