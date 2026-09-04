@@ -25,3 +25,4 @@ tests/fixtures/real-sessions/
 
 # research artifact — regenerated from the seed, not source
 /enforceability-worksheet.txt
+/.local-notes/
