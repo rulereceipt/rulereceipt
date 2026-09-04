@@ -42,7 +42,12 @@ beforeAll(() => {
 
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
-describe("enforceability scorer", () => {
+// Each case spawns `npx tsx`, which resolves and compiles TypeScript from
+// cold on a CI runner. Locally that is warm and takes about a second; in CI
+// the same call ran past the 5s default and failed the 0.1.28 release. The
+// tests are slow, not flaky — a generous ceiling is the honest fix, and
+// lowering coverage to make the suite fast would be the wrong trade.
+describe("enforceability scorer", { timeout: 120_000 }, () => {
   it("refuses to score a worksheet that doesn't match the drawn sample", () => {
     run(["corpus", "--n", "4", "--seed", "1"]);
     const ws = join(dir, "enforceability-worksheet.txt");
