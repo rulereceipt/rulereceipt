@@ -138,10 +138,15 @@ const sample = idx.slice(0, Math.min(SAMPLE_N, pool.length)).map((i) => pool[i])
  * reattach a label to a rule nobody ever looked at, which is the exact
  * failure this whole measurement exists to avoid.
  */
-function readAnswers(): { byIndex: Map<number, Letter>; byTitle: Map<string, Letter> } {
+function readAnswers(): {
+  byIndex: Map<number, Letter>;
+  byTitle: Map<string, Letter>;
+  titles: Map<number, string>;
+} {
   const byIndex = new Map<number, Letter>();
   const byTitle = new Map<string, Letter>();
-  if (!existsSync(WORKSHEET)) return { byIndex, byTitle };
+  const titles = new Map<number, string>();
+  if (!existsSync(WORKSHEET)) return { byIndex, byTitle, titles };
   let current = 0;
   let currentTitle = "";
   for (const line of readFileSync(WORKSHEET, "utf8").split("\n")) {
@@ -149,6 +154,7 @@ function readAnswers(): { byIndex: Map<number, Letter>; byTitle: Map<string, Let
     if (head) {
       current = Number(head[1]);
       currentTitle = head[2].trim();
+      titles.set(current, currentTitle);
     }
     const ans = line.match(/^ANSWER:\s*([tap])\b/i);
     if (ans && current > 0) {
@@ -157,11 +163,48 @@ function readAnswers(): { byIndex: Map<number, Letter>; byTitle: Map<string, Let
       if (currentTitle) byTitle.set(currentTitle, letter);
     }
   }
-  return { byIndex, byTitle };
+  return { byIndex, byTitle, titles };
 }
 
 if (argv.includes("--score")) {
-  const { byIndex: answers } = readAnswers();
+  const { byIndex: answers, titles } = readAnswers();
+
+  /**
+   * A worksheet is only evidence about the sample it was drawn from. The
+   * population changes whenever the classifier or parser does — one fix on
+   * 2026-09-04 returned 92 different rules out of 100 at the same seed — so
+   * scoring a stale worksheet against a fresh draw yields clean proportions
+   * and intervals over rules nobody ever read.
+   *
+   * Found in use: `--score` run without repeating `--n 150` printed
+   * "Sample: 100 drawn" above results computed from 150 labels, and nothing
+   * anywhere objected. Refusing is the only safe behaviour; a warning would
+   * be read past.
+   */
+  // Both sides go through the same normalisation. The worksheet writes the
+  // title truncated to 150 characters, which can land on a space, and reading
+  // it back trims. Comparing a trimmed value against an untrimmed one reports
+  // every title longer than the cut as a mismatch — two forms of the same
+  // rule, flagged as different rules.
+  const norm = (t: string) => t.slice(0, 150).trim();
+  const drawn = sample.map((r) => norm(r.title));
+  const onSheet = [...titles.entries()].sort((a, b) => a[0] - b[0]).map(([, t]) => norm(t));
+  const mismatch =
+    onSheet.length !== drawn.length || onSheet.some((t, i) => t !== drawn[i]);
+  if (onSheet.length > 0 && mismatch) {
+    console.error(`${WORKSHEET} does not match the sample this run drew.`);
+    console.error(`  worksheet holds ${onSheet.length} rules; --n ${SAMPLE_N} --seed ${SEED} draws ${drawn.length}.`);
+    const firstDiff = onSheet.findIndex((t, i) => t !== drawn[i]);
+    if (firstDiff >= 0 && drawn[firstDiff] !== undefined) {
+      console.error(`  first difference at block ${firstDiff + 1}:`);
+      console.error(`    worksheet: ${onSheet[firstDiff].slice(0, 80)}`);
+      console.error(`    this draw: ${drawn[firstDiff].slice(0, 80)}`);
+    }
+    console.error(`Re-run with the same --n and --seed used to draw it, or draw again and relabel.`);
+    console.error(`Scoring anyway would report proportions over rules that were never read.`);
+    process.exit(1);
+  }
+
   if (answers.size === 0) {
     console.error(`No answers found in ${WORKSHEET}.`);
     console.error(`Put a single letter (t / a / p) after "ANSWER:" on each block you label.`);
