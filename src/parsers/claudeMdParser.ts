@@ -45,9 +45,44 @@ const BULLET_ITEM = /^\s*[-*+]\s+(.+)$/;
 const SETEXT_H1_UNDERLINE = /^=+\s*$/;
 const SETEXT_H2_UNDERLINE = /^-{2,}\s*$/;
 
+/**
+ * A fenced code block is content, not structure.
+ *
+ * Found by auditing 559 real rules files: 588 rules came out holding an
+ * unclosed fence, meaning the parser had split them mid-block. Markdown
+ * headings and bullets appear inside code samples constantly — a shell
+ * comment starts with `#`, a YAML list item starts with `-` — and treating
+ * those as rule boundaries does three things at once. It truncates the real
+ * rule at the fence, it fabricates rules out of the sample's contents, and
+ * it lifts commands out of a "here is what NOT to do" example into a rule
+ * body, where the structured checks can then read them as though they were
+ * the rule itself.
+ *
+ * Matches both fence styles CommonMark allows, and requires the closing
+ * fence to use the same character as the opening one, so a ``` inside a
+ * ~~~ block does not close it.
+ */
+const FENCE_LINE = /^\s*(`{3,}|~{3,})/;
+
 function normalizeSetextHeaders(lines: string[]): string[] {
   const out = [...lines];
+  // Fence-aware for the same reason as the main pass: a row of dashes inside
+  // a code sample is not a setext underline.
+  let inFence = false;
+  let fenceChar = "";
   for (let i = 0; i < out.length - 1; i++) {
+    const fence = out[i].match(FENCE_LINE);
+    if (fence) {
+      const ch = fence[1][0];
+      if (!inFence) {
+        inFence = true;
+        fenceChar = ch;
+      } else if (ch === fenceChar) {
+        inFence = false;
+      }
+      continue;
+    }
+    if (inFence) continue;
     const title = out[i];
     if (title.trim() === "") continue;
     if (
@@ -106,6 +141,8 @@ export function parseClaudeMdText(raw: string, source: "global" | "project"): Ru
   let sectionCount = 0;
   let sectionId: string | null = "S0"; // "S0" before any header is seen; null while a header is pending its first rule
   let bulletIndex = 0;
+  let inFence = false;
+  let fenceChar = "";
 
   const flush = () => {
     if (current) {
@@ -124,7 +161,39 @@ export function parseClaudeMdText(raw: string, source: "global" | "project"): Ru
     return sectionId;
   };
 
+  /** Adds a line to whatever rule is open, promoting a pending section if needed. */
+  const appendBody = (line: string) => {
+    if (currentIsMarkedRule) {
+      bodyLines.push(line);
+    } else if (pendingSectionTitle !== null && line.trim() !== "") {
+      current = { id: `${assignSectionId()}.0`, title: pendingSectionTitle, text: "", source };
+      bodyLines = [line];
+      pendingSectionTitle = null;
+    } else if (current) {
+      bodyLines.push(line);
+    }
+  };
+
   for (const line of lines) {
+    // Fence state is tracked before any structural match, so nothing inside a
+    // code block is ever read as a heading, a bullet, or a rule marker.
+    const fence = line.match(FENCE_LINE);
+    if (fence) {
+      const ch = fence[1][0];
+      if (!inFence) {
+        inFence = true;
+        fenceChar = ch;
+      } else if (ch === fenceChar) {
+        inFence = false;
+      }
+      appendBody(line);
+      continue;
+    }
+    if (inFence) {
+      appendBody(line);
+      continue;
+    }
+
     const numbered = line.match(NUMBERED_HEADER);
     if (numbered) {
       flush();
@@ -165,15 +234,7 @@ export function parseClaudeMdText(raw: string, source: "global" | "project"): Ru
       continue;
     }
 
-    if (currentIsMarkedRule) {
-      bodyLines.push(line);
-    } else if (pendingSectionTitle !== null && line.trim() !== "") {
-      current = { id: `${assignSectionId()}.0`, title: pendingSectionTitle, text: "", source };
-      bodyLines = [line];
-      pendingSectionTitle = null;
-    } else if (current) {
-      bodyLines.push(line);
-    }
+    appendBody(line);
   }
   flush();
 

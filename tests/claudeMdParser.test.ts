@@ -4,6 +4,7 @@ import { homedir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseClaudeMd } from "../src/parsers/readClaudeMd.js";
+import { parseClaudeMdText } from "../src/parsers/claudeMdParser.js";
 
 const REAL_GLOBAL_CLAUDE_MD = join(homedir(), ".claude", "CLAUDE.md");
 const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), "fixtures");
@@ -219,5 +220,65 @@ describe("parseClaudeMd against a file mixing numbered-header rules and plain-he
     const rules = parseClaudeMd(FILE, "project");
     const ids = rules.map((r) => r.id);
     expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  // ---- fenced code blocks are content, not structure ----
+  //
+  // Found by auditing the parser across 559 real rules files: 588 rules came
+  // out carrying an unclosed code fence, meaning the parser had split them
+  // mid-block. A markdown heading or bullet inside a fence is sample text,
+  // not a new rule, and treating it as structure does three things at once:
+  // truncates the real rule at the fence, fabricates rules out of the code,
+  // and drops commands from a "don't do this" example into a rule body where
+  // the structured checks can read them.
+
+  it("does not split a rule on a heading inside a code fence", () => {
+    const rules = parseClaudeMdText(
+      [
+        "## 1. Never commit to main",
+        "Bad example:",
+        "",
+        "```bash",
+        "# this is a code comment, not a heading",
+        "git commit -am wip",
+        "```",
+        "",
+        "That was the bad example.",
+      ].join("\n"),
+      "project"
+    );
+    expect(rules).toHaveLength(1);
+    expect(rules[0].title).toBe("Never commit to main");
+  });
+
+  it("does not split a rule on a bullet inside a code fence", () => {
+    const rules = parseClaudeMdText(
+      ["## Style", "Prefer this shape:", "", "```yaml", "- item one", "- item two", "```"].join("\n"),
+      "project"
+    );
+    expect(rules).toHaveLength(1);
+  });
+
+  it("keeps the whole fenced block inside the rule it belongs to", () => {
+    const rules = parseClaudeMdText(
+      ["## 1. Never commit to main", "Bad example:", "", "```bash", "# bad", "git commit -am wip", "- also bad", "```", "", "Do not do that."].join("\n"),
+      "project"
+    );
+    expect(rules[0].text).toContain("git commit -am wip");
+    expect(rules[0].text).toContain("Do not do that.");
+  });
+
+  it("never turns a line inside a fence into a rule of its own", () => {
+    const rules = parseClaudeMdText(
+      ["## A", "text", "```js", "// ## not a heading", "const x = 1;", "- not a bullet", "```", "## B", "more"].join("\n"),
+      "project"
+    );
+    const titles = rules.map((r) => r.title);
+    expect(titles).not.toContain("not a bullet");
+    expect(titles).not.toContain("not a heading");
+    // Fences must also stay balanced within whichever rule holds them.
+    for (const r of rules) {
+      expect((r.text.match(/```/g) ?? []).length % 2).toBe(0);
+    }
   });
 });
