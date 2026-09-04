@@ -128,22 +128,40 @@ const sample = idx.slice(0, Math.min(SAMPLE_N, pool.length)).map((i) => pool[i])
 
 // ---------------------------------------------------------------- score
 
-/** Reads the answers back out of the worksheet, tolerating blank rows. */
-function readAnswers(): Map<number, Letter> {
-  const answers = new Map<number, Letter>();
-  if (!existsSync(WORKSHEET)) return answers;
+/**
+ * Reads the answers back out of the worksheet, tolerating blank rows.
+ *
+ * Keyed on the rule's own title, never on its position. The population this
+ * samples from changes whenever the classifier does — the 2026-09-04 fix
+ * moved 390 items out of it — so a redraw puts different rules at the same
+ * block numbers. Carrying answers forward positionally would silently
+ * reattach a label to a rule nobody ever looked at, which is the exact
+ * failure this whole measurement exists to avoid.
+ */
+function readAnswers(): { byIndex: Map<number, Letter>; byTitle: Map<string, Letter> } {
+  const byIndex = new Map<number, Letter>();
+  const byTitle = new Map<string, Letter>();
+  if (!existsSync(WORKSHEET)) return { byIndex, byTitle };
   let current = 0;
+  let currentTitle = "";
   for (const line of readFileSync(WORKSHEET, "utf8").split("\n")) {
-    const head = line.match(/^\[(\d+)\]/);
-    if (head) current = Number(head[1]);
+    const head = line.match(/^\[(\d+)\]\s*(.*)$/);
+    if (head) {
+      current = Number(head[1]);
+      currentTitle = head[2].trim();
+    }
     const ans = line.match(/^ANSWER:\s*([tap])\b/i);
-    if (ans && current > 0) answers.set(current, ans[1].toLowerCase() as Letter);
+    if (ans && current > 0) {
+      const letter = ans[1].toLowerCase() as Letter;
+      byIndex.set(current, letter);
+      if (currentTitle) byTitle.set(currentTitle, letter);
+    }
   }
-  return answers;
+  return { byIndex, byTitle };
 }
 
 if (argv.includes("--score")) {
-  const answers = readAnswers();
+  const { byIndex: answers } = readAnswers();
   if (answers.size === 0) {
     console.error(`No answers found in ${WORKSHEET}.`);
     console.error(`Put a single letter (t / a / p) after "ANSWER:" on each block you label.`);
@@ -179,7 +197,7 @@ if (argv.includes("--score")) {
 
 // ---------------------------------------------------------------- worksheet
 
-const existing = readAnswers();
+const { byTitle: existing } = readAnswers();
 const lines: string[] = [
   `Enforceability worksheet — ${sample.length} rules drawn from ${pool.length}, seed ${SEED}`,
   ``,
@@ -208,14 +226,21 @@ sample.forEach((r, i) => {
   lines.push(`[${n}] ${r.title.slice(0, 150)}`);
   if (body) lines.push(`    ${body}`);
   lines.push(`    (file: ${r.file.slice(0, 70)} · cli kind: ${r.kind})`);
-  lines.push(`ANSWER: ${existing.get(n) ?? ""}`);
+  // Matched by title, so a label only survives if it is the same rule.
+  lines.push(`ANSWER: ${existing.get(r.title.slice(0, 150)) ?? ""}`);
   lines.push(``);
 });
 
 writeFileSync(WORKSHEET, `${lines.join("\n")}\n`);
 console.log(`Population : ${pool.length} real rules`);
 console.log(`Sample     : ${sample.length} (seed ${SEED})`);
-if (existing.size) console.log(`Carried forward: ${existing.size} existing answers`);
+if (existing.size) {
+  const kept = sample.filter((r) => existing.has(r.title.slice(0, 150))).length;
+  console.log(`Carried forward: ${kept} of ${existing.size} previous answers (matched by rule, not position)`);
+  if (kept < existing.size) {
+    console.log(`  ${existing.size - kept} previous answer(s) dropped — those rules are no longer in the sample.`);
+  }
+}
 console.log(`\nWrote ${WORKSHEET}`);
 console.log(`Label each block with t / a / p, then:`);
 console.log(`  npx tsx scripts/enforceability-sample.ts --score`);
