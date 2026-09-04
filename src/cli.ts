@@ -159,11 +159,13 @@ interface CheckOptions {
   exitZero: boolean;
   /** Fail when there is no session, or an empty one, instead of reporting a pass for a check that never ran. */
   requireSession: boolean;
+  /** List the items the classifier decided were documentation, so a misclassified rule can be seen rather than silently dropped. */
+  showSkipped: boolean;
   transcriptOverride?: string;
 }
 
 async function runCheck(opts: CheckOptions) {
-  const { markdown, share, email, emailAlways, llm, telemetry, html, exitZero, requireSession, transcriptOverride } = opts;
+  const { markdown, share, email, emailAlways, llm, telemetry, html, exitZero, requireSession, showSkipped, transcriptOverride } = opts;
   const cwd = process.cwd();
   const rules = loadRules(cwd);
 
@@ -276,10 +278,38 @@ async function runCheck(opts: CheckOptions) {
     writeHtmlReport(results, { sessionFilePath, ruleCount: results.length }, cwd, html);
   }
 
+  // A count alone is not enough. The classifier is a heuristic over English
+  // verbs: measured across 559 public rules files it drops non-English
+  // content at 97.5% against a 64.5% baseline, and any imperative verb
+  // outside its list is invisible to it. Neither gap closes by extending the
+  // list — imperative verbs are not a closed class, and the list is
+  // English-only by construction.
+  //
+  // What does close is the silence. "12 items were documentation" reads as
+  // reassurance; it is the one place this tool still guesses without saying
+  // so, and a rule dropped here never appears in the report at all. Listing
+  // them needs no key, works in any language, and lets the person who wrote
+  // the rule be the one who decides.
   if (notARule.length > 0) {
+    const n = notARule.length;
+    const plural = n === 1 ? "" : "s";
     console.log(
-      `\n(${notARule.length} item${notARule.length === 1 ? "" : "s"} in your rules file ${notARule.length === 1 ? "is" : "are"} documentation, not a rule — directory listings, reference tables, examples. Not checked, because there's nothing to check.)`
+      `\n(${n} item${plural} in your rules file ${n === 1 ? "was" : "were"} treated as documentation and not checked — directory listings, reference tables, examples.)`
     );
+    if (showSkipped) {
+      console.log(`\nSkipped as documentation:\n`);
+      for (const { rule } of notARule) {
+        const label = rule.title.replace(/\s+/g, " ").trim();
+        console.log(`  [${rule.id}] ${label.slice(0, 110)}`);
+      }
+      console.log(
+        `\nIf any of those is actually a rule, the classifier was wrong. It looks for` +
+          `\nEnglish instruction words, so a rule written another way — or in another` +
+          `\nlanguage — can land here. Worth a look; you know your rules, it doesn't.`
+      );
+    } else {
+      console.log(`Run with --show-skipped to see them.`);
+    }
   }
 
   appendHistory(results, sessionFilePath);
@@ -367,6 +397,10 @@ program
     "fail (exit 1) if no session is found, or the session is empty, instead of reporting a pass for a check that never actually ran. Use this anywhere automated."
   )
   .option(
+    "--show-skipped",
+    "list the items that were treated as documentation and not checked. Worth running once on any rules file: the classifier is a heuristic over English verbs, so a rule it does not recognise is otherwise dropped without you seeing it."
+  )
+  .option(
     "--transcript <path>",
     "manual override: check this exact .jsonl session file instead of auto-detecting one. Useful if your Claude Code session lives somewhere non-standard that auto-detection doesn't cover."
   )
@@ -382,6 +416,7 @@ program
       html: opts.html ?? false,
       exitZero: Boolean(opts.exitZero),
       requireSession: Boolean(opts.requireSession),
+      showSkipped: Boolean(opts.showSkipped),
       transcriptOverride: opts.transcript,
     }).catch((err) => {
       console.error("Something went wrong:", err instanceof Error ? err.message : err);

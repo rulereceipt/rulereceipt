@@ -181,11 +181,81 @@ function isEventRecord(rule: Rule): boolean {
   return EVENT_RECORD_TITLE.test(rule.title);
 }
 
+/**
+ * A line whose SUBJECT is a command-line option, i.e. the documentation of
+ * a flag rather than an instruction to the agent. "`--file=<path>, -f`: Use
+ * alternative tasks.json file" describes what the flag does; the imperative
+ * belongs to the flag, not to the reader.
+ *
+ * This is why the directive test alone cannot separate these: command
+ * documentation is written with the same verbs as a command, because it is
+ * describing a command. The distinguishing property is grammatical — what
+ * the sentence is ABOUT — and it is announced by the line beginning with an
+ * option token and a separator.
+ *
+ * Deliberately narrow. It requires the option token to be the first thing on
+ * the line and to be followed by a colon, so a rule that merely mentions a
+ * flag ("Always pass `--frozen-lockfile` when installing") is untouched.
+ */
+const FLAG_DOCUMENTATION =
+  /^\s*`?\s*-{1,2}[A-Za-z0-9][\w-]*(?:=[^\s,`]*)?(?:\s*,\s*`?\s*-{1,2}[\w-]+`?(?:=[^\s,`]*)?)*\s*`?\s*:/;
+
+/**
+ * English prose almost always contains at least one function word. A shell
+ * invocation contains none, and contains at least one token carrying a path
+ * separator, a flag prefix, an internal dot, or an assignment.
+ *
+ * Both conditions are required. "Use modular architecture" has no function
+ * word either, but no command-shaped token, so it stays a rule. "Run `npm
+ * test` before every push" has command-shaped tokens but also has function
+ * words, so it stays a rule too.
+ *
+ * This is a property of the language, not of the file format — the same
+ * reasoning as DIRECTIVE_LANGUAGE above, which is why it is expressed as a
+ * test on the text rather than as a list of documentation conventions.
+ */
+const FUNCTION_WORD =
+  /\b(a|an|the|is|are|was|were|be|being|been|to|of|in|on|for|with|when|if|that|this|these|those|and|or|but|not|no|do|does|you|your|it|its|as|at|by|from|before|after|until|unless|any|every|all|each|must|should|never|always|only|via|per|than|then|so|such|into|onto|over|under|about)\b/i;
+const COMMAND_SHAPED_TOKEN = /(?:^|\s)(?:\S*[/\\]\S*|-{1,2}[A-Za-z]\S*|\S+\.\S+|\S+=\S+)/;
+
+function looksLikeBareCommand(text: string): boolean {
+  const withoutCode = text
+    .replace(/```[\s\S]*?```/g, " ")
+    .replace(/`[^`]*`/g, " ")
+    .trim();
+  // If stripping code leaves nothing, the body WAS only code.
+  const body = withoutCode.length > 0 ? withoutCode : text.replace(/[`\n]+/g, " ").trim();
+  if (!body) return false;
+  // Long enough to be prose, whatever it contains.
+  if (body.split(/\s+/).length > 12) return false;
+  if (FUNCTION_WORD.test(body)) return false;
+  return COMMAND_SHAPED_TOKEN.test(body);
+}
+
+/**
+ * A heading that labels a command, with the command as its whole body:
+ * "Build release APK" over `.\gradlew assembleRelease`. The title reads as
+ * an imperative, but nothing here constrains the agent — it is a how-to, and
+ * there is no compliance to check.
+ *
+ * Guarded by TITLE_OPENS_WITH_DIRECTIVE so a genuine prohibition whose body
+ * is the forbidden command ("Never run: `rm -rf /`") is still a rule.
+ */
+function isCommandDocumentation(rule: Rule): boolean {
+  if (TITLE_OPENS_WITH_DIRECTIVE.test(rule.title)) return false;
+  if (FLAG_DOCUMENTATION.test(rule.text) || FLAG_DOCUMENTATION.test(rule.title)) return true;
+  return looksLikeBareCommand(rule.text);
+}
+
 function isNotARule(rule: Rule): boolean {
   // Checked before the directive test on purpose: an incident note that
   // ends with its lesson contains a real directive, and would otherwise
   // be enforced as though the history itself were the rule.
   if (isEventRecord(rule)) return true;
+  // Same reason as above: command documentation carries real imperatives
+  // ("Use alternative tasks.json file"), so the directive test below would
+  // otherwise accept it as a rule to check compliance against.
+  if (isCommandDocumentation(rule)) return true;
   const combined = `${rule.title} ${rule.text}`;
   if (DIRECTIVE_LANGUAGE.test(combined)) return false;
   // Title and text are tested SEPARATELY: the imperative pattern is

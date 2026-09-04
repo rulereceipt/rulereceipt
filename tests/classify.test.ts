@@ -318,4 +318,34 @@ describe("incident write-ups are records, not rules", () => {
   it("STILL enforces a rule whose title is an ordinary directive", () => {
     expect(classifyRule(makeRule("Always run `npm test` before pushing.", "Always run `npm test` before pushing")).kind).not.toBe("notARule");
   });
+
+  // ---- documentation of a command, not an instruction to follow ----
+  // Real corpus cases. These slip past the directive test because command
+  // documentation uses the same imperative verbs as an instruction: the
+  // line describes what the flag DOES ("Use alternative tasks.json file")
+  // rather than telling the agent to do anything.
+
+  it("treats a CLI flag's own documentation as not a rule", () => {
+    expect(classifyRule(makeRule("`--file=<path>, -f`: Use alternative tasks.json file")).kind).toBe("notARule");
+    expect(classifyRule(makeRule("`--with-subtasks`: Show subtasks for each task")).kind).toBe("notARule");
+    expect(classifyRule(makeRule("`--status=<status>`: New status value (required)")).kind).toBe("notARule");
+  });
+
+  it("treats a section whose entire body is a command as not a rule", () => {
+    expect(classifyRule(makeRule(".\\gradlew assembleRelease", "Build release APK")).kind).toBe("notARule");
+    expect(classifyRule(makeRule("cp .env.copy .env", "Copy environment template")).kind).toBe("notARule");
+    expect(classifyRule(makeRule("cargo test -p deno_core", "Run tests in a specific package")).kind).toBe("notARule");
+  });
+
+  // ---- guards: these must NOT be swept up by the above ----
+
+  it("still treats a rule that names a command as a rule", () => {
+    expect(classifyRule(makeRule("Never run `git push --force` under any circumstances.")).kind).not.toBe("notARule");
+    expect(classifyRule(makeRule("Always pass `--frozen-lockfile` when installing dependencies.")).kind).not.toBe("notARule");
+  });
+
+  it("still treats prose that mentions a command as a rule", () => {
+    expect(classifyRule(makeRule("Run `npm test` before every push.", "Testing")).kind).not.toBe("notARule");
+    expect(classifyRule(makeRule("Use `--dry-run` first when the change is destructive.")).kind).not.toBe("notARule");
+  });
 });
