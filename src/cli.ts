@@ -9,6 +9,7 @@ import { parseClaudeMd } from "./parsers/readClaudeMd.js";
 import { readLatestTranscript, readTranscriptFromFile, findLatestSessionFile } from "./parsers/transcriptParser.js";
 import { loadRules } from "./rules.js";
 import { classifyRules } from "./checks/classify.js";
+import { loadOverrides, saveOverride, clearOverride, staleOverrides, ruleFingerprint, OVERRIDES_PATH } from "./overrides.js";
 import { runDeterministicChecks } from "./checks/deterministicChecks.js";
 import { runIfEditThenTestChecks } from "./checks/ifEditThenTest.js";
 import { runGitBranchPolicyChecks } from "./checks/gitBranchPolicy.js";
@@ -223,7 +224,32 @@ async function runCheck(opts: CheckOptions) {
       return;
     }
   }
-  const classifications = classifyRules(rules);
+  /**
+   * The classifier's guess is corrected here, before anything is checked.
+   *
+   * It looks for a list of English instruction words and is wrong in both
+   * directions: imperative verbs are not a closed class, and the list cannot
+   * match a rule written in another language. This project's own Rule 5 was
+   * filed as documentation and never checked, because it says "say so
+   * explicitly" and `say` is not on the list.
+   *
+   * A rule the user re-includes becomes a judgment result rather than a
+   * confident verdict. Knowing it IS a rule says nothing about which check
+   * can settle it, and guessing would be exactly the behaviour this tool
+   * exists to avoid — so it reports as needing a person, which is honest and
+   * strictly better than being dropped in silence.
+   */
+  const overrides = loadOverrides(cwd);
+  const classifications = classifyRules(rules).map((c) => {
+    const decision = overrides.get(ruleFingerprint(c.rule))?.decision;
+    if (!decision) return c;
+    if (decision === "notARule") return { kind: "notARule" as const, rule: c.rule };
+    return c.kind === "notARule" ? { kind: "judgment" as const, rule: c.rule } : c;
+  });
+
+  // An override that stopped matching usually means the rule was reworded.
+  // Saying so beats letting someone assume a correction is still in force.
+  const stale = staleOverrides(overrides, rules);
   const deterministic = classifications.filter((c) => c.kind === "deterministic");
   const ifEditThenTest = classifications.filter((c) => c.kind === "ifEditThenTest");
   const gitBranchPolicy = classifications.filter((c) => c.kind === "gitBranchPolicy");
@@ -300,16 +326,32 @@ async function runCheck(opts: CheckOptions) {
       console.log(`\nSkipped as documentation:\n`);
       for (const { rule } of notARule) {
         const label = rule.title.replace(/\s+/g, " ").trim();
-        console.log(`  [${rule.id}] ${label.slice(0, 110)}`);
+        // The handle is a content hash, never the rule id: ids are positional
+        // and every edit above a rule renumbers it, so a correction keyed on
+        // one would silently reattach itself to a different rule.
+        //
+        // The source is shown because rules are read from the global file as
+        // well as the project's. Without it, someone editing their project
+        // CLAUDE.md to fix an item that came from ~/.claude/CLAUDE.md gets no
+        // explanation for why nothing changed.
+        const where = rule.source === "global" ? " (global)" : "";
+        console.log(`  [${ruleFingerprint(rule)}]${where} ${label.slice(0, 100)}`);
       }
       console.log(
         `\nIf any of those is actually a rule, the classifier was wrong. It looks for` +
           `\nEnglish instruction words, so a rule written another way — or in another` +
-          `\nlanguage — can land here. Worth a look; you know your rules, it doesn't.`
+          `\nlanguage — can land here. Worth a look; you know your rules, it doesn't.` +
+          `\n\nTo fix one permanently:  rulereceipt rules --include <handle>`
       );
     } else {
       console.log(`Run with --show-skipped to see them.`);
     }
+  }
+
+  if (stale.length > 0) {
+    console.log(
+      `\n(${stale.length} saved correction${stale.length === 1 ? "" : "s"} no longer match any rule in this project — the rule was probably reworded. Run \`rulereceipt rules --list\` to see them.)`
+    );
   }
 
   appendHistory(results, sessionFilePath);
@@ -424,6 +466,64 @@ program
     });
   });
 
+/**
+ * Corrections to what the classifier thinks is a rule.
+ *
+ * Writes, deliberately and only from here. `check` never writes anything —
+ * a tool that puts files in someone's project without being asked is one
+ * people stop trusting, and that guarantee is worth more than the
+ * convenience of auto-saving a correction.
+ */
+async function runRules(opts: { include?: string; exclude?: string; clear?: string; list?: boolean }) {
+  const cwd = process.cwd();
+  const rules = loadRules(cwd);
+  const overrides = loadOverrides(cwd);
+
+  const findRule = (handle: string) => rules.find((r) => ruleFingerprint(r) === handle);
+
+  if (opts.include || opts.exclude) {
+    const handle = (opts.include ?? opts.exclude) as string;
+    const decision = opts.include ? "rule" : "notARule";
+    const rule = findRule(handle);
+    if (!rule) {
+      console.error(`No rule in this project has the handle ${handle}.`);
+      console.error(`Handles come from \`rulereceipt check --show-skipped\`, and change if the rule's wording changes.`);
+      process.exitCode = 1;
+      return;
+    }
+    saveOverride(cwd, { hash: handle, decision, title: rule.title.replace(/\s+/g, " ").trim().slice(0, 200) });
+    const verb = opts.include ? "will now be checked" : "will no longer be checked";
+    console.log(`Saved to ${OVERRIDES_PATH}.`);
+    console.log(`  "${rule.title.replace(/\s+/g, " ").trim().slice(0, 90)}" ${verb}.`);
+    if (opts.include) {
+      console.log(`\nIt will report as needing your judgment. Knowing it is a rule says nothing`);
+      console.log(`about which check can settle it, and guessing is what this tool avoids.`);
+    }
+    return;
+  }
+
+  if (opts.clear) {
+    console.log(clearOverride(cwd, opts.clear) ? `Removed the correction for ${opts.clear}.` : `No correction stored for ${opts.clear}.`);
+    return;
+  }
+
+  if (overrides.size === 0) {
+    console.log(`No corrections stored for this project.`);
+    console.log(`\nRun \`rulereceipt check --show-skipped\` to see what the classifier excluded,`);
+    console.log(`then \`rulereceipt rules --include <handle>\` for anything that is really a rule.`);
+    return;
+  }
+
+  const stale = new Set(staleOverrides(overrides, rules).map((o) => o.hash));
+  console.log(`Corrections in ${OVERRIDES_PATH}:\n`);
+  for (const o of overrides.values()) {
+    const mark = o.decision === "rule" ? "checked" : "ignored";
+    const note = stale.has(o.hash) ? "   (no longer matches any rule — reworded?)" : "";
+    console.log(`  ${o.hash}  ${mark.padEnd(8)} ${o.title.slice(0, 70)}${note}`);
+  }
+  console.log(`\nRemove one with:  rulereceipt rules --clear <handle>`);
+}
+
 async function runLint(markdown: boolean, llm: boolean) {
   const cwd = process.cwd();
   const claudeMdPath = join(cwd, "CLAUDE.md");
@@ -516,6 +616,20 @@ program
       console.error("Something went wrong:", err instanceof Error ? err.message : err);
       process.exitCode = 1;
     }
+  });
+
+program
+  .command("rules")
+  .description("correct what the classifier treats as a rule. Handles come from `check --show-skipped`.")
+  .option("--include <handle>", "treat this item as a real rule and check it from now on")
+  .option("--exclude <handle>", "treat this item as documentation and stop reporting it")
+  .option("--clear <handle>", "remove a stored correction")
+  .option("--list", "show stored corrections (the default when no other flag is given)")
+  .action((opts) => {
+    runRules(opts).catch((err) => {
+      console.error("Something went wrong:", err instanceof Error ? err.message : err);
+      process.exitCode = 1;
+    });
   });
 
 program

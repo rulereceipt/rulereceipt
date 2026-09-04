@@ -54,6 +54,13 @@ Published and live on npm, actively developed.
      exactly what it excluded. A rule phrased unusually, or written in
      another language, can land there — and a rule dropped silently is
      worse than one reported wrongly.
+
+     When it gets one wrong, `rulereceipt rules --include <handle>` fixes it
+     permanently. The handle is a hash of the rule's own text, not its
+     position, so the correction survives edits elsewhere in the file. That
+     matters more than making the classifier smarter: imperative verbs are
+     not a closed class and the word list is English-only, so it will keep
+     being wrong — it just needs to be correctable.
 4. Prints a report — terminal table by default, `--markdown` for pasting
    into a PR or Slack message, or `--html` for a shareable single file —
    showing what passed, what failed, and a quoted line of evidence for
@@ -76,6 +83,9 @@ rulereceipt check --llm        # opt-in: grade judgment rules with your own Clau
 rulereceipt check --share      # opt-in: send anonymous pass/fail/unclear counts
 rulereceipt check --telemetry  # opt-in: send one random per-machine ID
 rulereceipt check --transcript <path>      # check a specific session file
+rulereceipt rules              # show corrections you've made to what counts as a rule
+rulereceipt rules --include <handle>   # "this IS a rule" — check it from now on
+rulereceipt rules --exclude <handle>   # "this isn't" — stop reporting it
 rulereceipt doctor             # list hooks/auto-run tasks configured on this machine
 rulereceipt lint               # find contradictions between CLAUDE.md and AGENTS.md
 rulereceipt digest             # summarise recent checks; --email to send it
@@ -159,11 +169,14 @@ real distinct-install counts are knowable, nothing else. None of them fire
 unless you explicitly pass the flag, and `DO_NOT_TRACK=1` /
 `RULERECEIPT_NO_TELEMETRY=1` forces telemetry off even if you do.
 
-**Read-only, and no hooks.** RuleReceipt never modifies
-`.claude/settings.json` and installs no hooks without explicit action. It
-only ever reads your CLAUDE.md/AGENTS.md and session transcripts —
-read-only, manual invocation only (`rulereceipt check`). No automatic
-hooks, ever, in v1.
+**Never writes anything you didn't ask for.** RuleReceipt never modifies
+`.claude/settings.json` and installs no hooks. No automatic hooks, ever, in
+v1 — it runs only when you type the command.
+
+Two commands write, both only when you invoke them: `check --html` writes the
+report to the path you name, and `rules --include/--exclude` records a
+correction in `.rulereceipt/overrides.json`. Plain `rulereceipt check` writes
+nothing and makes no network calls.
 
 **You can verify the package came from this source.** Every release from
 0.1.19 on is built and published by GitHub Actions and signed with

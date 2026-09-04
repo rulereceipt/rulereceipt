@@ -894,7 +894,7 @@
       <div class="trust-grid">
         <div class="trust-cell"><h3>Offline by default</h3><p><code>--llm</code>, <code>--share</code> and <code>--telemetry</code> are opt-in and off until you turn them on. <a href="/privacy">Full detail</a>.</p></div>
         <div class="trust-cell"><h3>No account, no server, no login</h3><p>Nothing of ours sits in the path of a check &mdash; so there is nothing of ours to breach.</p></div>
-        <div class="trust-cell"><h3>Read-only, always</h3><p>It never writes a file, installs a hook, or changes a setting. Not <code>settings.json</code>, not anything.</p></div>
+        <div class="trust-cell"><h3>Never writes what you didn't ask for</h3><p>No hooks, ever, and it never touches <code>settings.json</code>. Only <code>--html</code> and <code>rules</code> write, both because you asked.</p></div>
       </div>
       <div style="height:20px"></div>
       <div class="security-note"><strong>You can verify the package you install came from the code you read.</strong> Every release is built and published by GitHub Actions and signed with npm provenance — no publishing token exists on anyone's laptop to be stolen. After installing, run <code>npm audit signatures</code> and npm will confirm the package was built from this public repository, at a specific commit. That's the appropriate standard for a tool whose whole job is verification, and it's checkable by you, not asserted by us.</div>
