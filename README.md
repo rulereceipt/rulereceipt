@@ -48,7 +48,12 @@ Published and live on npm, actively developed.
      Claude key; without it they report UNCLEAR rather than guessing.
    - Lines containing no instruction at all — directory listings,
      reference tables, examples — aren't rules, and are reported as such
-     instead of being checked.
+     instead of being checked. This step is a heuristic over English
+     instruction words, so it can be wrong in both directions: run
+     `rulereceipt check --show-skipped` once on your rules file to see
+     exactly what it excluded. A rule phrased unusually, or written in
+     another language, can land there — and a rule dropped silently is
+     worse than one reported wrongly.
 4. Prints a report — terminal table by default, `--markdown` for pasting
    into a PR or Slack message, or `--html` for a shareable single file —
    showing what passed, what failed, and a quoted line of evidence for
@@ -64,6 +69,7 @@ rulereceipt check              # check the latest session in this project
 rulereceipt check --markdown   # same, formatted for pasting into a PR/Slack
 rulereceipt check --html       # write a shareable single-file HTML report you can send
 rulereceipt check --html report.html       # ...to a specific path
+rulereceipt check --show-skipped           # list what was treated as documentation and not checked
 rulereceipt check --require-session        # fail if there's no session, instead of passing silently
 rulereceipt check --exit-zero              # report failures without failing the build
 rulereceipt check --llm        # opt-in: grade judgment rules with your own Claude key
