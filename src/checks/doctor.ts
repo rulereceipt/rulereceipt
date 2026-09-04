@@ -7,6 +7,13 @@ export interface HookEntry {
   event: string;
   command: string;
   flags: string[];
+  /**
+   * The matcher the hook is registered under — which tool it fires on, for
+   * tool-call events. Kept because it is the only machine-readable statement
+   * of what a hook watches; the command itself is usually a script path whose
+   * contents this tool does not read.
+   */
+  matcher?: string;
 }
 
 export interface DoctorResult {
@@ -50,10 +57,17 @@ function extractHooksFromSettings(filePath: string): HookEntry[] {
     for (const matcher of matchers) {
       const hookList = (matcher as { hooks?: unknown[] })?.hooks;
       if (!Array.isArray(hookList)) continue;
+      const matcherName = (matcher as { matcher?: unknown })?.matcher;
       for (const h of hookList) {
         const command = (h as { command?: unknown })?.command;
         if (typeof command === "string") {
-          entries.push({ sourceFile: filePath, event, command, flags: flagCommand(command) });
+          entries.push({
+            sourceFile: filePath,
+            event,
+            command,
+            flags: flagCommand(command),
+            matcher: typeof matcherName === "string" ? matcherName : undefined,
+          });
         }
       }
     }

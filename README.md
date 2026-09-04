@@ -86,6 +86,7 @@ rulereceipt check --transcript <path>      # check a specific session file
 rulereceipt rules              # show corrections you've made to what counts as a rule
 rulereceipt rules --include <handle>   # "this IS a rule" — check it from now on
 rulereceipt rules --exclude <handle>   # "this isn't" — stop reporting it
+rulereceipt rules --coverage   # which rules a configured hook might actually enforce
 rulereceipt doctor             # list hooks/auto-run tasks configured on this machine
 rulereceipt lint               # find contradictions between CLAUDE.md and AGENTS.md
 rulereceipt digest             # summarise recent checks; --email to send it
@@ -97,6 +98,30 @@ rulereceipt verify <session-file> <hash>   # spot-check a report you received ag
 ```
 
 `verify` isn't a routine check — trust your team day to day, same as any status update. It's there for the rare case it actually matters (a dispute, an incident review): give it the session file and the hash printed in the report, and it confirms whether they really match.
+
+## Which rules actually have teeth
+
+A rule in a file and a rule with a `PreToolUse` hook behind it look identical
+when you read them, and behave completely differently when they're ignored.
+One fails loudly; the other doesn't fail at all.
+
+```bash
+rulereceipt rules --coverage
+```
+
+This lists your rules against the hooks configured on this machine and in the
+project, and tells you which rules name something a *blocking* hook also
+names. Hooks on events that can't refuse anything — `SessionStart`,
+`PostToolUse` — are counted separately, because they can log or inject
+context but can't make a rule fail.
+
+**It reports a possible backing, never a proof, and says so in its own
+output.** A hook's command is usually a path to a script this tool doesn't
+read, so the only evidence available is the event, the matcher, and literal
+text in the command. Both mistakes are possible: a hook can guard a rule
+while sharing no wording with it, and shared wording doesn't mean the hook
+guards it. Treat the links as somewhere to look, and everything else as prose
+until you've checked.
 
 ## Sharing a report
 

@@ -26,6 +26,7 @@ import { generateDigest } from "./digest.js";
 import { enableSchedule, disableSchedule, scheduleStatus, type Cadence } from "./schedule.js";
 import { findSplitBrainConflicts } from "./checks/splitBrain.js";
 import { runDoctor } from "./checks/doctor.js";
+import { correlate, summarise, isBlockingEvent } from "./checks/hookCoverage.js";
 import { sendTelemetryPing, isTelemetryEnabled } from "./telemetry.js";
 import type { Rule, CheckResult } from "./types.js";
 
@@ -474,7 +475,84 @@ program
  * people stop trusting, and that guarantee is worth more than the
  * convenience of auto-saving a correction.
  */
-async function runRules(opts: { include?: string; exclude?: string; clear?: string; list?: boolean }) {
+/**
+ * Which rules have a hook behind them, and — said plainly — which of that is
+ * guesswork.
+ *
+ * A hook's command is normally a path to a script this tool does not read, so
+ * the only evidence available is the event, the matcher, and literal text in
+ * the command string. Both error directions are live: a hook can guard a rule
+ * while sharing no wording with it, and shared wording proves nothing. The
+ * output says so every time, because it reads like an audit and people
+ * believe audits.
+ */
+function runCoverage() {
+  const cwd = process.cwd();
+  const rules = loadRules(cwd);
+  if (rules.length === 0) {
+    console.log("No CLAUDE.md or AGENTS.md found, so there are no rules to check hooks against.");
+    return;
+  }
+  const hooks = runDoctor(cwd).hooks;
+  const coverage = correlate(rules, hooks);
+  const s = summarise(coverage, hooks);
+
+  console.log(`Rule coverage against configured hooks\n`);
+  console.log(`  ${hooks.length} hook${hooks.length === 1 ? "" : "s"} configured · ${s.blockingHooks} can refuse something · ${s.nonBlockingHooks} cannot`);
+  console.log(`  ${s.possiblyGuarded} of ${s.totalRules} rules name something a blocking hook also names`);
+  console.log(`  ${s.noHookFound} of ${s.totalRules} have no hook this can connect them to\n`);
+
+  const guarded = coverage.filter((c) => c.backing === "possiblyGuarded");
+  if (guarded.length > 0) {
+    console.log(`Possibly guarded:\n`);
+    for (const c of guarded) {
+      console.log(`  ${c.rule.title.replace(/\s+/g, " ").trim().slice(0, 80)}`);
+      for (const h of c.matchedHooks) {
+        // Relative to the working directory when possible: an absolute path
+        // is noise in a report someone may paste elsewhere, and can leak a
+        // home directory name.
+        const where = h.sourceFile.startsWith(cwd) ? h.sourceFile.slice(cwd.length + 1) : h.sourceFile;
+        console.log(`    ${h.event} hook in ${where}${h.matcher ? ` (matcher: ${h.matcher})` : ""}`);
+      }
+      console.log(`    linked on: ${c.sharedTokens.map((t) => `"${t}"`).join(", ")}`);
+      console.log("");
+    }
+  }
+
+  // Project rules first. Someone running this inside a project can act on
+  // their own rules; the ones from ~/.claude/CLAUDE.md apply everywhere and
+  // are usually not what they came here to look at. Listing global rules
+  // first buried every project rule behind them.
+  const unbacked = coverage
+    .filter((c) => c.backing === "noHookFound")
+    .sort((a, b) => Number(a.rule.source === "global") - Number(b.rule.source === "global"));
+  if (unbacked.length > 0) {
+    const projectCount = unbacked.filter((c) => c.rule.source !== "global").length;
+    console.log(`No hook found for ${unbacked.length} rule${unbacked.length === 1 ? "" : "s"} (${projectCount} in this project), including:\n`);
+    for (const c of unbacked.slice(0, 10)) {
+      const where = c.rule.source === "global" ? " (global)" : "";
+      console.log(`  ${c.rule.title.replace(/\s+/g, " ").trim().slice(0, 76)}${where}`);
+    }
+    if (unbacked.length > 10) console.log(`  ...and ${unbacked.length - 10} more`);
+    console.log("");
+  }
+
+  console.log(`This is text overlap, and it is not proof. A hook can guard a rule without`);
+  console.log(`sharing any wording with it, and shared wording does not mean the hook`);
+  console.log(`guards it — the command is usually a script this tool does not read. Treat`);
+  console.log(`the links above as somewhere to look, and the rest as prose until you have`);
+  console.log(`checked otherwise.`);
+  if (s.nonBlockingHooks > 0) {
+    console.log(`\nHooks on events that cannot refuse anything were not counted. They can`);
+    console.log(`log or inject context, but they cannot make a rule fail when it is ignored.`);
+  }
+}
+
+async function runRules(opts: { include?: string; exclude?: string; clear?: string; list?: boolean; coverage?: boolean }) {
+  if (opts.coverage) {
+    runCoverage();
+    return;
+  }
   const cwd = process.cwd();
   const rules = loadRules(cwd);
   const overrides = loadOverrides(cwd);
@@ -625,6 +703,7 @@ program
   .option("--exclude <handle>", "treat this item as documentation and stop reporting it")
   .option("--clear <handle>", "remove a stored correction")
   .option("--list", "show stored corrections (the default when no other flag is given)")
+  .option("--coverage", "show which rules a configured hook might actually be enforcing, and which are prose only")
   .action((opts) => {
     runRules(opts).catch((err) => {
       console.error("Something went wrong:", err instanceof Error ? err.message : err);
