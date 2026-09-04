@@ -45,8 +45,8 @@ export interface AnalysisResult {
 export const CORPUS = {
   files: 559,
   parsed: 23704,
-  notRulesPct: 62.9,
-  checkablePct: 43.5,
+  notRulesPct: 64.5,
+  checkablePct: 42.7,
 };
 
 function pct(part: number, whole: number): number {

@@ -64,6 +64,13 @@
     letter-spacing: -0.015em;
     text-transform: none;
   }
+  .measure-table { width:100%; border-collapse:collapse; margin:20px 0; font-size:0.88rem; }
+  .measure-table th, .measure-table td { text-align:left; padding:10px 12px; border-bottom:1px solid #E8E6DC; vertical-align:top; }
+  .measure-table th { font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace; font-size:0.72rem; letter-spacing:0.06em; text-transform:uppercase; color:#7A756E; font-weight:500; }
+  .measure-table td.n { font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .measure-table tr:last-child td { border-bottom:none; }
+  .measure-table tr:last-child { background:#F0EEE6; }
+  .measure-scroll { overflow-x:auto; }
 </style>
 </head>
 <body>
@@ -112,7 +119,7 @@
     </div>
 
     <h2>Then we looked harder, and found something worse</h2>
-    <p>Fixing three bugs wasn't enough, because chasing individual false positives is itself the mistake. So we built a test harness and ran the classifier over <strong>559 real public rule files</strong> — CLAUDE.md, AGENTS.md, AGENT.md, .cursorrules, Copilot instructions, .windsurfrules and GEMINI.md — from projects like PyTorch, Kubernetes, and Elasticsearch. 23,704 parsed items, of which 8,803 were real rules. Two things came out of it.</p>
+    <p>Fixing three bugs wasn't enough, because chasing individual false positives is itself the mistake. So we built a test harness and ran the classifier over <strong>559 real public rule files</strong> — CLAUDE.md, AGENTS.md, AGENT.md, .cursorrules, Copilot instructions, .windsurfrules and GEMINI.md — from projects like PyTorch, Kubernetes, and Elasticsearch. 23,704 parsed items, of which 8,413 were real rules. Two things came out of it.</p>
 
     <div class="bug">
       <div class="tag">Finding 1 — most "rules" in a rules file aren't rules</div>
@@ -127,7 +134,54 @@
       <p>So we changed the rule permanently, for every check, in every format: <strong>a text match never produces a failure.</strong> It reports what it found, quotes it, and says plainly that it can't distinguish a violation from a mention. Confident failures now come only from structured checks that read what was actually executed or written — an actual git command's actual branch argument, actual file edits, actual file operations. Four of those exist so far; more will follow, one category at a time.</p>
     </div>
 
-    <p>The measurable result: the fragile keyword path — the source of every false positive on this page — dropped from <strong>43.5% of real rules to 30.3%</strong>, and to 11.3% of everything the parser extracts, and the remainder can no longer report a false failure by construction. Verified across all 559 files, with no crashes. The corpus was later grown roughly fourteen-fold, from a 40-file sample to 559 files across formats the classifier had never been tuned on, and the distribution barely moved: lines carrying no instruction went from 65.4% to 62.8%, and the share of real rules answerable mechanically went from 47.8% to 43.5%. That stability is the actual argument: directives are a property of language, not of file format.</p>
+    <p>The measurable result: the fragile keyword path — the source of every false positive on this page — dropped from <strong>43.5% of real rules to 29.1%</strong>, and to 10.3% of everything the parser extracts, and the remainder can no longer report a false failure by construction. Verified across all 559 files, with no crashes. The corpus was later grown roughly fourteen-fold, from a 40-file sample to 559 files across formats the classifier had never been tuned on, and the distribution barely moved: lines carrying no instruction went from 65.4% to 64.5%, and the share of real rules answerable mechanically went from 47.8% to 42.7%. That stability is the actual argument: directives are a property of language, not of file format.</p>
+
+
+    <h2>How these numbers have moved</h2>
+    <p>Every figure on this page is a measurement taken on a date, with a
+    classifier that keeps changing. Overwriting them each time would hide the
+    thing most worth seeing &mdash; which corrections moved which number, and
+    by how much. So the previous values stay.</p>
+
+    <div class="measure-scroll">
+    <table class="measure-table">
+      <thead>
+        <tr><th>Measured</th><th>Files</th><th>Parsed</th><th>Not a rule</th><th>Real rules</th><th>Checkable</th><th>What changed</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="n">30 Aug 2026</td><td class="n">40</td><td class="n">&mdash;</td>
+          <td class="n">65.4%</td><td class="n">&mdash;</td><td class="n">47.8%</td>
+          <td>First sample, after the false-positive rewrite above. Absolute counts weren't recorded at the time.</td>
+        </tr>
+        <tr>
+          <td class="n">31 Aug 2026</td><td class="n">559</td><td class="n">23,704</td>
+          <td class="n">62.9%</td><td class="n">8,803</td><td class="n">43.5%</td>
+          <td>Corpus grown roughly fourteen-fold, into formats the classifier had never been tuned on. The distribution barely moved, which is the argument.</td>
+        </tr>
+        <tr>
+          <td class="n">4 Sep 2026</td><td class="n">559</td><td class="n">23,704</td>
+          <td class="n">64.5%</td><td class="n">8,413</td><td class="n">42.7%</td>
+          <td>Command documentation was being counted as rules. A line documenting a flag describes what the flag does, and uses the same verbs as an instruction, so the directive test could not separate them. 390 items reclassified.</td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+
+    <p>The last row also came with a finding that does not fit in a table.
+    The classifier looks for a list of English instruction words, and this
+    project's own rule &mdash; <em>&ldquo;No silent scope changes&rdquo;</em>
+    &mdash; had never been checked by it, because the rule says
+    &ldquo;say so explicitly&rdquo; and <em>say</em> is not on the list. It
+    had been dropped as documentation in every report this tool had produced.</p>
+
+    <p>That gap does not close by lengthening the list. Imperative verbs are
+    not a closed class, and a list of English ones cannot match a rule written
+    in another language &mdash; measured across the same 559 files,
+    non-English content is dropped at 97.5% against a 64.5% baseline. What
+    closes is the silence: <code>rulereceipt check --show-skipped</code> now
+    lists what was excluded, so a rule the classifier failed to recognise is
+    something you can see rather than something you never hear about.</p>
 
     <h2>Why we're publishing this instead of quietly fixing it</h2>
     <p>A tool whose entire purpose is "don't just trust the summary, show the evidence" doesn't get to ask for trust it isn't willing to extend to itself. We found these by actually using the tool on real work, the same way we're asking you to. If we'd hidden this, the next person to hit it would have had to find it themselves, with no idea whether it was a one-off or the whole thing being unreliable. Now you know exactly what was wrong, exactly how it was found, and exactly what changed.</p>
