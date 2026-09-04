@@ -26,7 +26,7 @@ import { generateDigest } from "./digest.js";
 import { enableSchedule, disableSchedule, scheduleStatus, type Cadence } from "./schedule.js";
 import { findSplitBrainConflicts } from "./checks/splitBrain.js";
 import { runDoctor } from "./checks/doctor.js";
-import { correlate, summarise, isBlockingEvent } from "./checks/hookCoverage.js";
+import { correlate, summarise } from "./checks/hookCoverage.js";
 import { sendTelemetryPing, isTelemetryEnabled } from "./telemetry.js";
 import type { Rule, CheckResult } from "./types.js";
 

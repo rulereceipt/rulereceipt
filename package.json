@@ -38,7 +38,8 @@
     "test:watch": "vitest",
     "lint": "eslint src tests",
     "prepublishOnly": "npm run build && npm test",
-    "build:checker": "esbuild src/browser/analyze.ts --bundle --format=esm --minify --outfile=landing/checker.js"
+    "build:checker": "esbuild src/browser/analyze.ts --bundle --format=esm --minify --outfile=landing/checker.js",
+    "verify": "npm run lint && npm run typecheck && npm test"
   },
   "engines": {
     "node": ">=18"

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, writeFileSync, rmSync, mkdirSync } from "node:fs";
+import { mkdtempSync, writeFileSync, rmSync, mkdirSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -111,7 +111,6 @@ describe("rulereceipt rules --coverage", () => {
     // `rules --coverage` only reads. Writing is reserved for --include and
     // --exclude, which the user invokes deliberately.
     run(["rules", "--coverage"]);
-    const { existsSync } = require("node:fs") as typeof import("node:fs");
     expect(existsSync(join(dir, ".rulereceipt", "overrides.json"))).toBe(false);
   });
 });
