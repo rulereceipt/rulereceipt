@@ -119,7 +119,7 @@
     </div>
 
     <h2>Then we looked harder, and found something worse</h2>
-    <p>Fixing three bugs wasn't enough, because chasing individual false positives is itself the mistake. So we built a test harness and ran the classifier over <strong>559 real public rule files</strong> — CLAUDE.md, AGENTS.md, AGENT.md, .cursorrules, Copilot instructions, .windsurfrules and GEMINI.md — from projects like PyTorch, Kubernetes, and Elasticsearch. 23,704 parsed items, of which 8,413 were real rules. Two things came out of it.</p>
+    <p>Fixing three bugs wasn't enough, because chasing individual false positives is itself the mistake. So we built a test harness and ran the classifier over <strong>559 real public rule files</strong> — CLAUDE.md, AGENTS.md, AGENT.md, .cursorrules, Copilot instructions, .windsurfrules and GEMINI.md — from projects like PyTorch, Kubernetes, and Elasticsearch. 21,986 parsed items, of which 8,043 were real rules. Two things came out of it.</p>
 
     <div class="bug">
       <div class="tag">Finding 1 — most "rules" in a rules file aren't rules</div>
@@ -134,7 +134,7 @@
       <p>So we changed the rule permanently, for every check, in every format: <strong>a text match never produces a failure.</strong> It reports what it found, quotes it, and says plainly that it can't distinguish a violation from a mention. Confident failures now come only from structured checks that read what was actually executed or written — an actual git command's actual branch argument, actual file edits, actual file operations. Four of those exist so far; more will follow, one category at a time.</p>
     </div>
 
-    <p>The measurable result: the fragile keyword path — the source of every false positive on this page — dropped from <strong>43.5% of real rules to 29.1%</strong>, and to 10.3% of everything the parser extracts, and the remainder can no longer report a false failure by construction. Verified across all 559 files, with no crashes. The corpus was later grown roughly fourteen-fold, from a 40-file sample to 559 files across formats the classifier had never been tuned on, and the distribution barely moved: lines carrying no instruction went from 65.4% to 64.5%, and the share of real rules answerable mechanically went from 47.8% to 42.7%. That stability is the actual argument: directives are a property of language, not of file format.</p>
+    <p>The measurable result: the fragile keyword path — the source of every false positive on this page — dropped from <strong>43.5% of real rules to 29.6%</strong>, and to 10.8% of everything the parser extracts, and the remainder can no longer report a false failure by construction. Verified across all 559 files, with no crashes. The corpus was later grown roughly fourteen-fold, from a 40-file sample to 559 files across formats the classifier had never been tuned on, and the distribution barely moved: lines carrying no instruction went from 65.4% to 63.4%, and the share of real rules answerable mechanically went from 47.8% to 44.2%. That stability is the actual argument: directives are a property of language, not of file format.</p>
 
 
     <h2 id="history">How these numbers have moved</h2>
@@ -163,6 +163,11 @@
           <td class="n">4 Sep 2026</td><td class="n">559</td><td class="n">23,704</td>
           <td class="n">64.5%</td><td class="n">8,413</td><td class="n">42.7%</td>
           <td>Command documentation was being counted as rules. A line documenting a flag describes what the flag does, and uses the same verbs as an instruction, so the directive test could not separate them. 390 items reclassified.</td>
+        </tr>
+        <tr>
+          <td class="n">4 Sep 2026</td><td class="n">559</td><td class="n">21,986</td>
+          <td class="n">63.4%</td><td class="n">8,043</td><td class="n">44.2%</td>
+          <td>The parser had no concept of a fenced code block, so a shell comment starting with <code>#</code>, or a YAML item starting with <code>-</code>, was read as a rule boundary. 588 rules were being cut mid-block, and 1,718 items &mdash; 7.2% of everything extracted &mdash; were lines lifted out of code samples that had never been rules at all. Unclosed fences now 8.</td>
         </tr>
       </tbody>
     </table>

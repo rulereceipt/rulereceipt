@@ -44,9 +44,9 @@ export interface AnalysisResult {
 /** Measured across 559 real public rules files. Shown for comparison. */
 export const CORPUS = {
   files: 559,
-  parsed: 23704,
-  notRulesPct: 64.5,
-  checkablePct: 42.7,
+  parsed: 21986,
+  notRulesPct: 63.4,
+  checkablePct: 44.2,
 };
 
 function pct(part: number, whole: number): number {
