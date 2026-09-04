@@ -64,7 +64,26 @@ jobs:
       # package, so those are the blocking gate. A dev-only advisory (a
       # test runner, a types package) blocking a release would mean a real
       # fix can't ship because an unrelated tool has an open advisory.
-      - run: npm audit --omit=dev --audit-level=high
+      # Retried, because the failure mode here is npm's advisory endpoint
+      # timing out rather than an advisory being found — that killed the
+      # v0.1.27 release after every other gate had passed. The retry does
+      # not weaken the gate: a real high-severity advisory fails all three
+      # attempts identically and still blocks the publish. It only stops a
+      # transient outage at registry.npmjs.org from deciding whether a fix
+      # can ship. Still fails closed after three tries.
+      - name: Audit production dependencies (blocking)
+        run: |
+          for attempt in 1 2 3; do
+            if npm audit --omit=dev --audit-level=high; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              echo "npm audit attempt $attempt failed; retrying in 20s"
+              sleep 20
+            fi
+          done
+          echo "npm audit failed three times — refusing to publish"
+          exit 1
       - name: Dev dependency advisories (informational)
         run: npm audit --audit-level=high || true
 
