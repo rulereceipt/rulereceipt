@@ -22,6 +22,46 @@ function eventSearchText(event: TranscriptEvent): string {
   return "";
 }
 
+/**
+ * Standard short spellings of destructive flags, canonicalised before
+ * matching.
+ *
+ * Without this, a prohibition returned PASS whenever its exact literal was
+ * absent — so a rule banning `git push --force` printed "no occurrence
+ * found" for a session that ran `git push -f`. Found 2026-09-08. That is
+ * the inverse of the false-FAIL problem in the postmortem and the more
+ * dangerous direction: a wrong FAIL sends someone to check the evidence, a
+ * wrong PASS stops them looking.
+ *
+ * Deliberately three entries, not an open-ended table. These are stable
+ * decades-old CLI conventions for the specific destructive operations rules
+ * actually ban. Expansion is gated on the COMMAND CONTEXT, because a bare
+ * `-f` means something different everywhere: `grep -f patterns.txt` is not
+ * forcing anything, and rewriting it would invent a violation.
+ *
+ * `--force-with-lease` must keep passing a `--force` ban — it is the safe
+ * command, and the trailing word boundary in matchesPattern already keeps
+ * the two apart.
+ */
+const FLAG_ALIASES: Array<{ context: RegExp; short: RegExp; canonical: string }> = [
+  { context: /\bgit\s+push\b/, short: /(?:^|\s)-[A-Za-z]*f/, canonical: "git push --force" },
+  { context: /\bgit\s+commit\b/, short: /(?:^|\s)-[A-Za-z]*n/, canonical: "git commit --no-verify" },
+  { context: /\brm\b/, short: /(?:^|\s)-(?:[A-Za-z]*r[A-Za-z]*f|[A-Za-z]*f[A-Za-z]*r)/, canonical: "rm -rf" },
+];
+
+/**
+ * The text a pattern is matched against: the event's own text, plus the
+ * canonical spelling of any aliased flag it used. Kept separate from the
+ * text quoted back as evidence, so a report always shows what the session
+ * actually ran, never a canonical form it never typed.
+ */
+function searchHaystack(event: TranscriptEvent): string {
+  const raw = eventSearchText(event);
+  if (event.kind !== "tool_use") return raw;
+  const extra = FLAG_ALIASES.filter((a) => a.context.test(raw) && a.short.test(raw)).map((a) => a.canonical);
+  return extra.length > 0 ? `${raw} ${extra.join(" ")}` : raw;
+}
+
 function escapeRegex(literal: string): string {
   return literal.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -65,7 +105,7 @@ export function runDeterministicChecks(
       let foundEvent: TranscriptEvent | undefined;
       let foundPattern: string | undefined;
       for (const event of events) {
-        const haystack = eventSearchText(event);
+        const haystack = searchHaystack(event);
         for (const pattern of patterns) {
           if (matchesPattern(haystack, pattern)) {
             foundEvent = event;
@@ -105,7 +145,7 @@ export function runDeterministicChecks(
           ruleTitle: rule.title,
           ruleSource: rule.source,
           status: "PASS",
-          evidence: `no occurrence of ${patterns.map((p) => `"${p}"`).join(" or ")} found in this session`,
+          evidence: `no occurrence of ${patterns.map((p) => `"${p}"`).join(" or ")} in the commands and messages recorded this session — this is a text scan of the transcript, so it is evidence rather than proof: a spelling this checker does not know would not be caught`,
         };
       }
 

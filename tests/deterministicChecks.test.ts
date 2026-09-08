@@ -216,3 +216,75 @@ describe("runDeterministicChecks", () => {
     expect(elapsedMs).toBeLessThan(1000);
   });
 });
+
+/**
+ * A prohibition returned PASS whenever its literal string was absent, and
+ * the matcher is a plain text search. So `git push -f` — the same action,
+ * the standard short spelling — produced:
+ *
+ *   PASS  no occurrence of "git push --force" found in this session
+ *
+ * on a session that force-pushed. Found 2026-09-08.
+ *
+ * This is the inverse of the false-FAIL problem the postmortem covers, and
+ * it is the more dangerous direction: a wrong FAIL sends someone to look at
+ * the evidence, a wrong PASS stops them looking at all. The checker was
+ * already careful never to FAIL on a bare match; it was not careful at all
+ * about what its PASS meant.
+ *
+ * Fixed by canonicalising a short list of standard destructive flag
+ * aliases before matching. Deliberately narrow — these are stable, decades
+ * old CLI conventions, not an open-ended list of "ways people write things".
+ * `--force-with-lease` must keep passing: it is the safe command, and a
+ * rule banning --force is not banning it.
+ */
+describe("a prohibition PASS must not be defeated by a flag alias", () => {
+  const forceRule = {
+    kind: "deterministic" as const,
+    rule: { id: "1", title: "No force pushing", text: "Never run `git push --force`.", source: "project" as const },
+    patterns: ["git push --force"],
+    polarity: "forbid" as const,
+  };
+  const bash = (command: string) => [{ kind: "tool_use" as const, toolName: "Bash", input: { command } }];
+
+  it("does not PASS a session that force-pushed with the short flag", () => {
+    const [r] = runDeterministicChecks([forceRule], bash("git push -f origin main"));
+    expect(r.status).not.toBe("PASS");
+  });
+
+  it("does not PASS when the force push is chained behind another command", () => {
+    const [r] = runDeterministicChecks([forceRule], bash("npm test && git push -f"));
+    expect(r.status).not.toBe("PASS");
+  });
+
+  it("still PASSes --force-with-lease, which the rule does not ban", () => {
+    const [r] = runDeterministicChecks([forceRule], bash("git push --force-with-lease origin main"));
+    expect(r.status).toBe("PASS");
+  });
+
+  it("does not expand -f for an unrelated command", () => {
+    // `grep -f patterns.txt` has nothing to do with forcing anything. A
+    // blanket -f -> --force rewrite would invent a violation here.
+    const [r] = runDeterministicChecks([forceRule], bash("grep -f patterns.txt src/"));
+    expect(r.status).toBe("PASS");
+  });
+
+  it("catches --no-verify written as -n on a commit", () => {
+    const rule = {
+      kind: "deterministic" as const,
+      rule: { id: "2", title: "No skipping hooks", text: "Never use `git commit --no-verify`.", source: "project" as const },
+      patterns: ["git commit --no-verify"],
+      polarity: "forbid" as const,
+    };
+    const [r] = runDeterministicChecks([rule], bash('git commit -n -m "wip"'));
+    expect(r.status).not.toBe("PASS");
+  });
+
+  it("says plainly what a PASS here does and does not establish", () => {
+    // The evidence must not read as proof the thing never happened. It is
+    // proof that a text scan of the recorded commands did not see it.
+    const [r] = runDeterministicChecks([forceRule], bash("npm test"));
+    expect(r.status).toBe("PASS");
+    expect(r.evidence).toMatch(/recorded|scanned|text|not proof|no record/i);
+  });
+});
