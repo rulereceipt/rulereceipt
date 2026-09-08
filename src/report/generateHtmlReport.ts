@@ -157,9 +157,12 @@ function countBy(results: CheckResult[], status: CheckResult["status"]): number 
   return results.filter((r) => r.status === status).length;
 }
 
-function renderResultRow(result: CheckResult, all: CheckResult[]): string {
+function renderResultRow(result: CheckResult, all: CheckResult[], hideEvidence: boolean): string {
   const bucket = bucketOf(result);
   const cls = BUCKET_CLASS[bucket];
+  const evidence = !hideEvidence && result.evidence
+    ? `<p class="result__evidence">${clean(result.evidence)}</p>`
+    : "";
   return `
         <article class="result result--${cls}">
           <div class="result__head">
@@ -167,8 +170,28 @@ function renderResultRow(result: CheckResult, all: CheckResult[]): string {
             <span class="result__id">${clean(ruleLabel(result, all))}</span>
           </div>
           <h3 class="result__title">${clean(result.ruleTitle)}</h3>
-          ${result.evidence ? `<p class="result__evidence">${clean(result.evidence)}</p>` : ""}
+          ${evidence}
         </article>`;
+}
+
+/**
+ * The explanation every rule in a section shares, or null when they differ.
+ *
+ * Judgment rules all carry the same sentence, because the reason is the
+ * same one every time. Rendered per-rule that produced thirteen copies of
+ * one 300-character paragraph on a real 14-rule file. Fixed in the terminal
+ * report first and missed here, which was the wrong half to miss — this is
+ * the report that gets sent to someone else.
+ *
+ * Conditional on the text being byte-identical: `--llm` gives each judgment
+ * rule its own model opinion, and hoisting those would delete the only
+ * per-rule content the section has.
+ */
+function sharedEvidence(rs: CheckResult[]): string | null {
+  if (rs.length < 2) return null;
+  const first = rs[0].evidence;
+  if (!first) return null;
+  return rs.every((r) => r.evidence === first) ? first : null;
 }
 
 function renderSection(bucket: Bucket, results: CheckResult[], all: CheckResult[]): string {
@@ -178,11 +201,14 @@ function renderSection(bucket: Bucket, results: CheckResult[], all: CheckResult[
     bucket === "UNCLEAR_JUDGMENT"
       ? `<p class="section__note">These were never questions a tool could settle — they need someone to read the session and decide. That is expected, not a gap in the check.</p>`
       : "";
+  const shared = sharedEvidence(inSection);
+  const sharedBlock = shared ? `<p class="section__shared">${clean(shared)}</p>` : "";
   return `
       <section class="section">
         <h2 class="section__title">${clean(BUCKET_LABEL[bucket])} <span class="section__count">${inSection.length}</span></h2>
         ${note}
-        ${inSection.map((r) => renderResultRow(r, all)).join("")}
+        ${sharedBlock}
+        ${inSection.map((r) => renderResultRow(r, all, shared !== null)).join("")}
       </section>`;
 }
 
@@ -272,6 +298,7 @@ export function generateHtmlReport(results: CheckResult[], meta: HtmlReportMeta)
   .result--judgment { border-left-color: #6b6f76; }
   .badge--judgment { background: #f2f3f5; color: #4a4e55; }
   .section__note { font-size: 13px; color: var(--muted); margin: -4px 0 12px; }
+  .section__shared { font-size: 13px; color: var(--muted); margin: 0 0 14px; padding: 10px 12px; border-left: 2px solid var(--line); background: var(--panel); border-radius: 0 6px 6px 0; white-space: pre-wrap; }
   .result__id { font-size: 12px; color: var(--muted); }
   .result__title { font-size: 15px; margin: 0 0 6px; font-weight: 600; }
   .result__evidence { margin: 0; font-size: 14px; color: var(--muted); white-space: pre-wrap; }

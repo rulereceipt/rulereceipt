@@ -252,3 +252,73 @@ describe("absolute home paths never reach the shareable report", () => {
     expect(html).toContain("/var/log/app.log");
   });
 });
+
+/**
+ * The shared report had the same wall the terminal report did.
+ *
+ * Fixed in the terminal on 2026-09-08 and missed here, which was the wrong
+ * half to miss: the HTML report is the one that gets SENT to someone. On a
+ * real 14-rule file it repeated one 300-character paragraph thirteen times,
+ * and rulereceipt.dev's own example-report page shipped a frozen copy of
+ * that output.
+ *
+ * Same rule as the terminal: hoist only when the text is byte-identical, so
+ * --llm's per-rule model opinions are never collapsed into one.
+ */
+const JUDGMENT_TEXT =
+  "NEEDS HUMAN REVIEW — this rule is a judgment call, not something that can be settled by looking at what commands ran.";
+
+function judged(id: string, title: string, evidence = JUDGMENT_TEXT): CheckResult {
+  return { ruleId: id, ruleTitle: title, ruleSource: "global", status: "UNCLEAR", needsHuman: true, evidence };
+}
+
+function occurrences(haystack: string, needle: string): number {
+  return haystack.split(needle).length - 1;
+}
+
+describe("generateHtmlReport does not repeat one explanation per rule", () => {
+  const many = [
+    result({ ruleId: "16", ruleTitle: "Never wipe the databases", status: "PASS", evidence: "never written to" }),
+    judged("1", "Evidence or it didn't happen"),
+    judged("2", "Distinguish the three states honestly"),
+    judged("3", "Anomalies are bugs until proven results"),
+    judged("4", "Surface bad news first"),
+  ];
+
+  it("prints the shared judgment text once, not once per rule", () => {
+    const html = generateHtmlReport(many, meta());
+    expect(occurrences(html, JUDGMENT_TEXT)).toBe(1);
+  });
+
+  it("still names every judgment rule", () => {
+    const html = generateHtmlReport(many, meta());
+    for (const t of [
+      "Evidence or it didn&#39;t happen",
+      "Distinguish the three states honestly",
+      "Anomalies are bugs until proven results",
+      "Surface bad news first",
+    ]) {
+      expect(html, `missing ${t}`).toContain(t);
+    }
+  });
+
+  it("keeps per-rule evidence when it differs, as --llm produces", () => {
+    const llm = [
+      judged("1", "Evidence or it didn't happen", "the model thinks this held: output was pasted"),
+      judged("4", "Surface bad news first", "the model thinks this broke: the failure came last"),
+    ];
+    const html = generateHtmlReport(llm, meta());
+    expect(html).toContain("output was pasted");
+    expect(html).toContain("the failure came last");
+  });
+
+  it("keeps evidence on a section whose rules genuinely differ", () => {
+    const mixed = [
+      result({ ruleId: "1", ruleTitle: "Rule one", status: "PASS", evidence: "first distinct reason" }),
+      result({ ruleId: "2", ruleTitle: "Rule two", status: "PASS", evidence: "second distinct reason" }),
+    ];
+    const html = generateHtmlReport(mixed, meta());
+    expect(html).toContain("first distinct reason");
+    expect(html).toContain("second distinct reason");
+  });
+});

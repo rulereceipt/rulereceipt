@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Sample report — RuleReceipt — acme-api</title>
+<title>RuleReceipt — acme-api</title>
 <style>
   :root {
     --ink: #14161a; --muted: #5c636e; --line: #e2e5ea; --bg: #ffffff; --panel: #f7f8fa;
@@ -48,12 +48,10 @@
   .result--judgment { border-left-color: #6b6f76; }
   .badge--judgment { background: #f2f3f5; color: #4a4e55; }
   .section__note { font-size: 13px; color: var(--muted); margin: -4px 0 12px; }
+  .section__shared { font-size: 13px; color: var(--muted); margin: 0 0 14px; padding: 10px 12px; border-left: 2px solid var(--line); background: var(--panel); border-radius: 0 6px 6px 0; white-space: pre-wrap; }
   .result__id { font-size: 12px; color: var(--muted); }
   .result__title { font-size: 15px; margin: 0 0 6px; font-weight: 600; }
   .result__evidence { margin: 0; font-size: 14px; color: var(--muted); white-space: pre-wrap; }
-  .samplenote { background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--muted); border-radius: 8px; padding: 14px 18px; margin-bottom: 24px; font-size: 14px; color: var(--muted); }
-  .samplenote strong { color: var(--ink); }
-  .samplenote__verify { display: block; margin-top: 8px; }
   .note { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px 18px; font-size: 13.5px; color: var(--muted); }
   .note h2 { font-size: 13px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--ink); margin: 0 0 10px; }
   .note ul { margin: 0 0 12px; padding-left: 18px; }
@@ -79,14 +77,6 @@
     <p>What the AI coding agent actually did in this session, checked against the project's written rules.</p>
   </header>
 
-  <div class="samplenote">
-    <strong>This is a sample.</strong> It was produced by running <code>rulereceipt check --html</code>
-    against a constructed session for a fictional project — not a real audit of anyone's work. Everything
-    below is the tool's genuine output, unedited.
-    <span class="samplenote__verify">The session file it read is published alongside it, so you can check
-    the fingerprint below describes that exact file: download both, then run
-    <code>rulereceipt verify example-session.jsonl &lt;fingerprint&gt;</code>.</span>
-  </div>
   <div class="verdict verdict--fail">
     <strong>2 rules not followed</strong>
     <span>1 followed · 2 not followed · 1 couldn&#39;t tell · 3 need your judgment</span>
@@ -96,13 +86,14 @@
     <tr><th>Project</th><td><code>~/projects/acme-api</code></td></tr>
     <tr><th>Session file</th><td><code>example-session.jsonl</code></td></tr>
     <tr><th>Session fingerprint</th><td><code>sha256:326ad7a4fd772e5dbbe33c32235480cf60646da0c46687a90ebb752fa0dd8469</code></td></tr>
-    <tr><th>Generated</th><td><code>2026-09-01T07:13:52.372Z</code></td></tr>
-    <tr><th>Tool version</th><td><code>rulereceipt 0.1.25</code></td></tr>
+    <tr><th>Generated</th><td><code>2026-09-08T14:16:18.197Z</code></td></tr>
+    <tr><th>Tool version</th><td><code>rulereceipt 0.1.32</code></td></tr>
   </table>
 
 
       <section class="section">
         <h2 class="section__title">Not followed <span class="section__count">2</span></h2>
+        
         
         
         <article class="result result--fail">
@@ -131,6 +122,7 @@
         <h2 class="section__title">Couldn&#39;t tell <span class="section__count">1</span></h2>
         
         
+        
         <article class="result result--unclear">
           <div class="result__head">
             <span class="badge badge--unclear">Couldn&#39;t tell</span>
@@ -142,6 +134,7 @@
       </section>
       <section class="section">
         <h2 class="section__title">Followed <span class="section__count">1</span></h2>
+        
         
         
         <article class="result result--pass">
@@ -156,6 +149,7 @@
       <section class="section">
         <h2 class="section__title">Needs your judgment <span class="section__count">3</span></h2>
         <p class="section__note">These were never questions a tool could settle — they need someone to read the session and decide. That is expected, not a gap in the check.</p>
+        <p class="section__shared">NEEDS HUMAN REVIEW — this rule is a judgment call, not something that can be settled by looking at what commands ran. Read the session and decide for yourself. (`--llm` will give you a model&#39;s opinion on it, using your own Anthropic key — an opinion, not a verdict.)</p>
         
         <article class="result result--judgment">
           <div class="result__head">
@@ -163,7 +157,7 @@
             <span class="result__id">Rule 5</span>
           </div>
           <h3 class="result__title">Surface bad news first</h3>
-          <p class="result__evidence">NEEDS HUMAN REVIEW — this rule is a judgment call, not something that can be settled by looking at what commands ran. Read the session and decide for yourself. (`--llm` will give you a model&#39;s opinion on it, using your own Anthropic key — an opinion, not a verdict.)</p>
+          
         </article>
         <article class="result result--judgment">
           <div class="result__head">
@@ -171,7 +165,7 @@
             <span class="result__id">Rule 6</span>
           </div>
           <h3 class="result__title">Explain the trade-off before choosing</h3>
-          <p class="result__evidence">NEEDS HUMAN REVIEW — this rule is a judgment call, not something that can be settled by looking at what commands ran. Read the session and decide for yourself. (`--llm` will give you a model&#39;s opinion on it, using your own Anthropic key — an opinion, not a verdict.)</p>
+          
         </article>
         <article class="result result--judgment">
           <div class="result__head">
@@ -179,7 +173,7 @@
             <span class="result__id">Rule 7</span>
           </div>
           <h3 class="result__title">Keep changes reviewable</h3>
-          <p class="result__evidence">NEEDS HUMAN REVIEW — this rule is a judgment call, not something that can be settled by looking at what commands ran. Read the session and decide for yourself. (`--llm` will give you a model&#39;s opinion on it, using your own Anthropic key — an opinion, not a verdict.)</p>
+          
         </article>
       </section>
 
