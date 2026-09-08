@@ -185,3 +185,127 @@ describe("markdown table cells cannot be broken by rule or evidence content", ()
     expect(pipesInDataRow(md({ ruleTitle: "a | b", evidence: "x \\| y\nz | w" }))).toBe(4);
   });
 });
+
+/**
+ * The judgment section used to repeat one sentence once per rule.
+ *
+ * Measured 2026-09-08 against a real 14-rule file: 13 rules came back as
+ * judgment calls and the report printed the SAME 300-character explanation
+ * 13 times — one distinct evidence text across all of them. Nothing in
+ * those 13 blocks was about the reader's session.
+ *
+ * The verdicts were right. The presentation made a correct report read as
+ * a tool that had done nothing, which is the worst outcome for something
+ * whose whole pitch is that its output can be trusted.
+ *
+ * So: say it once, list the rules under it, and keep per-rule evidence for
+ * the case where it actually differs — `--llm` fills each judgment rule
+ * with a distinct model opinion, and hoisting THAT would destroy real
+ * content.
+ */
+const JUDGMENT_BOILERPLATE =
+  "NEEDS HUMAN REVIEW — this rule is a judgment call, not something that can be settled by looking at what commands ran.";
+
+function judgment(id: string, title: string, evidence = JUDGMENT_BOILERPLATE): CheckResult {
+  return { ruleId: id, ruleTitle: title, ruleSource: "global", status: "UNCLEAR", needsHuman: true, evidence };
+}
+
+function occurrences(haystack: string, needle: string): number {
+  return haystack.split(needle).length - 1;
+}
+
+describe("generateReport does not repeat the same explanation once per rule", () => {
+  const many = [
+    { ruleId: "16", ruleTitle: "Never wipe data storage databases", ruleSource: "global", status: "PASS", evidence: "never written to" } as CheckResult,
+    judgment("1", "Evidence or it didn't happen"),
+    judgment("2", "Distinguish the three states honestly"),
+    judgment("3", "Anomalies are bugs until proven results"),
+    judgment("4", "Surface bad news first"),
+  ];
+
+  it("prints shared judgment text once, however many rules share it", () => {
+    const out = generateReport(many, { sessionFilePath: null, ruleCount: 5 });
+    expect(occurrences(out, JUDGMENT_BOILERPLATE)).toBe(1);
+  });
+
+  it("still names every judgment rule", () => {
+    const out = generateReport(many, { sessionFilePath: null, ruleCount: 5 });
+    for (const t of [
+      "Evidence or it didn't happen",
+      "Distinguish the three states honestly",
+      "Anomalies are bugs until proven results",
+      "Surface bad news first",
+    ]) {
+      expect(out, `missing ${t}`).toContain(t);
+    }
+  });
+
+  it("tells the reader how many are waiting on them", () => {
+    const out = generateReport(many, { sessionFilePath: null, ruleCount: 5 });
+    expect(out).toMatch(/4 need your judgment/i);
+  });
+
+  it("keeps per-rule evidence when it actually differs, as --llm produces", () => {
+    // The hoist must be conditional on the text being identical. With --llm
+    // each judgment rule carries its own model opinion, and collapsing those
+    // would throw away the only per-rule content the section has.
+    const llm = [
+      judgment("1", "Evidence or it didn't happen", "the model thinks this held: output was pasted"),
+      judgment("4", "Surface bad news first", "the model thinks this broke: the failure came last"),
+    ];
+    const out = generateReport(llm, { sessionFilePath: null, ruleCount: 2 });
+    expect(out).toContain("output was pasted");
+    expect(out).toContain("the failure came last");
+  });
+
+  it("leads with what is broken, not what passed", () => {
+    // Rule 4 of the file this tool was built against, applied to the tool's
+    // own output: a failure must not sit below a list of successes.
+    const mixed = [
+      { ruleId: "1", ruleTitle: "Passing rule", ruleSource: "global", status: "PASS", evidence: "fine" } as CheckResult,
+      { ruleId: "2", ruleTitle: "Broken rule", ruleSource: "global", status: "FAIL", evidence: "did not hold" } as CheckResult,
+      judgment("3", "Judgment rule"),
+    ];
+    const out = generateReport(mixed, { sessionFilePath: null, ruleCount: 3 });
+    expect(out.indexOf("Broken rule")).toBeLessThan(out.indexOf("Passing rule"));
+  });
+
+  it("does not hoist when only one rule needs judgment", () => {
+    // Nothing is repeated, so nothing needs collapsing — the single rule
+    // keeps its explanation inline where it is read with the rule.
+    const one = [judgment("1", "Only judgment rule")];
+    const out = generateReport(one, { sessionFilePath: null, ruleCount: 1 });
+    expect(occurrences(out, JUDGMENT_BOILERPLATE)).toBe(1);
+    expect(out).toContain("Only judgment rule");
+  });
+});
+
+describe("a hoisted section does not restate its own status on every line", () => {
+  it("drops the per-row status marker when the section heading already says it", () => {
+    // "Needs your judgment (13)" followed by 13 lines each reading
+    // "? UNCLEAR" is the same repetition the hoist was built to remove,
+    // one size smaller. The heading carries the status for the section.
+    const many = [
+      judgment("1", "First judgment rule"),
+      judgment("2", "Second judgment rule"),
+      judgment("3", "Third judgment rule"),
+    ];
+    const out = generateReport(many, { sessionFilePath: null, ruleCount: 3 });
+    expect(occurrences(out, "UNCLEAR")).toBe(0);
+    expect(out).toContain("Needs your judgment (3)");
+    for (const t of ["First judgment rule", "Second judgment rule", "Third judgment rule"]) {
+      expect(out, `missing ${t}`).toContain(t);
+    }
+  });
+
+  it("keeps the marker in sections that were not hoisted", () => {
+    // A mixed section still needs per-row status, because the rows differ.
+    const mixed = [
+      { ruleId: "1", ruleTitle: "Passing rule", ruleSource: "global", status: "PASS", evidence: "fine" } as CheckResult,
+      { ruleId: "2", ruleTitle: "Broken rule", ruleSource: "global", status: "FAIL", evidence: "did not hold" } as CheckResult,
+    ];
+    const out = generateReport(mixed, { sessionFilePath: null, ruleCount: 2 });
+    expect(out).toContain("PASS");
+    expect(out).toContain("FAIL");
+  });
+});

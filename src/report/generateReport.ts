@@ -81,15 +81,83 @@ function summaryLine(results: CheckResult[]): string {
   return parts.join(" · ");
 }
 
+type Bucket = "FAIL" | "UNCLEAR_EVIDENCE" | "UNCLEAR_JUDGMENT" | "PASS";
+
+function bucketOf(result: CheckResult): Bucket {
+  if (result.status === "FAIL") return "FAIL";
+  if (result.status === "PASS") return "PASS";
+  return result.needsHuman ? "UNCLEAR_JUDGMENT" : "UNCLEAR_EVIDENCE";
+}
+
+/**
+ * Deliberately identical to generateHtmlReport's buckets, order and labels.
+ * Two reports of the same session that disagree about what is worth
+ * showing first are two reports nobody can reconcile.
+ *
+ * Failures first: a report that opens with passes and buries a failure at
+ * the bottom is built to be skimmed past. Judgment calls last — they're
+ * expected, and they're the longest section.
+ */
+const BUCKET_LABEL: Record<Bucket, string> = {
+  FAIL: "Not followed",
+  UNCLEAR_EVIDENCE: "Couldn't tell",
+  UNCLEAR_JUDGMENT: "Needs your judgment",
+  PASS: "Followed",
+};
+const BUCKET_ORDER: Bucket[] = ["FAIL", "UNCLEAR_EVIDENCE", "PASS", "UNCLEAR_JUDGMENT"];
+
+/**
+ * The explanation shared by every rule in a section, or null when they
+ * differ.
+ *
+ * Judgment rules all carry the same sentence, because the reason is the
+ * same one every time: nothing in a transcript settles them. Printed
+ * per-rule that produced 13 copies of one 300-character paragraph on a
+ * real 14-rule file, and the report read as though the tool had done
+ * nothing.
+ *
+ * Conditional on the text actually being identical, which matters: with
+ * `--llm` each judgment rule carries its own model opinion, and hoisting
+ * those would delete the only per-rule content the section has.
+ */
+function sharedEvidence(rs: CheckResult[]): string | null {
+  if (rs.length < 2) return null;
+  const first = rs[0].evidence;
+  if (!first) return null;
+  return rs.every((r) => r.evidence === first) ? first : null;
+}
+
 export function generateReport(results: CheckResult[], meta: ReportMeta): string {
   const clean = results.map(sanitize);
   const lines: string[] = [];
   lines.push(`RuleReceipt · ${meta.ruleCount} rules checked`);
   lines.push("─".repeat(40));
-  for (const r of clean) {
-    lines.push(`${MARK[r.status]} ${r.status.padEnd(7)} ${ruleLabel(r, clean)}`);
-    if (r.evidence) lines.push(`  evidence: ${r.evidence}`);
+
+  for (const bucket of BUCKET_ORDER) {
+    const inBucket = clean.filter((r) => bucketOf(r) === bucket);
+    if (inBucket.length === 0) continue;
+
+    lines.push("");
+    lines.push(`${BUCKET_LABEL[bucket]} (${inBucket.length})`);
+
+    // A hoisted section states its status once in the heading, so the rows
+    // carry only the rules. Repeating "? UNCLEAR" on all 13 lines beneath
+    // "Needs your judgment (13)" is the same repetition one size smaller.
+    const shared = sharedEvidence(inBucket);
+    if (shared) {
+      lines.push(`  ${shared}`);
+      lines.push("");
+      for (const r of inBucket) lines.push(`  ${ruleLabel(r, clean)}`);
+      continue;
+    }
+
+    for (const r of inBucket) {
+      lines.push(`${MARK[r.status]} ${r.status.padEnd(7)} ${ruleLabel(r, clean)}`);
+      if (r.evidence) lines.push(`  evidence: ${r.evidence}`);
+    }
   }
+
+  lines.push("");
   lines.push("─".repeat(40));
   lines.push(summaryLine(clean));
 
