@@ -1,5 +1,5 @@
 import { homedir } from "node:os";
-import { dirname, join, parse } from "node:path";
+import { dirname, join, parse, resolve } from "node:path";
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { parseClaudeMd } from "./parsers/readClaudeMd.js";
 import { findClaudeHomeDirNames } from "./parsers/transcriptParser.js";
@@ -78,10 +78,18 @@ function findProjectRuleFiles(cwd: string): string[] {
   let dir = cwd;
 
   for (;;) {
+    // The home directory's rules are GLOBAL, and loadRules reads them as
+    // such. Guard BEFORE collecting: the original break sat below the push,
+    // so the home level was always collected first and every global rule was
+    // reported a second time as a project rule. Found 2026-09-08 — a machine
+    // with one 14-rule file reported "28 rules checked", doubling every
+    // figure on the report. Running from inside the home dir still collects
+    // it; loadRules dedupes that against the global pass.
+    if (dir === home && dir !== cwd) break;
     found.push(...ruleFilesAtLevel(dir));
     // stop AT the repo root (inclusive) — its rules do apply
     if (existsSync(join(dir, ".git"))) break;
-    if (dir === root || dir === home) break;
+    if (dir === root) break;
     const parent = dirname(dir);
     if (parent === dir) break;
     dir = parent;
@@ -109,16 +117,23 @@ function findProjectRuleFiles(cwd: string): string[] {
 export function loadRules(cwd: string): Rule[] {
   const rules: Rule[] = [];
 
+  // One file, one set of rules. Globals are read first, so a file reachable
+  // both ways keeps its "global" label. Without this, running the check from
+  // inside the home directory reported every global rule twice.
+  const seen = new Set<string>();
+  const read = (path: string, source: "global" | "project") => {
+    const key = resolve(path);
+    if (seen.has(key)) return;
+    seen.add(key);
+    rules.push(...parseClaudeMd(path, source));
+  };
+
   for (const dirName of findClaudeHomeDirNames()) {
     const base = join(homedir(), dirName);
-    rules.push(...parseClaudeMd(join(base, "CLAUDE.md"), "global"));
-    for (const file of markdownFilesIn(join(base, "rules"))) {
-      rules.push(...parseClaudeMd(file, "global"));
-    }
+    read(join(base, "CLAUDE.md"), "global");
+    for (const file of markdownFilesIn(join(base, "rules"))) read(file, "global");
   }
 
-  for (const path of findProjectRuleFiles(cwd)) {
-    rules.push(...parseClaudeMd(path, "project"));
-  }
+  for (const path of findProjectRuleFiles(cwd)) read(path, "project");
   return rules;
 }

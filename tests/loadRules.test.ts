@@ -215,3 +215,78 @@ describe("reads every rules-file location Claude Code actually loads", () => {
     expect(has(loadRules(dir), "txt-marker")).toBe(false);
   });
 });
+
+/**
+ * The home directory's own rules are GLOBAL, and loadRules already reads
+ * them as such. The upward project walk must not collect them a second
+ * time.
+ *
+ * Real bug found 2026-09-08 while running the published package against a
+ * real project: a machine with exactly one rules file (~/.claude/CLAUDE.md,
+ * 14 rules) reported "28 rules checked", every rule listed twice — once
+ * (global), once (project). The walk pushes a level's files BEFORE testing
+ * `dir === home`, so the home level is always collected before the loop
+ * stops there. rules.ts' own comment says the walk stops "so an unrelated
+ * rules file further up the filesystem — in a parent workspace, or the home
+ * directory — is never pulled into an unrelated project", which is the
+ * behaviour these tests pin down.
+ *
+ * Doubling matters beyond tidiness: the totals on the report and the
+ * "N followed · N not followed" summary are counts of these rules, so every
+ * figure the tool published about that session was 2x overstated.
+ */
+describe("loadRules does not report a home-directory rules file twice", () => {
+  let tempHome: string;
+  const realHome = homeState.current;
+
+  beforeEach(() => {
+    tempHome = mkdtempSync(join(tmpdir(), "rulereceipt-dup-home-"));
+    homeState.current = tempHome;
+  });
+  afterEach(() => {
+    rmSync(tempHome, { recursive: true, force: true });
+    homeState.current = realHome;
+  });
+
+  function countMarker(rules: ReturnType<typeof loadRules>, marker: string) {
+    return rules.filter((r) => r.title.includes(marker) || r.text.includes(marker)).length;
+  }
+
+  it("counts ~/.claude/CLAUDE.md once when the project sits under the home dir", () => {
+    mkdirSync(join(tempHome, ".claude"), { recursive: true });
+    writeFileSync(join(tempHome, ".claude", "CLAUDE.md"), "## Rule\n- dup-marker\n");
+    const project = join(tempHome, "Desktop", "work");
+    mkdirSync(project, { recursive: true });
+
+    const rules = loadRules(project);
+    expect(countMarker(rules, "dup-marker")).toBe(1);
+  });
+
+  it("attributes that single copy to global, not project", () => {
+    mkdirSync(join(tempHome, ".claude"), { recursive: true });
+    writeFileSync(join(tempHome, ".claude", "CLAUDE.md"), "## Rule\n- source-marker\n");
+    const project = join(tempHome, "Desktop", "work");
+    mkdirSync(project, { recursive: true });
+
+    const found = loadRules(project).filter(
+      (r) => r.title.includes("source-marker") || r.text.includes("source-marker")
+    );
+    expect(found).toHaveLength(1);
+    expect(found[0].source).toBe("global");
+  });
+
+  it("still reads a genuine project rules file on the way up", () => {
+    // The fix must not throw away real intermediate rules — a CLAUDE.md in
+    // a parent folder between cwd and home still applies.
+    mkdirSync(join(tempHome, ".claude"), { recursive: true });
+    writeFileSync(join(tempHome, ".claude", "CLAUDE.md"), "## Rule\n- global-marker\n");
+    const mid = join(tempHome, "Desktop");
+    const project = join(mid, "work");
+    mkdirSync(project, { recursive: true });
+    writeFileSync(join(mid, "CLAUDE.md"), "## Rule\n- parent-marker\n");
+
+    const rules = loadRules(project);
+    expect(countMarker(rules, "parent-marker")).toBe(1);
+    expect(countMarker(rules, "global-marker")).toBe(1);
+  });
+});
