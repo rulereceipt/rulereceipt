@@ -37,6 +37,22 @@ const MAX_TRANSCRIPT_CHARS = 120_000;
 const HEAD_CHARS = 40_000;
 const TAIL_CHARS = MAX_TRANSCRIPT_CHARS - HEAD_CHARS;
 
+/**
+ * How much of a rule's own text goes into the prompt.
+ *
+ * The transcript was capped and the rule body was not. One rule in the
+ * 559-file corpus is 122,000 characters — a section heading whose body is
+ * an entire architecture document, parsed as a single rule — and it would
+ * have been sent whole on top of a 120,000-character transcript. Roughly
+ * 60k tokens for one verdict, with nothing bounding it.
+ *
+ * A rule that does not fit in 8,000 characters is not really one rule, and
+ * the model does not need the rest to judge it. The prompt says when it was
+ * cut, so a verdict is never formed from a fragment the model believes is
+ * whole.
+ */
+const MAX_RULE_CHARS = 8_000;
+
 /** How many judgment calls may be in flight at once. */
 const MAX_CONCURRENT_CALLS = 4;
 
@@ -117,6 +133,15 @@ const INSTRUCTIONS =
  * about 13 rules it had never examined. Found 2026-09-08 by running the
  * published package; nothing in 167 lines of tests here asserted the field.
  */
+function ruleBody(text: string): string {
+  if (text.length <= MAX_RULE_CHARS) return text;
+  return (
+    text.slice(0, MAX_RULE_CHARS) +
+    `\n\n...[rule text truncated at ${MAX_RULE_CHARS} characters — this rule's body is ` +
+    `${text.length} characters long and is probably a whole document parsed as one rule]`
+  );
+}
+
 function didNotRun(rule: JudgmentClassification["rule"], reason: string): CheckResult {
   return {
     ruleId: rule.id,
@@ -206,7 +231,7 @@ export async function runJudgmentChecks(
                 text: `SESSION TRANSCRIPT:\n${transcript.text}`,
                 cache_control: { type: "ephemeral" },
               },
-              { type: "text", text: `RULE — ${rule.title}\n${rule.text}` },
+              { type: "text", text: `RULE — ${rule.title}\n${ruleBody(rule.text)}` },
             ],
           },
         ],

@@ -408,3 +408,60 @@ describe("runJudgmentChecks — the model id can be overridden without a release
     expect(calls[0].model).not.toBe("");
   });
 });
+
+describe("runJudgmentChecks — a huge rule body cannot blow up the request", () => {
+  const originalKey = process.env.ANTHROPIC_API_KEY;
+  let calls: CapturedCall[];
+  beforeEach(() => {
+    process.env.ANTHROPIC_API_KEY = "test-key";
+    calls = [];
+    vi.resetModules();
+    vi.doMock("@anthropic-ai/sdk", () => ({
+      default: class {
+        messages = {
+          create: vi.fn().mockImplementation(async (req: CapturedCall) => {
+            calls.push(req);
+            return { content: [{ type: "tool_use", input: { status: "PASS", evidence: "q" } }] };
+          }),
+        };
+      },
+    }));
+  });
+  afterEach(() => {
+    if (originalKey) process.env.ANTHROPIC_API_KEY = originalKey;
+    else delete process.env.ANTHROPIC_API_KEY;
+    vi.doUnmock("@anthropic-ai/sdk");
+  });
+
+  it("truncates a rule body that is really a whole document", async () => {
+    // The transcript is capped; the rule text was not. One rule in the
+    // 559-file corpus is 122k characters — a section heading whose body is
+    // an entire architecture document, parsed as a single rule. Sent whole
+    // on top of a 120k transcript that is ~60k tokens for one verdict, and
+    // nothing bounded it.
+    const huge: JudgmentClassification = {
+      kind: "judgment",
+      rule: { id: "1", title: "Architecture & Data Flow", text: "x".repeat(200_000), source: "project" },
+    };
+    const { runJudgmentChecks } = await import("../src/checks/judgmentChecks.js");
+    await runJudgmentChecks([huge], []);
+    const sent = JSON.stringify(calls[0]);
+    expect(sent.length).toBeLessThan(60_000);
+  });
+
+  it("says the rule was truncated rather than pretending it saw all of it", async () => {
+    const huge: JudgmentClassification = {
+      kind: "judgment",
+      rule: { id: "1", title: "Architecture & Data Flow", text: "x".repeat(200_000), source: "project" },
+    };
+    const { runJudgmentChecks } = await import("../src/checks/judgmentChecks.js");
+    await runJudgmentChecks([huge], []);
+    expect(JSON.stringify(calls[0])).toMatch(/truncat/i);
+  });
+
+  it("leaves an ordinary rule body untouched", async () => {
+    const { runJudgmentChecks } = await import("../src/checks/judgmentChecks.js");
+    await runJudgmentChecks([rule], []);
+    expect(JSON.stringify(calls[0])).not.toMatch(/truncat/i);
+  });
+});
