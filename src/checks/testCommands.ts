@@ -10,13 +10,17 @@ import type { TranscriptEvent } from "../types.js";
  * drift would show up as one checker contradicting the other in the same
  * report.
  *
+ * It can never be complete — projects wire their suite to whatever script
+ * name they like — so callers must never let a miss become an accusation.
+ * See UNKNOWN_SCRIPT_RUNNER in claimEvidence.ts.
+ *
  * Deliberately a known list rather than anything test-shaped. Both callers
  * use it to decide whether to report a FAIL, and a rule that fires because
  * someone ran a script with "test" in its name is the expensive kind of
  * wrong.
  */
 export const TEST_COMMAND =
-  /\b(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?test\b|\bnpx\s+(?:vitest|jest|mocha|ava)\b|\b(?:vitest|jest|mocha|pytest|phpunit|rspec|tox)\b|\bcargo\s+test\b|\bgo\s+test\b|\bmvn\s+(?:test|verify)\b|\bgradle\s+test\b|\bdotnet\s+test\b|\bpython\s+-m\s+(?:pytest|unittest)\b/i;
+  /\b(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?(?:test|verify|check|ci)\b|\bnpx\s+(?:vitest|jest|mocha|ava)\b|\b(?:vitest|jest|mocha|pytest|phpunit|rspec|tox)\b|\bcargo\s+test\b|\bgo\s+test\b|\bmvn\s+(?:test|verify)\b|\bgradle\s+test\b|\bdotnet\s+test\b|\bpython\s+-m\s+(?:pytest|unittest)\b/i;
 
 /** The first test command run in this session, or null if none ran. */
 export function findTestRun(events: TranscriptEvent[]): string | null {
