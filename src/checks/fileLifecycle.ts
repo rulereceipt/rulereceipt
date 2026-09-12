@@ -1,4 +1,5 @@
 import type { TranscriptEvent, CheckResult } from "../types.js";
+import { violation } from "../types.js";
 import type { FileLifecycleClassification } from "./classify.js";
 
 /**
@@ -89,18 +90,12 @@ export function runFileLifecycleChecks(
   classifications: FileLifecycleClassification[],
   events: TranscriptEvent[]
 ): CheckResult[] {
-  return classifications.map(({ rule, filePath, polarity }) => {
+  return classifications.map(({ rule, filePath, polarity, polarityInferred }) => {
     const mutation = findMutation(events, filePath);
 
     if (polarity === "forbid") {
       if (mutation) {
-        return {
-          ruleId: rule.id,
-          ruleTitle: rule.title,
-          ruleSource: rule.source,
-          status: "FAIL",
-          evidence: `"${filePath}" was actually modified: ${mutation.slice(0, 160)}`,
-        };
+        return violation(rule, polarity, `"${filePath}" was actually modified: ${mutation.slice(0, 160)}`, { method: "file_events", polarityInferred });
       }
       return {
         ruleId: rule.id,

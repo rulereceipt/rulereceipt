@@ -1,4 +1,5 @@
 import type { TranscriptEvent, CheckResult } from "../types.js";
+import { violation } from "../types.js";
 import type { GitBranchPolicyClassification } from "./classify.js";
 
 /**
@@ -94,7 +95,7 @@ export function runGitBranchPolicyChecks(
     }
   }
 
-  return classifications.map(({ rule, branchName, polarity }) => {
+  return classifications.map(({ rule, branchName, polarity, polarityInferred }) => {
     const pushOrCreateHit = allTargets.find(
       (t) =>
         t.branch === branchName &&
@@ -105,13 +106,7 @@ export function runGitBranchPolicyChecks(
 
     if (polarity === "forbid") {
       if (hit) {
-        return {
-          ruleId: rule.id,
-          ruleTitle: rule.title,
-          ruleSource: rule.source,
-          status: "FAIL",
-          evidence: `a git command actually targeted the "${branchName}" branch: ${hit.command}`,
-        };
+        return violation(rule, polarity, `a git command actually targeted the "${branchName}" branch: ${hit.command}`, { method: "git_events", polarityInferred });
       }
       return {
         ruleId: rule.id,

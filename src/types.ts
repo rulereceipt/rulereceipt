@@ -116,4 +116,44 @@ export interface CheckResult {
 
   /** Why an inconclusive or not_run outcome came out that way, e.g. scope_incomplete. */
   reason?: string;
+
+  /**
+   * Set when the rule's direction was inferred rather than read from an
+   * explicit signal word — a bare imperative like "Use `npm`" taken as a
+   * requirement.
+   *
+   * Named on the verdict so a measurement can split inferred rows from
+   * explicit ones and settle whether the leftover is coverage or noise,
+   * rather than the question being argued. Suggested on
+   * anthropics/claude-code#90542.
+   */
+  polarityInferred?: boolean;
+}
+
+/**
+ * A FAIL may only be constructed from a forbidding rule.
+ *
+ * This is the "cannot accuse" property as a compile-time invariant rather
+ * than a convention. It held by inspection — every `status: "FAIL"` sat
+ * inside a `polarity === "forbid"` branch — and inspection is exactly what
+ * stops holding the day someone adds a require-FAIL path. Passing the
+ * polarity in means a require branch cannot call this: `"require"` is not
+ * assignable to `"forbid"`, and the build fails rather than a user being
+ * accused of not doing something the tool guessed they had to do.
+ */
+export function violation(
+  rule: { id: string; title: string; source: "global" | "project" },
+  polarity: "forbid",
+  evidence: string,
+  extra: Partial<CheckResult> = {}
+): CheckResult {
+  return {
+    ruleId: rule.id,
+    ruleTitle: rule.title,
+    ruleSource: rule.source,
+    status: "FAIL",
+    outcome: "fail",
+    evidence,
+    ...extra,
+  };
 }

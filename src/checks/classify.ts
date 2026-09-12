@@ -12,6 +12,8 @@ export interface DeterministicClassification {
    * before). "require": pattern must appear somewhere -> its ABSENCE is
    * what fails, e.g. "always run `npm test` before committing." */
   polarity: DeterministicPolarity;
+  /** True when the direction was inferred from a bare imperative, not read from a signal word. */
+  polarityInferred?: boolean;
 }
 
 export interface IfEditThenTestClassification {
@@ -38,6 +40,8 @@ export interface GitBranchPolicyClassification {
   rule: Rule;
   branchName: string;
   polarity: DeterministicPolarity;
+  /** True when the direction was inferred from a bare imperative, not read from a signal word. */
+  polarityInferred?: boolean;
 }
 
 /**
@@ -58,6 +62,8 @@ export interface CodeContentClassification {
   rule: Rule;
   patterns: string[];
   polarity: DeterministicPolarity;
+  /** True when the direction was inferred from a bare imperative, not read from a signal word. */
+  polarityInferred?: boolean;
 }
 
 /**
@@ -75,6 +81,8 @@ export interface FileLifecycleClassification {
   rule: Rule;
   filePath: string;
   polarity: DeterministicPolarity;
+  /** True when the direction was inferred from a bare imperative, not read from a signal word. */
+  polarityInferred?: boolean;
 }
 
 /**
@@ -488,6 +496,22 @@ function detectPolarity(rule: Rule): DeterministicPolarity | null {
 }
 
 /**
+ * Was the direction READ from an explicit signal word, or INFERRED from a
+ * bare imperative?
+ *
+ * Named on the verdict rather than argued about. "Use npm for this project"
+ * is sometimes a required action and sometimes a description of current
+ * practice, and the only way to find out whether this inference is coverage
+ * or noise is to measure the two populations separately. Suggested on
+ * anthropics/claude-code#90542.
+ */
+function polarityWasInferred(rule: Rule): boolean {
+  const text = `${rule.title} ${rule.text}`;
+  if (FORBID_SIGNAL.test(text) || REQUIRE_SIGNAL.test(text)) return false;
+  return PRESCRIPTIVE_VERB.test(text);
+}
+
+/**
  * A rule is only treated as deterministic when it names a specific,
  * literal, checkable token (a CLI flag, a command, an exact string) in
  * backticks — e.g. "never use `git push --force`". Everything else
@@ -537,25 +561,26 @@ export function classifyRule(rule: Rule): Classification {
   if (polarity === null) {
     return { kind: "judgment", rule };
   }
+  const polarityInferred = polarityWasInferred(rule);
 
   if (BRANCH_WORD.test(text)) {
     // first backtick literal is treated as the branch name — real rules
     // this targets name exactly one branch ("the `demo` branch", "never
     // push to `main`"), not a set of them
     const [branchName] = patterns;
-    return { kind: "gitBranchPolicy", rule, branchName, polarity };
+    return { kind: "gitBranchPolicy", rule, branchName, polarity , polarityInferred };
   }
 
   if ([...patterns].some((p) => CODE_CONSTRUCT_PATTERN.test(p))) {
-    return { kind: "codeContent", rule, patterns: [...patterns], polarity };
+    return { kind: "codeContent", rule, patterns: [...patterns], polarity , polarityInferred };
   }
 
   const filePath = [...patterns].find((p) => FILE_PATH_PATTERN.test(p));
   if (filePath && FILE_MUTATION_INTENT.test(text)) {
-    return { kind: "fileLifecycle", rule, filePath, polarity };
+    return { kind: "fileLifecycle", rule, filePath, polarity , polarityInferred };
   }
 
-  return { kind: "deterministic", rule, patterns: [...patterns], polarity };
+  return { kind: "deterministic", rule, patterns: [...patterns], polarity , polarityInferred };
 }
 
 export function classifyRules(rules: Rule[]): Classification[] {

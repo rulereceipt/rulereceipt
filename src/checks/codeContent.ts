@@ -1,4 +1,5 @@
 import type { TranscriptEvent, CheckResult } from "../types.js";
+import { violation } from "../types.js";
 import type { CodeContentClassification } from "./classify.js";
 
 /**
@@ -38,7 +39,7 @@ export function runCodeContentChecks(
     if (content) editedContents.push(content);
   }
 
-  return classifications.map(({ rule, patterns, polarity }) => {
+  return classifications.map(({ rule, patterns, polarity, polarityInferred }) => {
     let foundPattern: string | undefined;
     let foundContent: string | undefined;
     for (const content of editedContents) {
@@ -54,13 +55,7 @@ export function runCodeContentChecks(
 
     if (polarity === "forbid") {
       if (foundPattern && foundContent) {
-        return {
-          ruleId: rule.id,
-          ruleTitle: rule.title,
-          ruleSource: rule.source,
-          status: "FAIL",
-          evidence: `found "${foundPattern}" actually written into a file: ${foundContent.slice(0, 160)}`,
-        };
+        return violation(rule, polarity, `found "${foundPattern}" actually written into a file: ${foundContent.slice(0, 160)}`, { method: "code_content", polarityInferred });
       }
       return {
         ruleId: rule.id,
