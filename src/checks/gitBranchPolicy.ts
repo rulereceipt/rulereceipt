@@ -95,7 +95,24 @@ export function runGitBranchPolicyChecks(
     }
   }
 
+  const anyGitCommand = events.some(
+    (e) => e.kind === "tool_use" && /\bgit\s/.test(JSON.stringify(e.input ?? ""))
+  );
   return classifications.map(({ rule, branchName, polarity, polarityInferred }) => {
+    // No git command ran, so a git rule never had a situation to govern.
+    // Calling that "followed" is how an empty session produced 2,770 green
+    // ticks across the 559-file corpus — every one true, none meaningful.
+    if (!anyGitCommand) {
+      return {
+        ruleId: rule.id,
+        ruleTitle: rule.title,
+        ruleSource: rule.source,
+        status: "UNCLEAR" as const,
+        outcome: "not_applicable" as const,
+        method: "git_events" as const,
+        evidence: "no git command ran this session, so this rule never applied",
+      };
+    }
     const pushOrCreateHit = allTargets.find(
       (t) =>
         t.branch === branchName &&

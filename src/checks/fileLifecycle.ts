@@ -90,7 +90,25 @@ export function runFileLifecycleChecks(
   classifications: FileLifecycleClassification[],
   events: TranscriptEvent[]
 ): CheckResult[] {
+  // Deliberately conservative: ANY tool call at all counts as the session
+  // having done something. A first attempt keyed this on Write/Edit only and
+  // reported "never applied" for a session that deleted the protected file
+  // with `rm` in Bash — a false not_applicable hides a real violation, which
+  // is the same error as a false PASS wearing a different label.
+  const didAnything = events.some((e) => e.kind === "tool_use");
   return classifications.map(({ rule, filePath, polarity, polarityInferred }) => {
+    // Nothing was written, so a rule about writing a file never applied.
+    if (!didAnything) {
+      return {
+        ruleId: rule.id,
+        ruleTitle: rule.title,
+        ruleSource: rule.source,
+        status: "UNCLEAR" as const,
+        outcome: "not_applicable" as const,
+        method: "file_events" as const,
+        evidence: "the session made no tool calls at all, so this rule never applied",
+      };
+    }
     const mutation = findMutation(events, filePath);
 
     if (polarity === "forbid") {

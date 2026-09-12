@@ -149,6 +149,10 @@ function didNotRun(rule: JudgmentClassification["rule"], reason: string): CheckR
     ruleSource: rule.source,
     status: "UNCLEAR",
     needsHuman: true,
+    // The check did not happen. Rendering that as a judgment call, or worse
+    // as "couldn't tell", was the original defect in this file.
+    outcome: "not_run",
+    method: "none",
     evidence: reason,
   };
 }

@@ -43,13 +43,13 @@ describe("runCodeContentChecks", () => {
   it("does NOT fail when the pattern appears only in prose the agent wrote", () => {
     const events = [textEvent("I noticed a stray print( call in the legacy module, worth cleaning up later.")];
     const [result] = runCodeContentChecks([noPrintRule], events);
-    expect(result.status).toBe("PASS");
+    expect(result.status).not.toBe("FAIL");
   });
 
   it("does NOT fail when the pattern appears only in a tool_result (a file the agent read)", () => {
     const events = [toolResult("def legacy():\n    print('old debug line')\n")];
     const [result] = runCodeContentChecks([noPrintRule], events);
-    expect(result.status).toBe("PASS");
+    expect(result.status).not.toBe("FAIL");
   });
 
   it("correctly FAILs when the pattern is actually written into a file via Write", () => {
@@ -70,9 +70,15 @@ describe("runCodeContentChecks", () => {
     expect(result.status).toBe("PASS");
   });
 
-  it("PASSes on a completely empty session", () => {
+  it("reports an empty session as never having applied, not as followed", () => {
+    // CHANGED 2026-09-12. This asserted PASS. A rule whose situation never
+    // arose was being counted as followed, which is how an empty transcript
+    // produced 2,770 green ticks across the 559-file corpus — every one true
+    // and none of them meaning anything. The guarantee that still matters is
+    // that it never accuses, and that is asserted here too.
     const [result] = runCodeContentChecks([noPrintRule], []);
-    expect(result.status).toBe("PASS");
+    expect(result.outcome).toBe("not_applicable");
+    expect(result.status).not.toBe("FAIL");
   });
 
   it("includes the real written content in the evidence when it FAILs", () => {

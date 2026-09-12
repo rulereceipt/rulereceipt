@@ -25,13 +25,13 @@ describe("runGitBranchPolicyChecks", () => {
   it("does NOT fail when 'demo' appears only as a repo/directory name, never as a git branch argument", () => {
     const events = [bash("cd acme-demo && ls"), textEvent("Looking at the acme demo repo now.")];
     const [result] = runGitBranchPolicyChecks([forbidDemoRule], events);
-    expect(result.status).toBe("PASS");
+    expect(result.status).not.toBe("FAIL");
   });
 
   it("does NOT fail when 'demo' appears in unrelated prose", () => {
     const events = [textEvent("I'll give a demo of this feature once it's done.")];
     const [result] = runGitBranchPolicyChecks([forbidDemoRule], events);
-    expect(result.status).toBe("PASS");
+    expect(result.status).not.toBe("FAIL");
   });
 
   // stronger version of the same real bug: a real GIT command that
@@ -84,9 +84,15 @@ describe("runGitBranchPolicyChecks", () => {
     expect(result.status).toBe("PASS");
   });
 
-  it("PASSes on a completely empty session", () => {
+  it("reports an empty session as never having applied, not as followed", () => {
+    // CHANGED 2026-09-12. This asserted PASS. A rule whose situation never
+    // arose was being counted as followed, which is how an empty transcript
+    // produced 2,770 green ticks across the 559-file corpus — every one true
+    // and none of them meaning anything. The guarantee that still matters is
+    // that it never accuses, and that is asserted here too.
     const [result] = runGitBranchPolicyChecks([forbidDemoRule], []);
-    expect(result.status).toBe("PASS");
+    expect(result.outcome).toBe("not_applicable");
+    expect(result.status).not.toBe("FAIL");
   });
 
   it("includes the actual command in the evidence when it FAILs", () => {

@@ -70,20 +70,45 @@ function ruleLabel(r: CheckResult, results: CheckResult[]): string {
  * as a division of labour.
  */
 function summaryLine(results: CheckResult[]): string {
-  const pass = results.filter((r) => r.status === "PASS").length;
-  const fail = results.filter((r) => r.status === "FAIL").length;
-  const needsHuman = results.filter((r) => r.status === "UNCLEAR" && r.needsHuman).length;
-  const couldntTell = results.filter((r) => r.status === "UNCLEAR" && !r.needsHuman).length;
-
-  const parts = [`${pass} followed`, `${fail} not followed`];
-  if (couldntTell > 0) parts.push(`${couldntTell} couldn't tell`);
-  if (needsHuman > 0) parts.push(`${needsHuman} need your judgment`);
+  const n = (b: Bucket) => results.filter((r) => bucketOf(r) === b).length;
+  const parts = [`${n("PASS")} followed`, `${n("FAIL")} not followed`];
+  if (n("UNCLEAR_EVIDENCE") > 0) parts.push(`${n("UNCLEAR_EVIDENCE")} couldn't tell`);
+  if (n("NOT_RUN") > 0) parts.push(`${n("NOT_RUN")} not run`);
+  if (n("NOT_APPLICABLE") > 0) parts.push(`${n("NOT_APPLICABLE")} didn't apply`);
+  if (n("UNCLEAR_JUDGMENT") > 0) parts.push(`${n("UNCLEAR_JUDGMENT")} need your judgment`);
   return parts.join(" · ");
 }
 
-type Bucket = "FAIL" | "UNCLEAR_EVIDENCE" | "UNCLEAR_JUDGMENT" | "PASS";
+type Bucket = "FAIL" | "UNCLEAR_EVIDENCE" | "NOT_RUN" | "PASS" | "NOT_APPLICABLE" | "UNCLEAR_JUDGMENT";
 
+/**
+ * Six buckets, because "the tool looked and could not decide", "the tool
+ * never ran", and "the situation never arose" are three different things
+ * that were all rendering as one.
+ *
+ * From anthropics/claude-code#90542. With no API key the report printed
+ * "13 couldn't tell" — a phrase defined in this file as the tool having
+ * looked — about thirteen rules it had never examined. And an empty
+ * transcript produced 2,770 green ticks across the 559-file corpus, every
+ * one of them true and none of them meaning anything, because a rule whose
+ * situation never arose was being counted as followed.
+ *
+ * `outcome` is preferred where a checker sets it; `status` remains the
+ * fallback while the rest are migrated.
+ */
 function bucketOf(result: CheckResult): Bucket {
+  switch (result.outcome) {
+    case "fail":
+      return "FAIL";
+    case "pass":
+      return "PASS";
+    case "not_run":
+      return "NOT_RUN";
+    case "not_applicable":
+      return "NOT_APPLICABLE";
+    case "inconclusive":
+      return result.needsHuman ? "UNCLEAR_JUDGMENT" : "UNCLEAR_EVIDENCE";
+  }
   if (result.status === "FAIL") return "FAIL";
   if (result.status === "PASS") return "PASS";
   return result.needsHuman ? "UNCLEAR_JUDGMENT" : "UNCLEAR_EVIDENCE";
@@ -101,10 +126,26 @@ function bucketOf(result: CheckResult): Bucket {
 const BUCKET_LABEL: Record<Bucket, string> = {
   FAIL: "Not followed",
   UNCLEAR_EVIDENCE: "Couldn't tell",
-  UNCLEAR_JUDGMENT: "Needs your judgment",
+  NOT_RUN: "Not run",
   PASS: "Followed",
+  NOT_APPLICABLE: "Didn't apply this session",
+  UNCLEAR_JUDGMENT: "Needs your judgment",
 };
-const BUCKET_ORDER: Bucket[] = ["FAIL", "UNCLEAR_EVIDENCE", "PASS", "UNCLEAR_JUDGMENT"];
+
+/**
+ * Failures, then the two kinds of gap, then what held, then what never came
+ * up, then the human's half. "Not run" sits near the top on purpose: a
+ * check that did not happen is closer to a gap than to a result, and
+ * burying it is how it got mistaken for one.
+ */
+const BUCKET_ORDER: Bucket[] = [
+  "FAIL",
+  "UNCLEAR_EVIDENCE",
+  "NOT_RUN",
+  "PASS",
+  "NOT_APPLICABLE",
+  "UNCLEAR_JUDGMENT",
+];
 
 /**
  * The explanation shared by every rule in a section, or null when they
@@ -154,6 +195,11 @@ export function generateReport(results: CheckResult[], meta: ReportMeta): string
     for (const r of inBucket) {
       lines.push(`${MARK[r.status]} ${r.status.padEnd(7)} ${ruleLabel(r, clean)}`);
       if (r.evidence) lines.push(`  evidence: ${r.evidence}`);
+      // What this method was ALLOWED to conclude, travelling with the
+      // verdict. A text scan may say it saw no occurrence of a spelling; it
+      // may not say the act did not happen. That distinction shipped for six
+      // versions as a PASS on a session that ran `git push -f`.
+      if (r.ceiling) lines.push(`  this means: ${r.ceiling}`);
     }
   }
 

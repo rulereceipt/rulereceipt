@@ -50,7 +50,7 @@ describe("runFileLifecycleChecks", () => {
   it("does NOT fail when the path appears only in prose", () => {
     const events = [textEvent("I checked .claude/settings.json and it looks untouched.")];
     const [result] = runFileLifecycleChecks([protectSettings], events);
-    expect(result.status).toBe("PASS");
+    expect(result.status).not.toBe("FAIL");
   });
 
   it("correctly FAILs when the file is actually written via the Write tool", () => {
@@ -89,9 +89,15 @@ describe("runFileLifecycleChecks", () => {
     expect(result.status).toBe("PASS");
   });
 
-  it("PASSes on a completely empty session", () => {
+  it("reports an empty session as never having applied, not as followed", () => {
+    // CHANGED 2026-09-12. This asserted PASS. A rule whose situation never
+    // arose was being counted as followed, which is how an empty transcript
+    // produced 2,770 green ticks across the 559-file corpus — every one true
+    // and none of them meaning anything. The guarantee that still matters is
+    // that it never accuses, and that is asserted here too.
     const [result] = runFileLifecycleChecks([protectSettings], []);
-    expect(result.status).toBe("PASS");
+    expect(result.outcome).toBe("not_applicable");
+    expect(result.status).not.toBe("FAIL");
   });
 
   // adversarial: reads AND an unrelated write AND one real mutation
