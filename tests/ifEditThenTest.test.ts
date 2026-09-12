@@ -89,3 +89,56 @@ describe("runIfEditThenTestChecks", () => {
     });
   });
 });
+
+/**
+ * Running the suite is honouring an "add tests for every change" rule just
+ * as much as touching a test file is.
+ *
+ * Real false positives found 2026-09-11 by running every rule in the
+ * 559-file corpus against one synthetic session — edit a source file, run
+ * `npm test` (12 passed), commit. Twelve rules came back FAIL saying "no
+ * matching test file was touched". The session had run the tests. FAIL is
+ * the most expensive verdict this tool produces, and this one was reachable
+ * by the most ordinary workflow there is: change code, run the suite.
+ *
+ * Both independent reviews of the checker design flagged exactly this —
+ * pair on "the project's test script ran", not only on "a test file was
+ * written".
+ */
+describe("a test RUN satisfies an edit-implies-test rule", () => {
+  const rule = {
+    kind: "ifEditThenTest" as const,
+    rule: { id: "1", title: "Add tests for every change", text: "Write tests for any code you change.", source: "project" as const },
+  };
+  const bash = (c: string): TranscriptEvent => ({
+    role: "assistant", kind: "tool_use", toolName: "Bash", input: { command: c }, timestamp: "2026-09-11T00:00:00Z",
+  });
+
+  it("does not FAIL when the suite was run after the edit", () => {
+    const [r] = runIfEditThenTestChecks([rule], [edit("src/app.ts"), bash("npm test")]);
+    expect(r.status).not.toBe("FAIL");
+  });
+
+  it("recognises runners other than npm", () => {
+    for (const cmd of ["pytest -q", "cargo test", "go test ./...", "npx vitest run", "pnpm test"]) {
+      const [r] = runIfEditThenTestChecks([rule], [edit("src/app.ts"), bash(cmd)]);
+      expect(r.status, `missed runner: ${cmd}`).not.toBe("FAIL");
+    }
+  });
+
+  it("says WHY it passed, naming the command", () => {
+    const [r] = runIfEditThenTestChecks([rule], [edit("src/app.ts"), bash("npm test")]);
+    expect(r.evidence).toMatch(/npm test/);
+  });
+
+  it("still FAILS when code changed and nothing tested it at all", () => {
+    // The case the rule actually exists for must keep failing.
+    const [r] = runIfEditThenTestChecks([rule], [edit("src/app.ts"), bash("git commit -m wip")]);
+    expect(r.status).toBe("FAIL");
+  });
+
+  it("does not count an unrelated command as a test run", () => {
+    const [r] = runIfEditThenTestChecks([rule], [edit("src/app.ts"), bash("npm run build")]);
+    expect(r.status).toBe("FAIL");
+  });
+});

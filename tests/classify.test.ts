@@ -349,3 +349,78 @@ describe("incident write-ups are records, not rules", () => {
     expect(classifyRule(makeRule("Use `--dry-run` first when the change is destructive.")).kind).not.toBe("notARule");
   });
 });
+
+describe("classifyRule routes claim-vs-evidence rules away from judgment", () => {
+  const mk = (title: string, text: string) => ({ id: "1", title, text, source: "project" as const });
+
+  it("routes a rule that demands evidence for a done claim", () => {
+    const r = mk(
+      "Evidence or it didn't happen",
+      "Never report an item done, confirmed or working without pasting the specific evidence in the same message."
+    );
+    expect(classifyRule(r).kind).toBe("claimEvidence");
+  });
+
+  it("needs BOTH halves — a reporting verb alone is not enough", () => {
+    // "tell me what changed" is about reporting and nothing else.
+    const r = mk("Summarise changes", "Tell me what changed in each file at the end of the session.");
+    expect(classifyRule(r).kind).not.toBe("claimEvidence");
+  });
+
+  it("needs BOTH halves — an evidence noun alone is not enough", () => {
+    // This is a test-running rule, not a claim rule.
+    const r = mk("Run the tests", "Always run the test suite and check the output before pushing.");
+    expect(classifyRule(r).kind).not.toBe("claimEvidence");
+  });
+
+  it("does not swallow a plain literal prohibition", () => {
+    const r = mk("No force pushing", "Never run `git push --force`.");
+    expect(classifyRule(r).kind).not.toBe("claimEvidence");
+  });
+});
+
+describe("claim-vs-evidence routing does not swallow pre-action gate rules", () => {
+  const mk = (title: string, text: string) => ({ id: "1", title, text, source: "project" as const });
+
+  it("does NOT route a confirm-before-acting rule", () => {
+    // Real misroute, 2026-09-11, verbatim text from a live CLAUDE.md. It
+    // carries a reporting verb ("say"), an evidence noun ("paste evidence")
+    // and a done-word ("are done"), so it routed to claimEvidence and was
+    // then answered with "you claimed a passing test suite 10 times" — a
+    // non-sequitur. Its subject is a gate before an action, not a report of
+    // a result. Written verbatim because an earlier paraphrase of this rule
+    // dropped the exact word that caused the misroute and the test passed
+    // against unfixed code.
+    const r = mk(
+      "Repeat-back before destructive or expensive actions",
+      `Before: deleting data, overwriting profiles/ledgers, re-running long backfills, changing
+DRY_RUN, placing live orders, or modifying anything tagged with a version — restate what
+will be changed, what will be lost, and wait for confirmation.
+
+DRY_RUN flip rule: Before flipping DRY_RUN=False, you MUST:
+1. Run the Rule 6 pre-flight (restate what changes, what's at risk, what other services
+   are affected).
+2. Verify all other services remain DRY_RUN=True (paste evidence).
+3. Wait for Shilpa to say explicit go-ahead — phrases like "verified, go live",
+   "confirmed, flip it", "make dry run false", or "go live" after a pre-flight count.
+Once all three steps are done, you MAY flip DRY_RUN=False and restart the daemon yourself.`
+    );
+    expect(classifyRule(r).kind).not.toBe("claimEvidence");
+  });
+
+  it("still routes a plain report-with-evidence rule", () => {
+    const r = mk(
+      "Evidence or it didn't happen",
+      "Never report an item done, confirmed or working without pasting the specific evidence in the same message."
+    );
+    expect(classifyRule(r).kind).toBe("claimEvidence");
+  });
+
+  it("still routes a rule about not upgrading assumed to done", () => {
+    const r = mk(
+      "Distinguish the three states honestly",
+      "Every reported item must be labeled DONE (evidence pasted), OPEN, or ASSUMED. Never upgrade ASSUMED to DONE without running the verification."
+    );
+    expect(classifyRule(r).kind).toBe("claimEvidence");
+  });
+});

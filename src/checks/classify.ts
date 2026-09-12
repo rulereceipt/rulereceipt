@@ -96,7 +96,20 @@ export interface NotARuleClassification {
   rule: Rule;
 }
 
+/**
+ * A rule about not claiming a thing is done without the evidence.
+ *
+ * Routed away from judgment because the contradiction it describes is
+ * fully present in a transcript: the claim is assistant text, the evidence
+ * is a tool result, and the order between them is recorded.
+ */
+export interface ClaimEvidenceClassification {
+  kind: "claimEvidence";
+  rule: Rule;
+}
+
 export type Classification =
+  | ClaimEvidenceClassification
   | DeterministicClassification
   | IfEditThenTestClassification
   | GitBranchPolicyClassification
@@ -266,6 +279,47 @@ function isNotARule(rule: Rule): boolean {
   return !IMPERATIVE_INSTRUCTION.test(rule.title) && !IMPERATIVE_INSTRUCTION.test(rule.text);
 }
 
+/**
+ * A rule about not reporting something as done without the evidence.
+ *
+ * Requires BOTH halves in the same rule: a verb about reporting or
+ * claiming, and a noun about evidence or verification. Either alone is far
+ * too broad — "run the tests" has the second, "tell me what changed" has
+ * the first, and neither is this rule.
+ *
+ * These rules almost never carry a backtick literal, so without this they
+ * fall straight through to judgment. This project's own Rule 1 ("Evidence
+ * or it didn't happen") is exactly that shape, and it is mechanically
+ * answerable whenever the session both claimed and ran something.
+ */
+const REPORTING_VERB =
+  /\b(?:report|claim|say|said|state|assert|tell|declar|announc|call(?:ing)?\s+it|mark(?:ing)?\s+it)\w*\b/i;
+const EVIDENCE_NOUN =
+  /\b(?:evidence|proof|prove|paste|pasted|verif\w*|receipt|output|actual\s+(?:result|output)|test\s+output)\b/i;
+const DONE_WORD =
+  /\b(?:done|complete\w*|pass(?:ing|ed|es)?|working|fixed|confirmed|success\w*|green|ready)\b/i;
+
+/**
+ * A gate the agent must pass BEFORE acting, rather than a report it makes
+ * after. Real misroute found 2026-09-11: "Repeat-back before destructive or
+ * expensive actions" contains a reporting verb ("say"), an evidence noun
+ * ("paste evidence") and a done-word ("are done"), so it satisfied all
+ * three tests below and was then answered with a verdict about claiming a
+ * passing test suite — true of the session, and nothing to do with the rule.
+ *
+ * Routing wider than the checker's competence is worse than not routing at
+ * all: a confident, irrelevant answer costs more than an honest "this one
+ * is yours".
+ */
+const PRE_ACTION_GATE =
+  /\b(?:repeat[- ]back|restate\s+what|wait\s+for\s+(?:confirmation|approval|explicit|sign[- ]?off)|ask\s+(?:first|before|for\s+permission)|get\s+(?:approval|sign[- ]?off|permission)|before\s+(?:you\s+)?(?:delet|overwrit|drop|truncat|wip|run|flip|deploy|push|commit|chang|modif|plac))\w*/i;
+
+function isClaimEvidenceRule(rule: Rule): boolean {
+  const text = `${rule.title} ${rule.text}`;
+  if (PRE_ACTION_GATE.test(text)) return false;
+  return REPORTING_VERB.test(text) && EVIDENCE_NOUN.test(text) && DONE_WORD.test(text);
+}
+
 const BRANCH_WORD = /\bbranch\b/i;
 
 // A function/method-call shape ("print(", "analytics.track(") is a strong,
@@ -382,6 +436,13 @@ export function classifyRule(rule: Rule): Classification {
   // should run against it — not a keyword match, not an LLM call.
   if (isNotARule(rule)) {
     return { kind: "notARule", rule };
+  }
+
+  // Checked before the backtick test below: these rules are about what the
+  // session SAID versus what it DID, and they essentially never name a
+  // literal, so they would otherwise fall through to judgment.
+  if (isClaimEvidenceRule(rule)) {
+    return { kind: "claimEvidence", rule };
   }
 
   const patterns = new Set<string>();

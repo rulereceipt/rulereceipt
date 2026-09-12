@@ -15,6 +15,7 @@ import { runIfEditThenTestChecks } from "./checks/ifEditThenTest.js";
 import { runGitBranchPolicyChecks } from "./checks/gitBranchPolicy.js";
 import { runCodeContentChecks } from "./checks/codeContent.js";
 import { runFileLifecycleChecks } from "./checks/fileLifecycle.js";
+import { runClaimEvidenceChecks } from "./checks/claimEvidence.js";
 import { runJudgmentChecks } from "./checks/judgmentChecks.js";
 import { generateReport, generateMarkdownReport, type ReportMeta } from "./report/generateReport.js";
 import { generateHtmlReport } from "./report/generateHtmlReport.js";
@@ -256,6 +257,7 @@ async function runCheck(opts: CheckOptions) {
   const gitBranchPolicy = classifications.filter((c) => c.kind === "gitBranchPolicy");
   const codeContent = classifications.filter((c) => c.kind === "codeContent");
   const fileLifecycle = classifications.filter((c) => c.kind === "fileLifecycle");
+  const claimEvidence = classifications.filter((c) => c.kind === "claimEvidence");
   const judgment = classifications.filter((c) => c.kind === "judgment");
   // Not rules at all — documentation, glossary entries, reference tables,
   // URLs, directory listings, code examples.
@@ -281,6 +283,7 @@ async function runCheck(opts: CheckOptions) {
     ...runGitBranchPolicyChecks(gitBranchPolicy, events),
     ...runCodeContentChecks(codeContent, events),
     ...runFileLifecycleChecks(fileLifecycle, events),
+    ...runClaimEvidenceChecks(claimEvidence, events),
   ];
   // Deterministic checks run by default, always, with no key — judgment
   // rules only call out to an LLM with an explicit --llm on THIS run, never

@@ -1,5 +1,6 @@
 import type { TranscriptEvent, CheckResult } from "../types.js";
 import type { IfEditThenTestClassification } from "./classify.js";
+import { findTestRun } from "./testCommands.js";
 
 const TEST_FILE_PATTERN = /(\.test\.|\.spec\.|__tests__\/|_test\.|\/tests?\/)/i;
 
@@ -48,6 +49,17 @@ export function runIfEditThenTestChecks(
   events: TranscriptEvent[]
 ): CheckResult[] {
   const editedPaths = extractEditedPaths(events);
+  // Running the suite honours "add tests for every change" as much as
+  // touching a test file does. Without this, the most ordinary workflow
+  // there is — change code, run the tests, commit — produced a FAIL saying
+  // no test file was touched. Twelve rules across the 559-file corpus hit
+  // it on one synthetic session (2026-09-11).
+  //
+  // Any run in the session counts, not only one after the edit. Requiring
+  // the stricter ordering would buy a little precision and risk the
+  // expensive direction of error, and in this project a wrong FAIL costs
+  // more than a missed detection.
+  const testRun = findTestRun(events);
   const testPaths = editedPaths.filter((p) => TEST_FILE_PATTERN.test(p));
   const prodPaths = editedPaths.filter((p) => !TEST_FILE_PATTERN.test(p) && !NON_TESTABLE_FILE_PATTERN.test(p));
 
@@ -62,6 +74,16 @@ export function runIfEditThenTestChecks(
           editedPaths.length === 0
             ? "no Write/Edit/NotebookEdit tool calls with a file_path in this session — can't tell if the rule applied"
             : "no code file was edited this session (only test/doc/config files, if any) — the rule never had a chance to apply",
+      };
+    }
+
+    if (testPaths.length === 0 && testRun !== null) {
+      return {
+        ruleId: rule.id,
+        ruleTitle: rule.title,
+        ruleSource: rule.source,
+        status: "PASS" as const,
+        evidence: `edited ${prodPaths[0]} and ran the suite: \`${testRun}\` (no test file was edited, but the code was exercised)`,
       };
     }
 
