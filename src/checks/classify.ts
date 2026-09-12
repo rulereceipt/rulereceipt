@@ -186,7 +186,7 @@ const EVENT_RECORD_TITLE = /\b(incident|post-?mortem|retro(spective)?|outage|wha
  * report that happens to contain the word never further along.
  */
 const TITLE_OPENS_WITH_DIRECTIVE =
-  /^\s*[-*+\d.\s]*(never|always|must|do not|don't|dont|avoid|ensure|prefer|only|make sure|be sure)\b/i;
+  /^\s*[-*+\d.\s]*(never|always|must|do not|don'?t|dont|avoid|ensure|prefer|only|make sure|be sure|no)\b/i;
 
 function isEventRecord(rule: Rule): boolean {
   if (TITLE_OPENS_WITH_DIRECTIVE.test(rule.title)) return false;
@@ -261,6 +261,10 @@ function isCommandDocumentation(rule: Rule): boolean {
 }
 
 function isNotARule(rule: Rule): boolean {
+  // "No debug logging", "No force pushing" — one of the commonest ways a
+  // prohibition is written, and the directive list had no entry for it, so
+  // these were being dropped as documentation before any check saw them.
+  if (TITLE_OPENS_WITH_DIRECTIVE.test(rule.title)) return false;
   // Checked before the directive test on purpose: an incident note that
   // ends with its lesson contains a real directive, and would otherwise
   // be enforced as though the history itself were the rule.
@@ -399,8 +403,10 @@ const BACKTICK_TOKEN = /`([^`]+)`/g;
 // ambiguous defaults to "forbid" semantics (pattern found = FAIL), which
 // was the only behavior that existed before this — no regression risk,
 // only an additive one for rules that clearly ask for a required action.
-const REQUIRE_SIGNAL = /\b(always|must|required|require|ensure|need to)\b/i;
-const FORBID_SIGNAL = /\b(never|don't|do not|forbidden|banned|must not)\b/i;
+const REQUIRE_SIGNAL =
+  /\b(always|must|required|require|ensure|need to|needs to|have to|has to|should|shall|make sure|be sure)\b/i;
+const FORBID_SIGNAL =
+  /\b(never|don'?t|do not|forbidden|banned|prohibited|disallow\w*|avoid|must not|should not|shouldn'?t|not allowed|no longer)\b|^\s*(?:#{1,6}\s*)?no\s+\S/im;
 
 /**
  * A rule can prohibit one thing AND prescribe another in the same breath:
@@ -418,7 +424,8 @@ const FORBID_SIGNAL = /\b(never|don't|do not|forbidden|banned|must not)\b/i;
 // often prescribes with a bare imperative ("Use `gh pr merge --merge`")
 // rather than "you must use" — and it's exactly those imperative clauses
 // whose literals get misattributed to the prohibiting half.
-const PRESCRIPTIVE_VERB = /\b(use|run|prefer|apply|follow|call|invoke|stick to)\b/i;
+const PRESCRIPTIVE_VERB =
+  /\b(use|run|prefer|apply|follow|call|invoke|stick to|update|write|create|add|include|keep|maintain|document)\b/i;
 
 function hasMixedPolarity(rule: Rule): boolean {
   const text = `${rule.title} ${rule.text}`;
@@ -445,13 +452,39 @@ function hasMixedPolarity(rule: Rule): boolean {
   );
 }
 
-function detectPolarity(rule: Rule): DeterministicPolarity {
+/**
+ * The direction of a rule, or null when the text does not say.
+ *
+ * This used to default to "forbid" — the accusing direction — justified as
+ * carrying "no regression risk" because it was the pre-existing behaviour.
+ * It carried the worst risk there is. Measured 2026-09-12 against
+ * cypress-io/cypress's own CLAUDE.md:
+ *
+ *   rule    "After ANY correction from the user: update the closest
+ *            relevant `CLAUDE.md` file"
+ *   verdict FAIL — "CLAUDE.md" was actually modified
+ *
+ * The rule asks you to write that file. The session did. The tool failed it
+ * for complying, because no require-word appeared and the default took over.
+ *
+ * A polarity is what a person settles in one second and what a matcher must
+ * never assume: the two answers are opposites, and one of them accuses
+ * someone of doing what they were told to do. Undetermined now means the
+ * rule is not mechanically checkable and goes to judgment.
+ */
+function detectPolarity(rule: Rule): DeterministicPolarity | null {
   const text = `${rule.title} ${rule.text}`;
   // An explicit forbid word anywhere wins over a require word — "you must
   // never use X" contains both "must" and "never", and it's a ban.
   if (FORBID_SIGNAL.test(text)) return "forbid";
   if (REQUIRE_SIGNAL.test(text)) return "require";
-  return "forbid";
+  // A bare imperative — "Use `npm`", "Update the changelog" — is a
+  // requirement. Reading it as one is also the SAFE direction: a required
+  // pattern that never appears reports UNCLEAR, while a forbidden one that
+  // appears reports a violation. Guessing toward require can waste a check;
+  // guessing toward forbid accuses someone.
+  if (PRESCRIPTIVE_VERB.test(text)) return "require";
+  return null;
 }
 
 /**
@@ -499,24 +532,30 @@ export function classifyRule(rule: Rule): Classification {
   }
 
   const text = `${rule.title} ${rule.text}`;
+  // A rule whose direction cannot be read is not a rule this can check.
+  const polarity = detectPolarity(rule);
+  if (polarity === null) {
+    return { kind: "judgment", rule };
+  }
+
   if (BRANCH_WORD.test(text)) {
     // first backtick literal is treated as the branch name — real rules
     // this targets name exactly one branch ("the `demo` branch", "never
     // push to `main`"), not a set of them
     const [branchName] = patterns;
-    return { kind: "gitBranchPolicy", rule, branchName, polarity: detectPolarity(rule) };
+    return { kind: "gitBranchPolicy", rule, branchName, polarity };
   }
 
   if ([...patterns].some((p) => CODE_CONSTRUCT_PATTERN.test(p))) {
-    return { kind: "codeContent", rule, patterns: [...patterns], polarity: detectPolarity(rule) };
+    return { kind: "codeContent", rule, patterns: [...patterns], polarity };
   }
 
   const filePath = [...patterns].find((p) => FILE_PATH_PATTERN.test(p));
   if (filePath && FILE_MUTATION_INTENT.test(text)) {
-    return { kind: "fileLifecycle", rule, filePath, polarity: detectPolarity(rule) };
+    return { kind: "fileLifecycle", rule, filePath, polarity };
   }
 
-  return { kind: "deterministic", rule, patterns: [...patterns], polarity: detectPolarity(rule) };
+  return { kind: "deterministic", rule, patterns: [...patterns], polarity };
 }
 
 export function classifyRules(rules: Rule[]): Classification[] {

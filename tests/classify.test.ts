@@ -76,11 +76,18 @@ describe("classifyRule", () => {
       expect(result.polarity).toBe("forbid");
     });
 
-    it("defaults to forbid when neither signal word is present (preserves old behavior, no regression)", () => {
+    // REPLACED 2026-09-12. This asserted that "Use `npm` for this project."
+    // is a PROHIBITION, on the grounds that defaulting to forbid preserved
+    // the previous behaviour and so carried no regression risk. It carried
+    // the worst risk there is: the rule tells you to use npm, and the tool
+    // would report a violation for using it. Same defect that failed
+    // cypress-io/cypress's "update the closest relevant `CLAUDE.md`" rule
+    // for updating CLAUDE.md. A bare imperative is a requirement.
+    it("reads a bare imperative as a requirement, not a ban", () => {
       const rule = makeRule("Use `npm` for this project.");
       const result = classifyRule(rule);
       if (result.kind !== "deterministic") throw new Error("expected deterministic");
-      expect(result.polarity).toBe("forbid");
+      expect(result.polarity).toBe("require");
     });
   });
 
@@ -469,5 +476,77 @@ describe("a rule whose literals cannot identify anything is not deterministic", 
   it("keeps a rule that has one junk literal and one real one", () => {
     const k = classifyRule(mk("Force push", "Never use `,` or `git push --force` here.")).kind;
     expect(k).not.toBe("judgment");
+  });
+});
+
+/**
+ * When the direction of a rule is unclear, the tool must not guess — and it
+ * certainly must not guess the accusing direction.
+ *
+ * Real verdict, 2026-09-12, against cypress-io/cypress's own CLAUDE.md:
+ *
+ *   rule    "After ANY correction from the user: update the closest
+ *            relevant `CLAUDE.md` file"
+ *   verdict FAIL — "CLAUDE.md" was actually modified
+ *
+ * The rule instructs you to update CLAUDE.md. The session did. The tool
+ * failed it for complying. detectPolarity looked for require-words, found
+ * none, and fell through to a default of "forbid" — justified in a comment
+ * as carrying "no regression risk" because it was the pre-existing
+ * behaviour.
+ *
+ * The trigger was right; the DIRECTION was invented. A polarity is exactly
+ * what a human settles in one second and exactly what a matcher must never
+ * assume, because the two answers are opposites and one of them accuses
+ * someone of something they were asked to do.
+ */
+describe("polarity is never guessed", () => {
+  const mk = (title: string, text: string) => ({ id: "1", title, text, source: "project" as const });
+  const polarityOf = (r: ReturnType<typeof mk>) => {
+    const c = classifyRule(r);
+    return "polarity" in c ? c.polarity : null;
+  };
+
+  it("does not fail a rule that ASKS you to write the file", () => {
+    // What matters is the outcome, not the route: this must never come back
+    // as a prohibition, because the session did what the rule asked.
+    const r = mk("Self-Improvement Loop", "After ANY correction from the user: update the closest relevant `CLAUDE.md` file.");
+    const c = classifyRule(r);
+    expect("polarity" in c ? c.polarity : "none").not.toBe("forbid");
+  });
+
+  it("still reads an explicit prohibition", () => {
+    expect(polarityOf(mk("No force pushing", "Never run `git push --force`."))).toBe("forbid");
+  });
+
+  it("still reads an explicit requirement", () => {
+    expect(polarityOf(mk("Test first", "Always run `npm test` before pushing."))).toBe("require");
+  });
+
+  it("reads a bare 'No X' heading as a prohibition", () => {
+    // Extremely common phrasing that the forbid list did not cover, so it
+    // was landing on the default rather than being recognised.
+    expect(polarityOf(mk("No debug logging", "No `console.log(` in committed code."))).toBe("forbid");
+  });
+
+  it("reads 'avoid' and 'do not use' as prohibitions", () => {
+    expect(polarityOf(mk("Deps", "Avoid `lodash` in new code."))).toBe("forbid");
+    expect(polarityOf(mk("Deps", "Do not use `moment` anywhere."))).toBe("forbid");
+  });
+
+  it("reads 'should' and 'have to' as requirements", () => {
+    expect(polarityOf(mk("Format", "Commits should use `conventional commits`."))).toBe("require");
+  });
+
+  it("leaves a rule with no readable direction to judgment", () => {
+    // No forbid word, no require word, no imperative — nothing says which
+    // way this points, so nothing may be asserted about it.
+    // An imperative that is neither a ban nor a prescription: nothing says
+    // which way it points, so nothing may be asserted about it.
+    expect(classifyRule(mk("Inputs", "Escape user input before `render(`.")).kind).toBe("judgment");
+  });
+
+  it("keeps forbid when a rule carries both signals", () => {
+    expect(polarityOf(mk("Merging", "You must never use `git merge --squash` here."))).toBe("forbid");
   });
 });
