@@ -595,3 +595,50 @@ describe("claims inside code blocks are shown, not asserted", () => {
     expect(r.status).toBe("FAIL");
   });
 });
+
+/**
+ * A command that WRITES a test command is not running one.
+ *
+ * Found 2026-09-12 by running the tool on the session that was building it,
+ * as a user would, rather than by testing it. The report said a claim of
+ * "406 tests pass" contradicted a failing test run, and named as that run a
+ * twenty-line heredoc whose Python body happened to contain the string
+ * `npm test` while generating a demo fixture. Nothing was executed. Three
+ * rounds of debugging had not found this; one real run did.
+ *
+ * The report was also unreadable — it printed the whole heredoc into the
+ * evidence field, which no one could act on.
+ */
+describe("a heredoc that contains a test command is not a test run", () => {
+  const heredoc = [
+    "cat > /tmp/demo.py <<'PY'",
+    "rows = [",
+    '  a_tool("npm test"),',
+    '  u_res("Tests 1 failed", True),',
+    "]",
+    "PY",
+  ].join("\n");
+
+  it("does not treat a written-out test command as a run", () => {
+    const events = [bash(heredoc), result("", false), says("All tests pass.")];
+    const [r] = runClaimEvidenceChecks([rule], events);
+    expect(r.status).not.toBe("FAIL");
+  });
+
+  it("still sees a real test command on a later line of the same block", () => {
+    const events = [
+      bash("cd /repo\nnpm test"),
+      result("Tests  1 failed | 4 passed", false),
+      says("All tests pass."),
+    ];
+    const [r] = runClaimEvidenceChecks([rule], events);
+    expect(r.status).toBe("FAIL");
+  });
+
+  it("keeps the quoted command short enough to read", () => {
+    const long = "cd /repo && npm test -- " + "--reporter=verbose ".repeat(40);
+    const events = [bash(long), result("Tests  1 failed | 4 passed", false), says("All tests pass.")];
+    const [r] = runClaimEvidenceChecks([rule], events);
+    expect(r.evidence.length).toBeLessThan(400);
+  });
+});

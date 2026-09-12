@@ -142,3 +142,58 @@ describe("a test RUN satisfies an edit-implies-test rule", () => {
     expect(r.status).toBe("FAIL");
   });
 });
+
+/**
+ * A scratch file is not production code.
+ *
+ * Found 2026-09-12 running 559 real rules files against 5 real sessions:
+ * 24 of the remaining FAILs said "edited
+ * /private/tmp/claude-501/.../scratchpad/probe.mjs but no matching test file
+ * was touched". That path is a throwaway probe written to inspect
+ * something, deleted minutes later. Demanding a test for it is nonsense,
+ * and demanding one loudly is a false accusation.
+ *
+ * Only extensions were excluded before, so any temp file with a code
+ * extension counted as production.
+ */
+describe("scratch, temp and generated paths are not production code", () => {
+  const rule = {
+    kind: "ifEditThenTest" as const,
+    rule: { id: "1", title: "Add tests", text: "Write tests for any code you change.", source: "project" as const },
+  };
+  const edit = (p: string): TranscriptEvent =>
+    ({ role: "assistant", kind: "tool_use", toolName: "Edit", input: { file_path: p }, timestamp: "2026-09-12T00:00:00Z" });
+
+  it("does not demand a test for a scratchpad probe", () => {
+    const [r] = runIfEditThenTestChecks([rule], [edit("/private/tmp/claude-501/abc/scratchpad/probe.mjs")]);
+    expect(r.status).not.toBe("FAIL");
+  });
+
+  it("ignores the usual throwaway and generated locations", () => {
+    for (const p of [
+      "/tmp/x.ts",
+      "/var/folders/zq/T/thing.js",
+      "node_modules/pkg/index.js",
+      "dist/bundle.js",
+      "build/out.js",
+      ".git/hooks/pre-commit",
+      "coverage/lcov-report/x.js",
+    ]) {
+      const [r] = runIfEditThenTestChecks([rule], [edit(p)]);
+      expect(r.status, `should not demand a test for ${p}`).not.toBe("FAIL");
+    }
+  });
+
+  it("still demands a test for real source under a src directory", () => {
+    const [r] = runIfEditThenTestChecks([rule], [edit("src/app.ts")]);
+    expect(r.status).toBe("FAIL");
+  });
+
+  it("does not let a temp edit mask a real one in the same session", () => {
+    // The real file still has to be answered for.
+    const [r] = runIfEditThenTestChecks([rule], [edit("/tmp/probe.mjs"), edit("src/app.ts")]);
+    expect(r.status).toBe("FAIL");
+    expect(r.evidence).toMatch(/src\/app\.ts/);
+    expect(r.evidence).not.toMatch(/probe\.mjs/);
+  });
+});

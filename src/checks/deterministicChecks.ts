@@ -87,7 +87,12 @@ function matchesPattern(haystack: string, pattern: string): boolean {
   const lastChar = pattern[pattern.length - 1];
   const needsTrailingBoundary = /[\w-]/.test(lastChar);
   const suffix = needsTrailingBoundary ? "(?![\\w-])" : "";
-  const regex = new RegExp(escapeRegex(pattern) + suffix);
+  // There was a trailing boundary and no leading one, so a short real
+  // pattern like `rm` matched inside "form", "storm" and "performance".
+  // Found 2026-09-12 running 559 rules files against 5 real sessions.
+  const firstChar = pattern[0];
+  const prefix = /[\w]/.test(firstChar) ? "(?<![\\w-])" : "";
+  const regex = new RegExp(prefix + escapeRegex(pattern) + suffix);
   return regex.test(haystack);
 }
 

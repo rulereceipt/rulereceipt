@@ -424,3 +424,50 @@ Once all three steps are done, you MAY flip DRY_RUN=False and restart the daemon
     expect(classifyRule(r).kind).toBe("claimEvidence");
   });
 });
+
+
+/**
+ * A rule whose only backtick literal is punctuation or a stopword is not a
+ * deterministic rule — the classifier was wrong to call it one.
+ *
+ * Found 2026-09-12 by running 559 real rules files against 5 real sessions:
+ * 2,795 reports, 18,025 verdicts, 967 FAIL. The corpus yields 267 patterns
+ * that cannot identify anything. `,` appears 22 times and matches every file
+ * containing a comma; `/`, `:`, `!` match everything; `or`, `in`, `is` match
+ * ordinary prose. Each is a machine for confident accusations about nothing.
+ *
+ * Dropping the pattern is not enough. If nothing checkable is left, the
+ * premise for calling the rule mechanical has gone, and it belongs in
+ * judgment where a person decides.
+ */
+describe("a rule whose literals cannot identify anything is not deterministic", () => {
+  const mk = (title: string, text: string) => ({ id: "1", title, text, source: "project" as const });
+
+  it("does not treat a comma as a checkable literal", () => {
+    // Needs a directive word, or it is notARule for an unrelated reason and
+    // the test proves nothing about the comma.
+    expect(classifyRule(mk("Reading results", "Always separate the fields with `,` when exporting.")).kind).toBe("judgment");
+  });
+
+  it("does not treat punctuation as a checkable literal", () => {
+    for (const p of ["/", ":", "!", "\\"]) {
+      expect(classifyRule(mk("Style", `Always use \`${p}\` in the header.`)).kind, `punctuation ${p}`).toBe("judgment");
+    }
+  });
+
+  it("does not treat a common English word as a checkable literal", () => {
+    for (const w of ["or", "in", "is", "the", "to"]) {
+      expect(classifyRule(mk("Convention", `Use \`${w}\` in the message.`)).kind, `stopword ${w}`).toBe("judgment");
+    }
+  });
+
+  it("keeps a short but real command name", () => {
+    const k = classifyRule(mk("Dangerous commands", "Never run `rm -rf` on the repo.")).kind;
+    expect(k).not.toBe("judgment");
+  });
+
+  it("keeps a rule that has one junk literal and one real one", () => {
+    const k = classifyRule(mk("Force push", "Never use `,` or `git push --force` here.")).kind;
+    expect(k).not.toBe("judgment");
+  });
+});

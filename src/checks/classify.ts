@@ -361,6 +361,36 @@ function isEditImpliesTestRule(rule: Rule): boolean {
   return EDIT_IMPLIES_TEST_PHRASE.test(text);
 }
 
+/**
+ * Function words that appear in backticks in real rules files but can never
+ * identify an action. Deliberately short and only English function words —
+ * `go`, `cd`, `rm`, `gh` are all real commands and must survive.
+ */
+const STOPWORD_LITERAL = new Set([
+  "a", "an", "and", "as", "at", "be", "by", "if", "in", "is", "it", "of",
+  "on", "or", "so", "the", "to", "we", "you", "this", "that", "with",
+  "for", "from", "not", "but", "are", "was", "do",
+]);
+
+/**
+ * Can this literal identify anything?
+ *
+ * Measured 2026-09-12 across 559 real rules files run against 5 real
+ * sessions — 2,795 reports, 18,025 verdicts, 967 of them FAIL. The corpus
+ * yields 267 literals that cannot: `,` appears 22 times and matches every
+ * file containing a comma; `/`, `:`, `!` match everything; `or`, `in`, `is`
+ * match ordinary prose. Each is a machine for confident accusations about
+ * nothing.
+ *
+ * Dropping the literal is not sufficient on its own — see classifyRule. If
+ * a rule has no usable literal left, the reason for calling it mechanical
+ * has gone with it, and it belongs in judgment.
+ */
+function isUsablePattern(token: string): boolean {
+  if (!/[A-Za-z0-9]/.test(token)) return false;
+  return !STOPWORD_LITERAL.has(token.toLowerCase());
+}
+
 const BACKTICK_TOKEN = /`([^`]+)`/g;
 
 // Keyword signal near the rule text that this is a mandatory action, not a
@@ -448,11 +478,11 @@ export function classifyRule(rule: Rule): Classification {
   const patterns = new Set<string>();
   for (const match of rule.text.matchAll(BACKTICK_TOKEN)) {
     const token = match[1].trim();
-    if (token.length > 0) patterns.add(token);
+    if (isUsablePattern(token)) patterns.add(token);
   }
   for (const match of rule.title.matchAll(BACKTICK_TOKEN)) {
     const token = match[1].trim();
-    if (token.length > 0) patterns.add(token);
+    if (isUsablePattern(token)) patterns.add(token);
   }
 
   // A rule that both forbids and prescribes can't be checked by literal

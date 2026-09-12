@@ -173,6 +173,18 @@ interface TestRun {
   output: string;
 }
 
+/**
+ * A command short enough to read in a report.
+ *
+ * Found by running the tool on a real session: the evidence field printed a
+ * twenty-line heredoc, which no one can act on. A report nobody can read is
+ * not a report.
+ */
+function short(command: string): string {
+  const oneLine = command.replace(/\s+/g, " ").trim();
+  return oneLine.length <= 70 ? oneLine : oneLine.slice(0, 70) + "…";
+}
+
 function commandOf(event: TranscriptEvent): string | null {
   if (event.kind !== "tool_use") return null;
   const input = event.input as { command?: unknown } | null | undefined;
@@ -306,7 +318,7 @@ export function runClaimEvidenceChecks(
     if (unreadable && !contradiction) {
       return unclear(
         rule,
-        `the session stated: "${unreadable.claim}", and \`${unreadable.run.command}\` ran before it — ` +
+        `the session stated: "${unreadable.claim}", and \`${short(unreadable.run.command)}\` ran before it — ` +
           `but that command is piped, so its exit code belongs to the last stage of the pipe rather than ` +
           `to the test run, and the outcome cannot be read from it`
       );
@@ -326,7 +338,7 @@ export function runClaimEvidenceChecks(
         status: "FAIL" as const,
         evidence:
           `the session stated: "${contradiction.claim}"\n` +
-          `  but the last run of \`${contradiction.run.command}\` before that returned an error: ` +
+          `  but the last run of \`${short(contradiction.run.command)}\` before that returned an error: ` +
           `${contradiction.run.output.replace(/\s+/g, " ").trim()}`,
       };
     }
@@ -337,7 +349,7 @@ export function runClaimEvidenceChecks(
         ruleSource: rule.source,
         status: "PASS" as const,
         evidence:
-          `the session stated: "${backed.claim}" — and \`${backed.run.command}\` had just ` +
+          `the session stated: "${backed.claim}" — and \`${short(backed.run.command)}\` had just ` +
           `completed without error`,
       };
     }

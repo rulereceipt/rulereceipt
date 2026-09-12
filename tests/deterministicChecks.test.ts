@@ -288,3 +288,41 @@ describe("a prohibition PASS must not be defeated by a flag alias", () => {
     expect(r.evidence).toMatch(/recorded|scanned|text|not proof|no record/i);
   });
 });
+
+/**
+ * Two bugs found together by running 559 real rules files against 5 real
+ * sessions — 2,795 reports, 18,025 verdicts, 967 of them FAIL.
+ *
+ * A literal has to be able to identify something. The corpus yields 267
+ * patterns that cannot: `,` appears 22 times as a checkable pattern and
+ * matches every file containing a comma; `/`, `:`, `!` and `\` match
+ * everything; `or`, `in` and `is` match ordinary prose. Each one is a
+ * machine for producing confident accusations about nothing.
+ *
+ * And the matcher had a trailing word boundary but no leading one, so a
+ * legitimate short pattern like `rm` matched inside "form", "storm" and
+ * "performance".
+ */
+describe("the matcher must not fire inside a longer word", () => {
+  const mk = (patterns: string[]) => ({
+    kind: "deterministic" as const,
+    rule: { id: "1", title: "Some rule", text: "text", source: "project" as const },
+    patterns,
+    polarity: "forbid" as const,
+  });
+  const write = (content: string): TranscriptEvent =>
+    toolUse("Write", { file_path: "src/a.ts", content });
+
+  it("does not match a real pattern inside a longer word", () => {
+    // There was a trailing word boundary and no leading one, so `rm` fired
+    // on "performance", "form" and "storm". Found 2026-09-12 while running
+    // 559 real rules files against 5 real sessions.
+    const [r] = runDeterministicChecks([mk(["rm"])], [write("const performance = form(storm)")]);
+    expect(r.status).toBe("PASS");
+  });
+
+  it("still matches the pattern as a real token", () => {
+    const [r] = runDeterministicChecks([mk(["rm"])], [toolUse("Bash", { command: "rm -rf build" })]);
+    expect(r.status).toBe("UNCLEAR");
+  });
+});

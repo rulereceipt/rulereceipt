@@ -11,6 +11,21 @@ const TEST_FILE_PATTERN = /(\.test\.|\.spec\.|__tests__\/|_test\.|\/tests?\/)/i;
 // change" rule. Excluded from prodPaths entirely, same as test files.
 const NON_TESTABLE_FILE_PATTERN = /\.(md|mdx|txt|rst|json|ya?ml|toml|lock|csv|log)$/i;
 
+/**
+ * Paths that are not this project's source, whatever their extension.
+ *
+ * Found 2026-09-12 running 559 real rules files against 5 real sessions: 24
+ * FAILs said "edited /private/tmp/.../scratchpad/probe.mjs but no matching
+ * test file was touched". That is a throwaway probe, written to inspect
+ * something and deleted minutes later. Demanding a test for it is nonsense;
+ * demanding one as a FAIL is a false accusation.
+ *
+ * Only file extensions were excluded before, so any temp file that happened
+ * to end in .ts or .mjs counted as production code.
+ */
+const NON_PROJECT_PATH_PATTERN =
+  /(?:^|\/)(?:tmp|temp|scratch|scratchpad|node_modules|dist|build|out|coverage|\.git|\.next|\.cache|vendor|__pycache__)(?:\/|$)|^\/(?:private\/)?(?:tmp|var)\//i;
+
 const WRITE_LIKE_TOOLS = new Set(["Write", "Edit", "NotebookEdit"]);
 
 function extractEditedPaths(events: TranscriptEvent[]): string[] {
@@ -61,7 +76,12 @@ export function runIfEditThenTestChecks(
   // more than a missed detection.
   const testRun = findTestRun(events);
   const testPaths = editedPaths.filter((p) => TEST_FILE_PATTERN.test(p));
-  const prodPaths = editedPaths.filter((p) => !TEST_FILE_PATTERN.test(p) && !NON_TESTABLE_FILE_PATTERN.test(p));
+  const prodPaths = editedPaths.filter(
+    (p) =>
+      !TEST_FILE_PATTERN.test(p) &&
+      !NON_TESTABLE_FILE_PATTERN.test(p) &&
+      !NON_PROJECT_PATH_PATTERN.test(p)
+  );
 
   return classifications.map(({ rule }) => {
     if (prodPaths.length === 0) {
