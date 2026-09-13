@@ -550,3 +550,59 @@ describe("polarity is never guessed", () => {
     expect(polarityOf(mk("Merging", "You must never use `git merge --squash` here."))).toBe("forbid");
   });
 });
+
+/**
+ * Two causes of 97% of the remaining false accusations, measured 2026-09-13
+ * across 559 rules files against 5 real sessions.
+ *
+ * codeContent picked its route with `some()` — if ANY backtick literal
+ * looked like a code construct, the rule routed there — and then passed
+ * EVERY literal through to the matcher. So a rule mentioning `foo(` and
+ * `name` searched written files for "name". 456 of 2,871 code-content
+ * patterns were a single bare word: name, OK, FAIL, ERROR, Description,
+ * JObject. Each one can fail any file containing that word.
+ *
+ * And claimEvidence was routing document sections. 51 of its 83 rules had
+ * bodies over 1,500 characters, median 1,932, longest 16,502 — against a
+ * median of 71 for rules generally. A rule titled "AutoEvolve Instructions
+ * for GitHub Copilot" produced 166 of the 347 failures on its own, because
+ * a long enough section contains a reporting verb, an evidence noun and a
+ * done-word somewhere in its body.
+ */
+describe("code-content checks only the literals that are actually code", () => {
+  const mk = (title: string, text: string) => ({ id: "1", title, text, source: "project" as const });
+
+  it("drops bare-word literals from a code-content rule", () => {
+    const c = classifyRule(mk("No debug output", "Never leave a `console.log(` call or use `name` as a variable."));
+    expect(c.kind).toBe("codeContent");
+    if (c.kind !== "codeContent") throw new Error("expected codeContent");
+    expect(c.patterns).toContain("console.log(");
+    expect(c.patterns).not.toContain("name");
+  });
+
+  it("keeps every literal that is genuinely a code construct", () => {
+    const c = classifyRule(mk("No debug output", "Never use `console.log(` or `debugger.break(` here."));
+    if (c.kind !== "codeContent") throw new Error("expected codeContent");
+    expect(c.patterns).toHaveLength(2);
+  });
+});
+
+describe("a document section is not a claim-evidence rule", () => {
+  const mk = (title: string, text: string) => ({ id: "1", title, text, source: "project" as const });
+
+  it("does not route a very long section to claimEvidence", () => {
+    // Long enough to contain a reporting verb, an evidence noun and a
+    // done-word by accident, which is exactly how this misfires.
+    const body =
+      "This document describes the workflow. " +
+      "Report progress as you go and paste evidence when a step is done. ".repeat(40);
+    expect(body.length).toBeGreaterThan(1500);
+    expect(classifyRule(mk("AutoEvolve Instructions for GitHub Copilot", body)).kind).not.toBe("claimEvidence");
+  });
+
+  it("still routes a normal-length rule", () => {
+    const c = classifyRule(mk("Evidence or it didn't happen",
+      "Never report an item done, confirmed or working without pasting the specific evidence in the same message."));
+    expect(c.kind).toBe("claimEvidence");
+  });
+});

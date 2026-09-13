@@ -326,7 +326,21 @@ const DONE_WORD =
 const PRE_ACTION_GATE =
   /\b(?:repeat[- ]back|restate\s+what|wait\s+for\s+(?:confirmation|approval|explicit|sign[- ]?off)|ask\s+(?:first|before|for\s+permission)|get\s+(?:approval|sign[- ]?off|permission)|before\s+(?:you\s+)?(?:delet|overwrit|drop|truncat|wip|run|flip|deploy|push|commit|chang|modif|plac))\w*/i;
 
+/**
+ * A body this long is a document section, not a rule.
+ *
+ * Rule bodies run to a median of 71 characters and a 99th percentile of
+ * about 1,700. Measured 2026-09-13, claimEvidence was routing sections with
+ * a median body of 1,932 and a longest of 16,502 — 51 of its 83 rules were
+ * over this threshold. A section that long contains a reporting verb, an
+ * evidence noun and a done-word somewhere by accident, which is how a rule
+ * titled "AutoEvolve Instructions for GitHub Copilot" produced 166 of 347
+ * failures on its own.
+ */
+const MAX_RULE_BODY_FOR_CLAIM = 1500;
+
 function isClaimEvidenceRule(rule: Rule): boolean {
+  if (rule.text.length > MAX_RULE_BODY_FOR_CLAIM) return false;
   const text = `${rule.title} ${rule.text}`;
   if (PRE_ACTION_GATE.test(text)) return false;
   return REPORTING_VERB.test(text) && EVIDENCE_NOUN.test(text) && DONE_WORD.test(text);
@@ -531,6 +545,7 @@ export function classifyRule(rule: Rule): Classification {
   if (isClaimEvidenceRule(rule)) {
     return { kind: "claimEvidence", rule };
   }
+  // (length guard applied inside isClaimEvidenceRule)
 
   const patterns = new Set<string>();
   for (const match of rule.text.matchAll(BACKTICK_TOKEN)) {
@@ -571,8 +586,15 @@ export function classifyRule(rule: Rule): Classification {
     return { kind: "gitBranchPolicy", rule, branchName, polarity , polarityInferred };
   }
 
-  if ([...patterns].some((p) => CODE_CONSTRUCT_PATTERN.test(p))) {
-    return { kind: "codeContent", rule, patterns: [...patterns], polarity , polarityInferred };
+  // Route on ANY code-shaped literal, but check ONLY the code-shaped ones.
+  // This used to pass every literal through once one of them looked like
+  // code, so a rule mentioning `foo(` and `name` searched written files for
+  // "name". Measured 2026-09-13: 456 of 2,871 code-content patterns were a
+  // single bare word — name, OK, FAIL, ERROR, Description — and each could
+  // fail any file containing it.
+  const codeLiterals = [...patterns].filter((p) => CODE_CONSTRUCT_PATTERN.test(p));
+  if (codeLiterals.length > 0) {
+    return { kind: "codeContent", rule, patterns: codeLiterals, polarity , polarityInferred };
   }
 
   const filePath = [...patterns].find((p) => FILE_PATH_PATTERN.test(p));
