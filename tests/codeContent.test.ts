@@ -37,7 +37,9 @@ describe("runCodeContentChecks", () => {
   it("does NOT fail when the pattern appears only as a search ARGUMENT in the agent's own Bash command", () => {
     const events = [bash('grep -rn "print(" src/')];
     const [result] = runCodeContentChecks([noPrintRule], events);
-    expect(result.status).toBe("PASS");
+    // name says it must not accuse; that is the guarantee, and a rule
+      // whose trigger never fired is not_applicable rather than followed
+      expect(result.status).not.toBe("FAIL");
   });
 
   it("does NOT fail when the pattern appears only in prose the agent wrote", () => {
@@ -67,7 +69,12 @@ describe("runCodeContentChecks", () => {
   it("PASSes when file edits happened but none contained the pattern", () => {
     const events = [write("src/clean.py", "def f():\n    return 42\n")];
     const [result] = runCodeContentChecks([noPrintRule], events);
-    expect(result.status).toBe("PASS");
+    // CHANGED 2026-09-13. Asserted PASS. A prohibition whose forbidden act
+      // never happened did not apply — calling it followed claims something
+      // the check cannot show. The guarantee that matters, that it never
+      // accuses, is asserted below.
+      expect(result.outcome).toBe("not_applicable");
+      expect(result.status).not.toBe("FAIL");
   });
 
   it("reports an empty session as never having applied, not as followed", () => {

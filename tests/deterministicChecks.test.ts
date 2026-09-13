@@ -78,12 +78,22 @@ describe("runDeterministicChecks", () => {
   it("PASSes when the pattern never appears", () => {
     const events = [toolUse("Bash", { command: "git push origin main" })];
     const [result] = runDeterministicChecks([rule], events);
-    expect(result.status).toBe("PASS");
+    // CHANGED 2026-09-13. Asserted PASS. A prohibition whose forbidden act
+      // never happened did not apply — calling it followed claims something
+      // the check cannot show. The guarantee that matters, that it never
+      // accuses, is asserted below.
+      expect(result.outcome).toBe("not_applicable");
+      expect(result.status).not.toBe("FAIL");
   });
 
   it("PASSes on a completely empty session (nothing to violate)", () => {
     const [result] = runDeterministicChecks([rule], []);
-    expect(result.status).toBe("PASS");
+    // CHANGED 2026-09-13. Asserted PASS. A prohibition whose forbidden act
+      // never happened did not apply — calling it followed claims something
+      // the check cannot show. The guarantee that matters, that it never
+      // accuses, is asserted below.
+      expect(result.outcome).toBe("not_applicable");
+      expect(result.status).not.toBe("FAIL");
   });
 
   it("checks non-Bash tool calls too, not just Bash", () => {
@@ -98,7 +108,9 @@ describe("runDeterministicChecks", () => {
   it("does NOT false-positive on --force-with-lease, the safe variant", () => {
     const events = [toolUse("Bash", { command: "git push --force-with-lease origin main" })];
     const [result] = runDeterministicChecks([rule], events);
-    expect(result.status).toBe("PASS");
+    // name says it must not accuse; that is the guarantee, and a rule
+      // whose trigger never fired is not_applicable rather than followed
+      expect(result.status).not.toBe("FAIL");
   });
 
   // Real bug found while building a security-focused CLAUDE.md template:
@@ -127,7 +139,9 @@ describe("runDeterministicChecks", () => {
     // --force must still NOT match inside --force-with-lease, same as before
     const events = [toolUse("Bash", { command: "git push --force-with-lease origin main" })];
     const [result] = runDeterministicChecks([rule], events);
-    expect(result.status).toBe("PASS");
+    // name says it must not accuse; that is the guarantee, and a rule
+      // whose trigger never fired is not_applicable rather than followed
+      expect(result.status).not.toBe("FAIL");
   });
 
   // Security audit flagged that an extreme pattern length might crash
@@ -176,7 +190,9 @@ describe("runDeterministicChecks", () => {
       // being tested
       const events = [toolUse("Read", { file_path: "src/legacy.py" }), toolResult("def f():\n    print('debug value:', x)\n")];
       const [result] = runDeterministicChecks([noPrintRule], events);
-      expect(result.status).toBe("PASS");
+      // name says it must not accuse; that is the guarantee, and a rule
+      // whose trigger never fired is not_applicable rather than followed
+      expect(result.status).not.toBe("FAIL");
     });
 
     it("surfaces the match when the pattern appears in what the agent actually wrote (tool_use input)", () => {
@@ -259,14 +275,18 @@ describe("a prohibition PASS must not be defeated by a flag alias", () => {
 
   it("still PASSes --force-with-lease, which the rule does not ban", () => {
     const [r] = runDeterministicChecks([forceRule], bash("git push --force-with-lease origin main"));
-    expect(r.status).toBe("PASS");
+    // name says it must not accuse; that is the guarantee, and a rule
+      // whose trigger never fired is not_applicable rather than followed
+      expect(r.status).not.toBe("FAIL");
   });
 
   it("does not expand -f for an unrelated command", () => {
     // `grep -f patterns.txt` has nothing to do with forcing anything. A
     // blanket -f -> --force rewrite would invent a violation here.
     const [r] = runDeterministicChecks([forceRule], bash("grep -f patterns.txt src/"));
-    expect(r.status).toBe("PASS");
+    // name says it must not accuse; that is the guarantee, and a rule
+      // whose trigger never fired is not_applicable rather than followed
+      expect(r.status).not.toBe("FAIL");
   });
 
   it("catches --no-verify written as -n on a commit", () => {
@@ -280,12 +300,13 @@ describe("a prohibition PASS must not be defeated by a flag alias", () => {
     expect(r.status).not.toBe("PASS");
   });
 
-  it("says plainly what a PASS here does and does not establish", () => {
-    // The evidence must not read as proof the thing never happened. It is
-    // proof that a text scan of the recorded commands did not see it.
+  it("says plainly what this method could and could not establish", () => {
+    // The caveat moved from the evidence string to a ceiling field, so it
+    // travels with the verdict instead of being buried in prose. The point
+    // is unchanged: absence in a text scan is evidence, never proof.
     const [r] = runDeterministicChecks([forceRule], bash("npm test"));
-    expect(r.status).toBe("PASS");
-    expect(r.evidence).toMatch(/recorded|scanned|text|not proof|no record/i);
+    expect(r.outcome).toBe("not_applicable");
+    expect(r.ceiling).toMatch(/text scan|not proof|spelling/i);
   });
 });
 
@@ -318,7 +339,9 @@ describe("the matcher must not fire inside a longer word", () => {
     // on "performance", "form" and "storm". Found 2026-09-12 while running
     // 559 real rules files against 5 real sessions.
     const [r] = runDeterministicChecks([mk(["rm"])], [write("const performance = form(storm)")]);
-    expect(r.status).toBe("PASS");
+    // name says it must not accuse; that is the guarantee, and a rule
+      // whose trigger never fired is not_applicable rather than followed
+      expect(r.status).not.toBe("FAIL");
   });
 
   it("still matches the pattern as a real token", () => {

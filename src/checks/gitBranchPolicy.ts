@@ -125,11 +125,20 @@ export function runGitBranchPolicyChecks(
       if (hit) {
         return violation(rule, polarity, `a git command actually targeted the "${branchName}" branch: ${hit.command}`, { method: "git_events", polarityInferred });
       }
+        // Trigger evaluated and absent: the rule never applied. Not
+        // "followed" — that word claims something the check cannot show.
       return {
         ruleId: rule.id,
         ruleTitle: rule.title,
         ruleSource: rule.source,
-        status: "PASS",
+        // status stays UNCLEAR: a legacy reader must not see a green
+        // tick for a rule that never applied. Setting PASS here while the
+        // outcome said not_applicable was the same word-borrowing this
+        // vocabulary exists to stop, one field further down.
+        status: "UNCLEAR",
+        outcome: "not_applicable" as const,
+        method: "git_events" as const,
+        ceiling: "a scan of recorded git commands — it does not see commands run outside this session",
         evidence: `no git command targeted the "${branchName}" branch this session`,
       };
     }

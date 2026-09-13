@@ -90,36 +90,27 @@ export function runFileLifecycleChecks(
   classifications: FileLifecycleClassification[],
   events: TranscriptEvent[]
 ): CheckResult[] {
-  // Deliberately conservative: ANY tool call at all counts as the session
-  // having done something. A first attempt keyed this on Write/Edit only and
-  // reported "never applied" for a session that deleted the protected file
-  // with `rm` in Bash — a false not_applicable hides a real violation, which
-  // is the same error as a false PASS wearing a different label.
-  const didAnything = events.some((e) => e.kind === "tool_use");
   return classifications.map(({ rule, filePath, polarity, polarityInferred }) => {
-    // Nothing was written, so a rule about writing a file never applied.
-    if (!didAnything) {
-      return {
-        ruleId: rule.id,
-        ruleTitle: rule.title,
-        ruleSource: rule.source,
-        status: "UNCLEAR" as const,
-        outcome: "not_applicable" as const,
-        method: "file_events" as const,
-        evidence: "the session made no tool calls at all, so this rule never applied",
-      };
-    }
     const mutation = findMutation(events, filePath);
 
     if (polarity === "forbid") {
       if (mutation) {
         return violation(rule, polarity, `"${filePath}" was actually modified: ${mutation.slice(0, 160)}`, { method: "file_events", polarityInferred });
       }
+        // Trigger evaluated and absent: the rule never applied. Not
+        // "followed" — that word claims something the check cannot show.
       return {
         ruleId: rule.id,
         ruleTitle: rule.title,
         ruleSource: rule.source,
-        status: "PASS",
+        // status stays UNCLEAR: a legacy reader must not see a green
+        // tick for a rule that never applied. Setting PASS here while the
+        // outcome said not_applicable was the same word-borrowing this
+        // vocabulary exists to stop, one field further down.
+        status: "UNCLEAR",
+        outcome: "not_applicable" as const,
+        method: "file_events" as const,
+        ceiling: "a check of file-mutation events — it shows no mutation of this path was recorded, not that the file is untouched on disk",
         evidence: `"${filePath}" was never written to, deleted, or moved this session (reading it does not count)`,
       };
     }

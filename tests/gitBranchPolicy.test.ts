@@ -41,7 +41,9 @@ describe("runGitBranchPolicyChecks", () => {
   it("does NOT fail when 'demo' appears inside a git command but not as a checkout/switch/branch/push argument", () => {
     const events = [bash("git log --oneline -- acme-demo/")];
     const [result] = runGitBranchPolicyChecks([forbidDemoRule], events);
-    expect(result.status).toBe("PASS");
+    // name says it must not accuse; that is the guarantee, and a rule
+      // whose trigger never fired is not_applicable rather than followed
+      expect(result.status).not.toBe("FAIL");
   });
 
   // A bare checkout with no commit is routine (syncing before branching
@@ -51,13 +53,17 @@ describe("runGitBranchPolicyChecks", () => {
   it("does NOT fail on a bare git checkout of the named branch with no commit following it", () => {
     const events = [bash("git checkout demo")];
     const [result] = runGitBranchPolicyChecks([forbidDemoRule], events);
-    expect(result.status).toBe("PASS");
+    // name says it must not accuse; that is the guarantee, and a rule
+      // whose trigger never fired is not_applicable rather than followed
+      expect(result.status).not.toBe("FAIL");
   });
 
   it("does NOT fail on a bare git switch to the named branch with no commit following it", () => {
     const events = [bash("git switch demo")];
     const [result] = runGitBranchPolicyChecks([forbidDemoRule], events);
-    expect(result.status).toBe("PASS");
+    // name says it must not accuse; that is the guarantee, and a rule
+      // whose trigger never fired is not_applicable rather than followed
+      expect(result.status).not.toBe("FAIL");
   });
 
   it("correctly FAILs when git checkout -b CREATES a new branch with the exact forbidden name", () => {
@@ -81,7 +87,9 @@ describe("runGitBranchPolicyChecks", () => {
   it("does NOT fail when checking out a DIFFERENT branch", () => {
     const events = [bash("git checkout main")];
     const [result] = runGitBranchPolicyChecks([forbidDemoRule], events);
-    expect(result.status).toBe("PASS");
+    // name says it must not accuse; that is the guarantee, and a rule
+      // whose trigger never fired is not_applicable rather than followed
+      expect(result.status).not.toBe("FAIL");
   });
 
   it("reports an empty session as never having applied, not as followed", () => {
@@ -116,7 +124,9 @@ describe("runGitBranchPolicyChecks", () => {
     it("does NOT fail when the protected branch is checked out only to sync/pull before branching off", () => {
       const events = [bash("git checkout sprint && git pull origin sprint"), bash("git checkout -b feature/new-thing")];
       const [result] = runGitBranchPolicyChecks([forbidSprintRule], events);
-      expect(result.status).toBe("PASS");
+      // name says it must not accuse; that is the guarantee, and a rule
+      // whose trigger never fired is not_applicable rather than followed
+      expect(result.status).not.toBe("FAIL");
     });
 
     it("correctly FAILs when a commit actually happens while sitting on the protected branch", () => {
@@ -128,7 +138,9 @@ describe("runGitBranchPolicyChecks", () => {
     it("does NOT fail when a commit happens on a DIFFERENT branch checked out after leaving the protected one", () => {
       const events = [bash("git checkout sprint"), bash("git checkout -b feature/x"), bash("git commit -am 'real work'")];
       const [result] = runGitBranchPolicyChecks([forbidSprintRule], events);
-      expect(result.status).toBe("PASS");
+      // name says it must not accuse; that is the guarantee, and a rule
+      // whose trigger never fired is not_applicable rather than followed
+      expect(result.status).not.toBe("FAIL");
     });
 
     it("still correctly FAILs on a direct push to the protected branch, with no checkout involved at all", () => {

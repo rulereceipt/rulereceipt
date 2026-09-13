@@ -145,12 +145,23 @@ export function runDeterministicChecks(
             evidence: `"${foundPattern}" appears in a ${foundEvent.kind === "tool_use" ? foundEvent.toolName + " call" : foundEvent.kind}, but a text match alone can't tell an actual violation from a mention (a search for it, a quote, an explanation) — needs a human look: ${haystack.slice(0, 160)}`,
           };
         }
+        // For a prohibition the trigger IS the forbidden act. Evaluated and
+        // absent means the rule never applied — not that it was followed.
+        // Reporting it as followed is how an empty transcript produced 2,770
+        // green ticks across the 559-file corpus.
         return {
           ruleId: rule.id,
           ruleTitle: rule.title,
           ruleSource: rule.source,
-          status: "PASS",
-          evidence: `no occurrence of ${patterns.map((p) => `"${p}"`).join(" or ")} in the commands and messages recorded this session — this is a text scan of the transcript, so it is evidence rather than proof: a spelling this checker does not know would not be caught`,
+          // status stays UNCLEAR: a legacy reader must not see a green
+          // tick for a rule that never applied. Setting PASS here while the
+          // outcome said not_applicable was the same word-borrowing this
+          // vocabulary exists to stop, one field further down.
+          status: "UNCLEAR",
+          outcome: "not_applicable",
+          method: "text_scan",
+          ceiling: "a text scan of the recorded commands and messages — evidence, not proof the act did not happen, since a spelling this checker does not know would not be caught",
+          evidence: `no occurrence of ${patterns.map((p) => `"${p}"`).join(" or ")} in the commands and messages recorded this session`,
         };
       }
 

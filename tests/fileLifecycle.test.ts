@@ -32,19 +32,25 @@ describe("runFileLifecycleChecks", () => {
   it("does NOT fail when the protected file is only READ with cat", () => {
     const events = [bash("cat .claude/settings.json")];
     const [result] = runFileLifecycleChecks([protectSettings], events);
-    expect(result.status).toBe("PASS");
+    // name says it must not accuse; that is the guarantee, and a rule
+      // whose trigger never fired is not_applicable rather than followed
+      expect(result.status).not.toBe("FAIL");
   });
 
   it("does NOT fail when the protected file is only read via the Read tool", () => {
     const events = [read(".claude/settings.json")];
     const [result] = runFileLifecycleChecks([protectSettings], events);
-    expect(result.status).toBe("PASS");
+    // name says it must not accuse; that is the guarantee, and a rule
+      // whose trigger never fired is not_applicable rather than followed
+      expect(result.status).not.toBe("FAIL");
   });
 
   it("does NOT fail when the path is only grepped", () => {
     const events = [bash("grep -n hooks .claude/settings.json")];
     const [result] = runFileLifecycleChecks([protectSettings], events);
-    expect(result.status).toBe("PASS");
+    // name says it must not accuse; that is the guarantee, and a rule
+      // whose trigger never fired is not_applicable rather than followed
+      expect(result.status).not.toBe("FAIL");
   });
 
   it("does NOT fail when the path appears only in prose", () => {
@@ -86,7 +92,9 @@ describe("runFileLifecycleChecks", () => {
   it("does NOT fail when a DIFFERENT file with a similar name is modified", () => {
     const events = [write(".claude/other-settings.json"), bash("rm backup-settings.json")];
     const [result] = runFileLifecycleChecks([protectSettings], events);
-    expect(result.status).toBe("PASS");
+    // name says it must not accuse; that is the guarantee, and a rule
+      // whose trigger never fired is not_applicable rather than followed
+      expect(result.status).not.toBe("FAIL");
   });
 
   it("reports an empty session as never having applied, not as followed", () => {

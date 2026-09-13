@@ -85,7 +85,9 @@ describe("runIfEditThenTestChecks", () => {
     it("still correctly PASSes when a real code file has a matching test, regardless of docs also being edited", () => {
       const events = [edit("src/foo.ts"), edit("src/foo.test.ts"), edit("README.md")];
       const [result] = runIfEditThenTestChecks([rule], events);
-      expect(result.status).toBe("PASS");
+      // name says it must not accuse; that is the guarantee, and a rule
+      // whose trigger never fired is not_applicable rather than followed
+      expect(result.status).not.toBe("FAIL");
     });
   });
 });

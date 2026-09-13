@@ -39,25 +39,7 @@ export function runCodeContentChecks(
     if (content) editedContents.push(content);
   }
 
-  // Deliberately conservative: ANY tool call at all counts as the session
-  // having done something. A first attempt keyed this on Write/Edit only and
-  // reported "never applied" for a session that deleted the protected file
-  // with `rm` in Bash — a false not_applicable hides a real violation, which
-  // is the same error as a false PASS wearing a different label.
-  const didAnything = events.some((e) => e.kind === "tool_use");
   return classifications.map(({ rule, patterns, polarity, polarityInferred }) => {
-    // Nothing was written, so a rule about written content never applied.
-    if (!didAnything) {
-      return {
-        ruleId: rule.id,
-        ruleTitle: rule.title,
-        ruleSource: rule.source,
-        status: "UNCLEAR" as const,
-        outcome: "not_applicable" as const,
-        method: "code_content" as const,
-        evidence: "the session made no tool calls at all, so this rule never applied",
-      };
-    }
     let foundPattern: string | undefined;
     let foundContent: string | undefined;
     for (const content of editedContents) {
@@ -75,11 +57,20 @@ export function runCodeContentChecks(
       if (foundPattern && foundContent) {
         return violation(rule, polarity, `found "${foundPattern}" actually written into a file: ${foundContent.slice(0, 160)}`, { method: "code_content", polarityInferred });
       }
+        // Trigger evaluated and absent: the rule never applied. Not
+        // "followed" — that word claims something the check cannot show.
       return {
         ruleId: rule.id,
         ruleTitle: rule.title,
         ruleSource: rule.source,
-        status: "PASS",
+        // status stays UNCLEAR: a legacy reader must not see a green
+        // tick for a rule that never applied. Setting PASS here while the
+        // outcome said not_applicable was the same word-borrowing this
+        // vocabulary exists to stop, one field further down.
+        status: "UNCLEAR",
+        outcome: "not_applicable" as const,
+        method: "code_content" as const,
+        ceiling: "a scan of content written through Write/Edit — it does not see content written by a shell command",
         evidence: `no file edit actually contained ${patterns.map((p) => `"${p}"`).join(" or ")} this session`,
       };
     }
