@@ -148,3 +148,77 @@ describe("runFileLifecycleChecks", () => {
     });
   });
 });
+
+/**
+ * A scratch file is not the project's file.
+ *
+ * Found 2026-09-13 by adjudicating the last structured failures by hand. A
+ * rule saying "CHANGELOG.md is release-only" fired on
+ * /private/tmp/.../scratchpad/CHANGELOG.md — a throwaway written during a
+ * probe and deleted minutes later. The same exclusion already existed in
+ * ifEditThenTest for exactly this reason and was never applied here.
+ */
+describe("temp and scratch paths are not the project's protected files", () => {
+  const protectChangelog = {
+    kind: "fileLifecycle" as const,
+    rule: { id: "1", title: "Changelog is release-only", text: "Never hand-edit `CHANGELOG.md`.", source: "project" as const },
+    filePath: "CHANGELOG.md",
+    polarity: "forbid" as const,
+  };
+  const edit = (p: string): TranscriptEvent =>
+    ({ role: "assistant", kind: "tool_use", toolName: "Edit", input: { file_path: p }, timestamp: "t" });
+
+  it("does not fire on a scratchpad copy", () => {
+    const [r] = runFileLifecycleChecks([protectChangelog], [edit("/private/tmp/claude-501/abc/scratchpad/CHANGELOG.md")]);
+    expect(r.status).not.toBe("FAIL");
+  });
+
+  it("does not fire on other throwaway locations", () => {
+    for (const p of ["/tmp/CHANGELOG.md", "node_modules/pkg/CHANGELOG.md", "dist/CHANGELOG.md"]) {
+      const [r] = runFileLifecycleChecks([protectChangelog], [edit(p)]);
+      expect(r.status, `should not fire on ${p}`).not.toBe("FAIL");
+    }
+  });
+
+  it("still fires on the project's own file", () => {
+    const [r] = runFileLifecycleChecks([protectChangelog], [edit("CHANGELOG.md")]);
+    expect(r.status).toBe("FAIL");
+  });
+
+  it("still fires on the project's file in a subdirectory", () => {
+    const [r] = runFileLifecycleChecks([protectChangelog], [edit("docs/CHANGELOG.md")]);
+    expect(r.status).toBe("FAIL");
+  });
+});
+
+describe("a shell mutation inside a temp directory is still a temp file", () => {
+  const protectClaude = {
+    kind: "fileLifecycle" as const,
+    rule: { id: "1", title: "Never commit under .claude/", text: "Never commit changes under `.claude/`.", source: "project" as const },
+    filePath: ".claude/",
+    polarity: "forbid" as const,
+  };
+  const bash = (command: string): TranscriptEvent =>
+    ({ role: "assistant", kind: "tool_use", toolName: "Bash", input: { command }, timestamp: "t" });
+
+  it("does not fire on a scratch tree built under /tmp", () => {
+    // Verbatim from a real session. The command is MULTI-LINE: `cd /tmp` on
+    // the first line, the .claude write three lines later. A guard that
+    // looks for a temp prefix adjacent to the filename cannot connect them,
+    // which is why a shortened one-line fixture passed while the real
+    // command still failed.
+    const real = [
+      "cd /tmp && rm -rf loadgap && mkdir -p loadgap/.claude && cd loadgap",
+      "CLI=/Users/shilpa/Desktop/Shilpa/rulereceipt/dist/cli.js",
+      "printf '# Root\\n\\n## 1. Root rule\\n' > .claude/CLAUDE.md",
+      "node $CLI check",
+    ].join("\n");
+    const [r] = runFileLifecycleChecks([protectClaude], [bash(real)]);
+    expect(r.status).not.toBe("FAIL");
+  });
+
+  it("still fires on a real deletion in the project", () => {
+    const [r] = runFileLifecycleChecks([protectClaude], [bash("rm -rf .claude/")]);
+    expect(r.status).toBe("FAIL");
+  });
+});

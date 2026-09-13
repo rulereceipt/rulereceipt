@@ -1,5 +1,6 @@
 import type { TranscriptEvent, CheckResult } from "../types.js";
 import { violation } from "../types.js";
+import { isProjectPath } from "./projectPaths.js";
 import type { FileLifecycleClassification } from "./classify.js";
 
 /**
@@ -43,6 +44,12 @@ function pathPattern(filePath: string): string {
   return `(?:^|[\\s'"=/])${escapeRegex(filePath.replace(/^\.\//, ""))}(?=$|[\\s'";)])`;
 }
 
+/**
+ * The command moves into a throwaway tree before doing anything. Anything
+ * it mutates after that is a scratch file, not the project's.
+ */
+const CD_INTO_TEMP = /\bcd\s+["']?(?:\/private)?\/(?:tmp|var\/folders)\b|\bcd\s+["']?[^\s"'&|;]*\/(?:scratchpad|node_modules)\b/;
+
 function mutatesPathInBash(command: string, filePath: string): boolean {
   const p = pathPattern(filePath);
   const mutations = [
@@ -69,6 +76,11 @@ function findMutation(events: TranscriptEvent[], filePath: string): string | nul
       const input = event.input as { file_path?: unknown };
       if (typeof input?.file_path === "string") {
         const actual = input.file_path.replace(/^\.\//, "");
+        // A throwaway copy is not the project's file. A rule saying
+        // "CHANGELOG.md is release-only" fired on a scratchpad CHANGELOG.md
+        // written during a probe and deleted minutes later — the basename
+        // matched and nothing else was checked.
+        if (!isProjectPath(actual)) continue;
         if (actual === normalized || actual.endsWith(`/${normalized}`)) {
           return `${event.toolName} on ${input.file_path}`;
         }
@@ -79,6 +91,15 @@ function findMutation(events: TranscriptEvent[], filePath: string): string | nul
     if (event.toolName === "Bash") {
       const input = event.input as { command?: unknown };
       if (typeof input?.command === "string" && mutatesPathInBash(input.command, filePath)) {
+        // A command whose working directory is a temp tree is operating on
+        // throwaway files, however the paths inside it are spelled.
+        //
+        // The first version required the temp prefix to sit next to the
+        // filename, which cannot work: the real command that exposed this
+        // does `cd /tmp` on its first line and writes `.claude/CLAUDE.md`
+        // three lines later. A shortened one-line fixture passed while the
+        // real command kept failing.
+        if (CD_INTO_TEMP.test(input.command)) continue;
         return input.command;
       }
     }

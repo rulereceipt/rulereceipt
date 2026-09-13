@@ -1,6 +1,7 @@
 import type { TranscriptEvent, CheckResult } from "../types.js";
 import type { IfEditThenTestClassification } from "./classify.js";
 import { findTestRun } from "./testCommands.js";
+import { isProjectPath } from "./projectPaths.js";
 
 const TEST_FILE_PATTERN = /(\.test\.|\.spec\.|__tests__\/|_test\.|\/tests?\/)/i;
 
@@ -23,8 +24,6 @@ const NON_TESTABLE_FILE_PATTERN = /\.(md|mdx|txt|rst|json|ya?ml|toml|lock|csv|lo
  * Only file extensions were excluded before, so any temp file that happened
  * to end in .ts or .mjs counted as production code.
  */
-const NON_PROJECT_PATH_PATTERN =
-  /(?:^|\/)(?:tmp|temp|scratch|scratchpad|node_modules|dist|build|out|coverage|\.git|\.next|\.cache|vendor|__pycache__)(?:\/|$)|^\/(?:private\/)?(?:tmp|var)\//i;
 
 const WRITE_LIKE_TOOLS = new Set(["Write", "Edit", "NotebookEdit"]);
 
@@ -80,7 +79,7 @@ export function runIfEditThenTestChecks(
     (p) =>
       !TEST_FILE_PATTERN.test(p) &&
       !NON_TESTABLE_FILE_PATTERN.test(p) &&
-      !NON_PROJECT_PATH_PATTERN.test(p)
+      isProjectPath(p)
   );
 
   return classifications.map(({ rule }) => {
