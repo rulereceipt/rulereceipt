@@ -174,6 +174,11 @@
           <td class="n">63.2%</td><td class="n">8,101</td><td class="n">35.3%</td>
           <td>The largest correction so far, and it moved the checkable figure down. When the classifier could not tell whether a rule <em>forbade</em> something or <em>required</em> it, it defaulted to forbid &mdash; the accusing direction &mdash; on the grounds that this preserved existing behaviour. It failed a real session for following <a href="https://github.com/cypress-io/cypress">Cypress</a>&rsquo;s own rule to &ldquo;update the closest relevant <code>CLAUDE.md</code>&rdquo;, because a <code>CLAUDE.md</code> had been updated. Direction is now never guessed: undetermined rules go to human judgment. Those 8.9 points were rules the tool was guessing about, so they were never really checkable &mdash; the earlier figures counted guesses as coverage. Also fixed: literals that cannot identify anything (<code>,</code> appeared 22 times as a checkable pattern and matched every file containing a comma), and a missing leading word boundary that fired <code>rm</code> inside &ldquo;performance&rdquo;.</td>
         </tr>
+        <tr>
+          <td class="n">14 Sep 2026</td><td class="n">559</td><td class="n">21,986</td>
+          <td class="n">63.2%</td><td class="n">8,101</td><td class="n">34.8%</td>
+          <td>A smaller correction, listed because the figure moved. Claim-evidence checks were being routed whole document sections &mdash; 51 of the 83 rules reaching that path had bodies over 1,500 characters, against a median of 71 for rules generally, and one titled &ldquo;AutoEvolve Instructions for GitHub Copilot&rdquo; produced 166 false failures on its own. Sections that long are no longer treated as a single rule. Same release closed a one-line fault worth 140 more: content matching chose its route if <em>any</em> backtick literal looked like code, then searched for <em>every</em> literal, so a rule mentioning <code>console.log(</code> also matched any file containing the word <code>name</code>. Across 559 rules files run against 5 real sessions, the share of reports carrying a false accusation fell from 15.8% to 2.9%.</td>
+        </tr>
       </tbody>
     </table>
     </div>
