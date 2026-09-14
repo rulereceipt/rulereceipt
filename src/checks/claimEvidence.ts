@@ -1,6 +1,6 @@
 import type { TranscriptEvent, CheckResult } from "../types.js";
 import type { ClaimEvidenceClassification } from "./classify.js";
-import { TEST_COMMAND } from "./testCommands.js";
+import { TEST_COMMAND, withoutHeredocs, countTestRuns } from "./testCommands.js";
 
 /**
  * Did the session claim something worked, when the log says it didn't?
@@ -230,7 +230,7 @@ export function runClaimEvidenceChecks(
   for (const event of events) {
     const command = commandOf(event);
     if (command !== null) {
-      pendingRun = TEST_COMMAND.test(command) ? command : null;
+      pendingRun = TEST_COMMAND.test(withoutHeredocs(command)) ? command : null;
       for (const action of ACTION_CLAIMS) {
         if (action.command.test(command)) commandsSeen.add(action.label);
       }
@@ -251,10 +251,15 @@ export function runClaimEvidenceChecks(
         // words survive a pipe, the exit status does not.
         const stated = outcomeFromOutput(event.content);
         const trustExitCode = !PIPED.test(pendingRun);
+        // Two suite invocations in one command means neither the exit code
+        // nor the printed summary belongs to a single run, so nothing about
+        // this command can contradict a claim. Checked before both, because
+        // reading the output is what defeated the pipe guard here.
+        const oneRun = countTestRuns(pendingRun) <= 1;
         lastRun = {
           command: pendingRun,
           failed: stated !== null ? stated : event.isError,
-          outcomeReadable: stated !== null || trustExitCode,
+          outcomeReadable: oneRun && (stated !== null || trustExitCode),
           output: event.content.slice(0, 200),
         };
         pendingRun = null;

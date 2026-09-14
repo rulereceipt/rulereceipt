@@ -88,6 +88,7 @@ rulereceipt rules --include <handle>   # "this IS a rule" — check it from now 
 rulereceipt rules --exclude <handle>   # "this isn't" — stop reporting it
 rulereceipt rules --coverage   # which rules a configured hook might actually enforce
 rulereceipt doctor             # list hooks/auto-run tasks configured on this machine
+rulereceipt hook               # run AS a Claude Code Stop hook — block Claude finishing on a broken rule
 rulereceipt lint               # find contradictions between CLAUDE.md and AGENTS.md
 rulereceipt digest             # summarise recent checks; --email to send it
 rulereceipt config             # set up email sending (stays on your machine)
@@ -98,6 +99,49 @@ rulereceipt verify <session-file> <hash>   # spot-check a report you received ag
 ```
 
 `verify` isn't a routine check — trust your team day to day, same as any status update. It's there for the rare case it actually matters (a dispute, an incident review): give it the session file and the hash printed in the report, and it confirms whether they really match.
+
+## Blocking, not just reporting
+
+`rulereceipt check` tells you afterwards. `rulereceipt hook` refuses to let the
+session end.
+
+Add this to `.claude/settings.json` — you add it, we never do:
+
+```json
+{
+  "hooks": {
+    "Stop": [
+      { "hooks": [ { "type": "command", "command": "npx rulereceipt hook" } ] }
+    ]
+  }
+}
+```
+
+When Claude tries to finish, it reads the session that just happened. If a rule
+was broken it hands Claude the rule, the evidence, and instructions to keep
+working, so the session cannot end on a claim that isn't backed.
+
+The one it is actually for: *"Done — all tests pass"* when the last run of
+`npm test` returned two failures. It checks the claim against what ran, which
+is the part a model cannot talk its way around.
+
+Three properties worth knowing before you wire it in:
+
+- **It only blocks on things it can prove.** Never a judgment rule, never an
+  LLM opinion, never "couldn't tell". Only a matched literal or a claim
+  contradicted by a recorded tool result. Run against twelve real sessions it
+  blocked none of them.
+- **It cannot loop.** Claude Code sets `stop_hook_active` when a session is
+  already continuing because of a block; the hook returns immediately in that
+  case. One interruption per stop.
+- **It fails open.** Unreadable transcript, missing rules file, a bug in us —
+  it allows the stop and writes a line to stderr. Failing closed would mean our
+  bug locks you out of finishing your own session. That is a deliberate
+  weakening, and it is why `check` in CI stays the backstop.
+
+It runs when Claude stops, so it catches a finished session, not a command
+mid-flight. For that, use a `PreToolUse` hook of your own — `rulereceipt
+doctor` will show you what you already have.
 
 ## Which rules actually have teeth
 

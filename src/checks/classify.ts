@@ -339,14 +339,69 @@ const PRE_ACTION_GATE =
  */
 const MAX_RULE_BODY_FOR_CLAIM = 1500;
 
+/**
+ * The claim shape: a reporting verb NEXT TO a done-word.
+ *
+ * "Do not claim tests passed", "before declaring work complete", "before
+ * telling user publishing is complete" — the two halves sit within a few
+ * words of each other, in one sentence, because that adjacency IS the
+ * thing being forbidden: announcing a finish you have not verified.
+ *
+ * Testing the two words independently across a whole section is what kept
+ * mis-routing. A 944-character rule about writing Slack updates contained a
+ * reporting verb in one paragraph, an evidence noun in another, and the
+ * done-word inside the compound "Slack-ready" — three unrelated matches,
+ * one confident verdict about whether a test command was piped. That was
+ * patched twice with blocklist entries (PRE_ACTION_GATE) before the
+ * independence was recognised as the fault itself.
+ *
+ * Thirty characters, measured rather than picked: it is the smallest
+ * window that keeps every genuine claim rule in the corpus and the widest
+ * that admits none of the scattered ones. `[^.\n]` confines the match to a
+ * single sentence, which is what stops a match spanning a paragraph break.
+ * Across 559 public rules files this narrows claim-evidence from 38 rules
+ * to 8, and all 8 read as the same instruction in different words.
+ */
+const CLAIM_SHAPE = new RegExp(
+  `(?:${REPORTING_VERB.source})[^.\n]{0,30}?(?:${DONE_WORD.source})` +
+    `|(?:${DONE_WORD.source})[^.\n]{0,30}?(?:${REPORTING_VERB.source})`,
+  "i",
+);
+
 function isClaimEvidenceRule(rule: Rule): boolean {
   if (rule.text.length > MAX_RULE_BODY_FOR_CLAIM) return false;
   const text = `${rule.title} ${rule.text}`;
+  // Kept as a second line of defence even though CLAIM_SHAPE now excludes
+  // every case it was added for. It is cheap, it is tested, and the rules
+  // it names are ones this checker must never answer.
   if (PRE_ACTION_GATE.test(text)) return false;
-  return REPORTING_VERB.test(text) && EVIDENCE_NOUN.test(text) && DONE_WORD.test(text);
+  return CLAIM_SHAPE.test(text) && EVIDENCE_NOUN.test(text);
 }
 
 const BRANCH_WORD = /\bbranch\b/i;
+
+/**
+ * A literal that could actually be a git branch name.
+ *
+ * git's refname rules, reduced to what a CLAUDE.md really writes: no
+ * whitespace, no shell punctuation, no `..`, no leading dash, not ending
+ * `.lock`. Everything this excludes was being accepted as a branch name and
+ * then searched for in the session's git commands.
+ *
+ * Rejecting a template is the point of the character class rather than an
+ * accident of it: `{`, `<` and `$` are how a rules file writes a PATTERN
+ * for branch names ("squad/{issue-number}-{kebab-case-slug}"), and a
+ * pattern is not a branch. Checking whether the session used a branch
+ * literally called that has no meaningful answer.
+ */
+const BRANCH_NAME_PATTERN = /^[A-Za-z0-9._/-]{1,100}$/;
+
+function isBranchName(literal: string): boolean {
+  if (!BRANCH_NAME_PATTERN.test(literal)) return false;
+  if (literal.startsWith("-") || literal.startsWith("/")) return false;
+  if (literal.includes("..") || literal.endsWith(".lock") || literal.endsWith("/")) return false;
+  return true;
+}
 
 // A function/method-call shape ("print(", "analytics.track(") is a strong,
 // simple signal that a backtick literal names actual CODE, not a CLI
@@ -598,11 +653,12 @@ export function classifyRule(rule: Rule): Classification {
   }
   const polarityInferred = polarityWasInferred(rule);
 
-  if (BRANCH_WORD.test(text)) {
-    // first backtick literal is treated as the branch name — real rules
-    // this targets name exactly one branch ("the `demo` branch", "never
-    // push to `main`"), not a set of them
-    const [branchName] = patterns;
+  // The first literal that could BE a branch, not simply the first literal.
+  // Real rules here name exactly one branch ("the `demo` branch", "never
+  // push to the `main` branch"), and a rule that mentions branches while
+  // naming a command belongs to whichever checker handles that command.
+  const branchName = [...patterns].find(isBranchName);
+  if (BRANCH_WORD.test(text) && branchName !== undefined) {
     return { kind: "gitBranchPolicy", rule, branchName, polarity , polarityInferred };
   }
 

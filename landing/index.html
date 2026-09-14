@@ -195,6 +195,20 @@
   }
   .install .prompt { color: var(--amber); }
   .install .cmd { color: var(--paper); }
+  .conf {
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+    line-height: 1.65;
+    background: var(--panel);
+    border: 1px solid var(--panel-line-strong);
+    border-radius: 14px;
+    padding: 16px 20px;
+    margin: 18px 0 0;
+    overflow-x: auto;
+    color: var(--paper-dim);
+    white-space: pre;
+  }
+  .conf .k { color: var(--amber); }
 
   /* ---------- signup ---------- */
   .signup-stage { padding: 10px 0 68px; }
@@ -889,12 +903,46 @@
 
   <section class="band">
     <div class="wrap-wide">
+      <h2>Stop it finishing on a broken rule</h2>
+      <p class="band-sub">A report tells you afterwards. This refuses to let the session end.</p>
+
+      <div class="install" id="copy-hook" data-copy="npx rulereceipt hook" data-loc="hook-section" role="button" tabindex="0" title="Click to copy">
+        <span class="prompt">$</span>
+        <span class="cmd">npx rulereceipt hook</span>
+      </div>
+
+      <p style="color:var(--paper-dim); font-size:0.92rem; margin:18px 0 6px;">Add this to <code>.claude/settings.json</code> &mdash; you add it, not us:</p>
+      <div class="conf">{
+  <span class="k">"hooks"</span>: {
+    <span class="k">"Stop"</span>: [
+      { <span class="k">"hooks"</span>: [ { <span class="k">"type"</span>: "command", <span class="k">"command"</span>: "npx rulereceipt hook" } ] }
+    ]
+  }
+}</div>
+
+      <p style="color:var(--paper-dim); font-size:0.92rem; margin:18px 0 0;">Point Claude Code&rsquo;s <code>Stop</code> hook at that command. When Claude tries to finish, RuleReceipt reads the session it just had. If a rule was broken, Claude is handed the rule, the evidence, and instructions to keep working &mdash; it does not get to stop and tell you it&rsquo;s done.</p>
+
+      <div class="trust-grid" style="margin-top:26px;">
+        <div class="trust-cell"><h3>It checks the claim, not just the command</h3><p>&ldquo;All tests pass&rdquo; is checked against whether a test actually ran and what it returned. A sentence is not evidence, and this is the one place a model cannot narrate past.</p></div>
+        <div class="trust-cell"><h3>It only blocks on things it can prove</h3><p>Never on a judgment call, never on an LLM opinion, never on &ldquo;couldn&rsquo;t tell.&rdquo; Only a matched literal or a claim contradicted by a recorded result. Across twelve real sessions it blocked none of them.</p></div>
+        <div class="trust-cell"><h3>It cannot wedge your session</h3><p>One interruption per stop, never a loop. If anything goes wrong &mdash; unreadable transcript, missing rules file, a bug in us &mdash; it lets you finish and says so on stderr. It fails open, on purpose.</p></div>
+      </div>
+
+      <div style="height:20px"></div>
+      <div class="security-note"><strong>Why this exists.</strong> A rules file is advice the model may narrate its way around. Someone running a multi-agent lab put numbers on it publicly: an agent auto-acknowledged 107 dispatched orders and performed none of them, and 69 of 664 records marked complete turned out to be plans to do the thing rather than the thing. Their conclusion was that rules living only in context are advisory by construction. This is the same tool, moved to where that stops being true.</div>
+      <div style="height:14px"></div>
+      <div class="security-note"><strong>The honest limit.</strong> It runs when Claude tries to stop, so it catches a finished session, not a command mid-flight &mdash; and it fails open, which means a bug in RuleReceipt silently stops gating rather than locking you out of your own editor. Those two costs are not symmetric and the default is not symmetric either. <code>rulereceipt check</code> in CI stays the backstop.</div>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap-wide">
       <h2>What we don't do</h2>
       <p class="band-sub">The privacy story, stated plainly, not buried in a policy page.</p>
       <div class="trust-grid">
         <div class="trust-cell"><h3>Offline by default</h3><p><code>--llm</code>, <code>--share</code> and <code>--telemetry</code> are opt-in and off until you turn them on. <a href="/privacy">Full detail</a>.</p></div>
         <div class="trust-cell"><h3>No account, no server, no login</h3><p>Nothing of ours sits in the path of a check &mdash; so there is nothing of ours to breach.</p></div>
-        <div class="trust-cell"><h3>Never writes what you didn't ask for</h3><p>No hooks, ever, and it never touches <code>settings.json</code>. Only <code>--html</code> and <code>rules</code> write, both because you asked.</p></div>
+        <div class="trust-cell"><h3>Never writes what you didn't ask for</h3><p>It never installs a hook and never touches <code>settings.json</code> &mdash; if you want it running as a gate you add those four lines yourself, and can delete them the same way. Only <code>--html</code> and <code>rules</code> write, both because you asked.</p></div>
       </div>
       <div style="height:20px"></div>
       <div class="security-note"><strong>You can verify the package you install came from the code you read.</strong> Every release is built and published by GitHub Actions and signed with npm provenance — no publishing token exists on anyone's laptop to be stolen. After installing, run <code>npm audit signatures</code> and npm will confirm the package was built from this public repository, at a specific commit. That's the appropriate standard for a tool whose whole job is verification, and it's checkable by you, not asserted by us.</div>
