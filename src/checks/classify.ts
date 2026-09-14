@@ -446,7 +446,27 @@ const FORBID_SIGNAL =
 // often prescribes with a bare imperative ("Use `gh pr merge --merge`")
 // rather than "you must use" — and it's exactly those imperative clauses
 // whose literals get misattributed to the prohibiting half.
-const PRESCRIPTIVE_VERB =
+/**
+ * Prescriptive verbs, in two lists, because they serve two jobs that pull in
+ * opposite directions.
+ *
+ * MIXED_POLARITY_VERB is the narrow one, used only to spot a prohibition
+ * followed by a prescription — "NEVER squash when merging PRs. Use `gh pr
+ * merge --merge`" — where the prescribed half's literals would otherwise be
+ * checked with the prohibition's polarity.
+ *
+ * INFERRED_REQUIRE_VERB is the wide one, used only to read the direction of a
+ * bare imperative when no signal word says which way a rule points.
+ *
+ * They were one list until 2026-09-14. Widening it for the second job broke
+ * the first: a rule reading "these databases must NEVER be deleted" stopped
+ * being checked at all, because a later bullet — "Any DB whose table names
+ * include: ..." — carries "include" with no forbid word beside it and so read
+ * as mixed polarity. That rule had been the only decided verdict on a real
+ * file, and the report went to 0 followed out of 15.
+ */
+const MIXED_POLARITY_VERB = /\b(use|run|prefer|apply|follow|call|invoke|stick to)\b/i;
+const INFERRED_REQUIRE_VERB =
   /\b(use|run|prefer|apply|follow|call|invoke|stick to|update|write|create|add|include|keep|maintain|document)\b/i;
 
 function hasMixedPolarity(rule: Rule): boolean {
@@ -470,7 +490,7 @@ function hasMixedPolarity(rule: Rule): boolean {
   const clauses = masked.split(/[.;\n]|(?:\s+-\s+)/).filter((c) => c.trim().length > 0);
   return clauses.some(
     (clause) =>
-      !FORBID_SIGNAL.test(clause) && (REQUIRE_SIGNAL.test(clause) || PRESCRIPTIVE_VERB.test(clause))
+      !FORBID_SIGNAL.test(clause) && (REQUIRE_SIGNAL.test(clause) || MIXED_POLARITY_VERB.test(clause))
   );
 }
 
@@ -505,7 +525,7 @@ function detectPolarity(rule: Rule): DeterministicPolarity | null {
   // pattern that never appears reports UNCLEAR, while a forbidden one that
   // appears reports a violation. Guessing toward require can waste a check;
   // guessing toward forbid accuses someone.
-  if (PRESCRIPTIVE_VERB.test(text)) return "require";
+  if (INFERRED_REQUIRE_VERB.test(text)) return "require";
   return null;
 }
 
@@ -522,7 +542,7 @@ function detectPolarity(rule: Rule): DeterministicPolarity | null {
 function polarityWasInferred(rule: Rule): boolean {
   const text = `${rule.title} ${rule.text}`;
   if (FORBID_SIGNAL.test(text) || REQUIRE_SIGNAL.test(text)) return false;
-  return PRESCRIPTIVE_VERB.test(text);
+  return INFERRED_REQUIRE_VERB.test(text);
 }
 
 /**

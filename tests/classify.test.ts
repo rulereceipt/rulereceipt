@@ -606,3 +606,62 @@ describe("a document section is not a claim-evidence rule", () => {
     expect(c.kind).toBe("claimEvidence");
   });
 });
+
+/**
+ * One verb list was doing two jobs, and widening it for one broke the other.
+ *
+ * To stop polarity defaulting to "forbid", PRESCRIPTIVE_VERB was widened on
+ * 2026-09-13 with update, write, create, add, include, keep, maintain,
+ * document. That list is also used to detect MIXED polarity — a prohibition
+ * followed by a prescription, "NEVER squash. Use `gh pr merge`" — where the
+ * prescribed half's literals would be misattributed to the forbidden half.
+ *
+ * Found 2026-09-14 by running the published tool on a real machine: a rule
+ * reading "these databases must NEVER be deleted" stopped being checked,
+ * because a later clause contains `UPDATE status='CLOSED'` with no forbid
+ * word beside it. It had been the only decided verdict on that file; the
+ * report went to 0 followed out of 15.
+ *
+ * Mixed-polarity detection needs the narrow list. Polarity inference can
+ * have the wide one.
+ */
+describe("widening the inference verbs must not break mixed-polarity detection", () => {
+  const mk = (title: string, text: string) => ({ id: "1", title, text, source: "project" as const });
+
+  it("still checks a prohibition that mentions an update elsewhere", () => {
+    // Verbatim from a live CLAUDE.md. A paraphrase of this passed against
+    // the broken code — the third time this week a shortened fixture hid the
+    // bug the real text exposes at once. The trigger is the clause
+    // "interpret that as wiping only OPEN pick status (UPDATE
+    // status='CLOSED')", which carries a prescriptive verb and no forbid
+    // word beside it.
+    const r = mk(
+      "Never wipe data storage databases",
+      [
+        "The following databases store irreplaceable historical data and must NEVER be deleted,",
+        "truncated, wiped, or DROP TABLE'd under any circumstances:",
+        "- `data/integrity_ledger.db` — wu_forecast_daily snapshots (all cities, all pull dates)",
+        "- `data/weather_picks.db` — all WU_DIRECTION / WU_GAP / RES_SCALP pick history",
+        "- Any DB whose table names include: wu_forecast_daily, weather_picks, error_log",
+        "",
+        'This rule applies even if the user says "fresh start" or "wipe picks" — interpret that as',
+        "wiping only OPEN pick status (UPDATE status='CLOSED'), never as DROP or DELETE FROM the table.",
+        "Before any DELETE/DROP on these DBs: state exactly what rows will be deleted, how many,",
+        "and wait for explicit confirmation. Violations of this rule cannot be undone.",
+      ].join("\n")
+    );
+    expect(classifyRule(r).kind).not.toBe("judgment");
+  });
+
+  it("still sends a genuine forbid-then-prescribe rule to judgment", () => {
+    // The case mixed-polarity detection exists for: literals belonging to
+    // the prescribed half would be checked with the prohibition's polarity.
+    const r = mk("Merging", "NEVER squash when merging PRs. Use `gh pr merge --merge --admin` instead.");
+    expect(classifyRule(r).kind).toBe("judgment");
+  });
+
+  it("still infers require from a bare imperative", () => {
+    const c = classifyRule(mk("Changelog", "Update the `CHANGELOG.md` after every change."));
+    expect("polarity" in c ? c.polarity : null).toBe("require");
+  });
+});
