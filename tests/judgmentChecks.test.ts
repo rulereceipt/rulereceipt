@@ -465,3 +465,83 @@ describe("runJudgmentChecks — a huge rule body cannot blow up the request", ()
     expect(JSON.stringify(calls[0])).not.toMatch(/truncat/i);
   });
 });
+
+/**
+ * The judgment path had three verdicts while the deterministic path had five,
+ * and the missing one was the common case.
+ *
+ * Measured 2026-09-14 with a real key against the four-event example session:
+ * 30 rules, 10 FAILs. The session contains one genuine issue. Among the false
+ * ones, "Tests must be able to fail" was failed on evidence of `npm test`
+ * returning 84 passed; "Changelog discipline" was failed on the sentence
+ * "Done — tests pass, 84 of 84"; and one rule was failed citing "RULE — Where
+ * signed-up emails actually live", which is the prompt quoted back as
+ * evidence.
+ *
+ * Three causes, all in the prompt rather than the model. There was no
+ * NOT_APPLICABLE, so a rule that simply never came up had to be forced into
+ * pass, fail or unclear. The one instruction about guessing said "never guess
+ * PASS when you are not sure" with no counterpart for FAIL, so the only
+ * stated pressure pointed at the accusing verdict. And nothing said the
+ * evidence had to come from the session rather than from the rule.
+ */
+describe("the judgment path can say a rule never applied", () => {
+  const originalKey = process.env.ANTHROPIC_API_KEY;
+  let calls: CapturedCall[];
+
+  beforeEach(() => {
+    process.env.ANTHROPIC_API_KEY = "test-key";
+    calls = [];
+    vi.resetModules();
+    vi.doMock("@anthropic-ai/sdk", () => ({
+      default: class {
+        messages = {
+          create: vi.fn().mockImplementation(async (req: CapturedCall) => {
+            calls.push(req);
+            return { content: [{ type: "tool_use", input: { status: "NOT_APPLICABLE", evidence: "" } }] };
+          }),
+        };
+      },
+    }));
+  });
+  afterEach(() => {
+    if (originalKey) process.env.ANTHROPIC_API_KEY = originalKey;
+    else delete process.env.ANTHROPIC_API_KEY;
+    vi.doUnmock("@anthropic-ai/sdk");
+  });
+
+  it("offers NOT_APPLICABLE as a verdict", async () => {
+    const { runJudgmentChecks } = await import("../src/checks/judgmentChecks.js");
+    await runJudgmentChecks([rule], []);
+    expect(JSON.stringify(calls[0].tools)).toContain("NOT_APPLICABLE");
+  });
+
+  it("maps NOT_APPLICABLE to the not_applicable outcome, never to a failure", async () => {
+    const { runJudgmentChecks } = await import("../src/checks/judgmentChecks.js");
+    const [r] = await runJudgmentChecks([rule], []);
+    expect(r.outcome).toBe("not_applicable");
+    expect(r.status).not.toBe("FAIL");
+  });
+
+  it("warns against guessing a failure, not only against guessing a pass", async () => {
+    const { runJudgmentChecks } = await import("../src/checks/judgmentChecks.js");
+    await runJudgmentChecks([rule], []);
+    const sys = JSON.stringify(calls[0].system);
+    expect(sys).toMatch(/guess/i);
+    expect(sys.toLowerCase()).toContain("fail");
+  });
+
+  it("tells the model most rules will not apply to any given session", async () => {
+    const { runJudgmentChecks } = await import("../src/checks/judgmentChecks.js");
+    await runJudgmentChecks([rule], []);
+    expect(JSON.stringify(calls[0].system)).toMatch(/most rules|will not apply|never came up/i);
+  });
+
+  it("requires the evidence to come from the session, not from the rule", async () => {
+    const { runJudgmentChecks } = await import("../src/checks/judgmentChecks.js");
+    await runJudgmentChecks([rule], []);
+    const schema = JSON.stringify(calls[0].tools);
+    expect(schema).toMatch(/transcript/i);
+    expect(schema).toMatch(/not.{0,30}(the rule|rule text)/i);
+  });
+});

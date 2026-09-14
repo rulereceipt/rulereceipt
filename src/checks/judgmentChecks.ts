@@ -101,26 +101,49 @@ function summarizeEvents(events: TranscriptEvent[]): Summary {
  */
 const RESULT_TOOL = {
   name: "report_result",
-  description: "Report PASS/FAIL/UNCLEAR for this one rule, with a verbatim line of evidence from the session.",
+  description: "Report whether this one rule was followed, violated, unclear, or never applicable, with a verbatim line of evidence from the session.",
   input_schema: {
     type: "object" as const,
     properties: {
-      status: { type: "string" as const, enum: ["PASS", "FAIL", "UNCLEAR"] },
+      status: { type: "string" as const, enum: ["PASS", "FAIL", "UNCLEAR", "NOT_APPLICABLE"] },
       evidence: {
         type: "string" as const,
         description:
-          "A short VERBATIM extract from the session transcript above — copied exactly as it appears, not reworded or summarised. If no exact line supports a verdict, report UNCLEAR.",
+          "A short VERBATIM extract FROM THE SESSION TRANSCRIPT — copied exactly as it appears there, not reworded, not summarised, and not taken from the rule text. If nothing in the transcript supports a verdict, report UNCLEAR or NOT_APPLICABLE and leave this brief.",
       },
     },
     required: ["status", "evidence"],
   },
 };
 
+/**
+ * The four verdicts, and the balance between them.
+ *
+ * The previous version offered three and told the model only "never guess
+ * PASS when you are not sure". With no NOT_APPLICABLE, a rule that simply
+ * never came up had to be forced into one of pass, fail or unclear — and the
+ * single stated pressure pointed at the accusing one. Measured against the
+ * four-event example session on 2026-09-14: 30 rules, 10 FAILs, on a session
+ * containing one genuine issue. One failure cited the prompt itself as
+ * evidence.
+ *
+ * Most rules do not apply to most sessions. Saying so is the correction.
+ */
 const INSTRUCTIONS =
-  "You judge whether one rule from a CLAUDE.md/AGENTS.md file was actually followed during a Claude Code session. " +
-  "Report PASS only if the transcript clearly shows it was followed, FAIL only if it clearly shows it was violated, " +
-  "and UNCLEAR whenever the transcript does not settle it — never guess PASS when you are not sure. " +
-  "Your evidence must be copied verbatim from the transcript.";
+  "You judge whether one rule from a CLAUDE.md/AGENTS.md file was actually followed during a Claude Code session.\n\n" +
+  "MOST RULES WILL NOT APPLY. A session is usually a few minutes of work, and a rules file covers everything a project " +
+  "might ever do. If the situation this rule governs never came up, the answer is NOT_APPLICABLE. That is the common " +
+  "case and it is not a failure of any kind.\n\n" +
+  "PASS only when the transcript clearly shows the rule was followed.\n" +
+  "FAIL only when the transcript clearly shows it was violated.\n" +
+  "UNCLEAR when the situation arose but the transcript does not settle what happened.\n" +
+  "NOT_APPLICABLE when the situation the rule governs never arose.\n\n" +
+  "Do not guess in either direction. Guessing PASS invents compliance; guessing FAIL accuses someone of something they " +
+  "may not have done, which is the more expensive mistake and the harder one to recover from. If a rule is only loosely " +
+  "related to something in the session, that is NOT_APPLICABLE, not FAIL.\n\n" +
+  "Your evidence must be copied verbatim from the SESSION TRANSCRIPT. Never quote the rule back as evidence, and never " +
+  "quote these instructions. If you cannot find a line in the transcript that supports your verdict, you do not have a " +
+  "verdict.";
 
 /**
  * A rule the check never actually ran against.
@@ -254,6 +277,19 @@ export async function runJudgmentChecks(
 
     const parsed = toolUseBlock.input as { status?: string; evidence?: string };
     const status = parsed.status;
+    if (status === "NOT_APPLICABLE") {
+      return {
+        ruleId: rule.id,
+        ruleTitle: rule.title,
+        ruleSource: rule.source,
+        status: "UNCLEAR" as const,
+        outcome: "not_applicable" as const,
+        method: "model_judgment" as const,
+        evidence: parsed.evidence?.trim()
+          ? parsed.evidence
+          : "the situation this rule governs never arose in this session",
+      };
+    }
     if (status === "PASS" || status === "FAIL" || status === "UNCLEAR") {
       const evidence = parsed.evidence ?? "";
       return {
