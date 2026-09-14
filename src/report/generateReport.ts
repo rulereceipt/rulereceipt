@@ -163,9 +163,23 @@ const BUCKET_ORDER: Bucket[] = [
  */
 function sharedEvidence(rs: CheckResult[]): string | null {
   if (rs.length < 2) return null;
-  const first = rs[0].evidence;
-  if (!first) return null;
-  return rs.every((r) => r.evidence === first) ? first : null;
+  // The MAJORITY text, not a unanimous one. Requiring every entry to match
+  // meant a single rule with its own message reinstated the wall for all the
+  // others — shipped in 0.1.35 and visible at once: fourteen judgment rules,
+  // twelve repeating the same 300-character paragraph, because two carried
+  // claim-evidence text. Whether it happened depended on what was in the
+  // transcript that minute, so it passed locally and broke for the reader.
+  const counts = new Map<string, number>();
+  for (const r of rs) {
+    if (!r.evidence) continue;
+    counts.set(r.evidence, (counts.get(r.evidence) ?? 0) + 1);
+  }
+  let best: string | null = null;
+  let bestN = 1;
+  for (const [text, n] of counts) {
+    if (n > bestN) { best = text; bestN = n; }
+  }
+  return best;
 }
 
 export function generateReport(results: CheckResult[], meta: ReportMeta): string {
@@ -188,7 +202,13 @@ export function generateReport(results: CheckResult[], meta: ReportMeta): string
     if (shared) {
       lines.push(`  ${shared}`);
       lines.push("");
-      for (const r of inBucket) lines.push(`  ${ruleLabel(r, clean)}`);
+      for (const r of inBucket) {
+        lines.push(`  ${ruleLabel(r, clean)}`);
+        // An entry that does not share the hoisted text still says its own
+        // piece — that difference is the only per-rule information there is.
+        if (r.evidence && r.evidence !== shared) lines.push(`    ${r.evidence}`);
+        if (r.ceiling) lines.push(`    this means: ${r.ceiling}`);
+      }
       continue;
     }
 

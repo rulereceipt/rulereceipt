@@ -309,3 +309,59 @@ describe("a hoisted section does not restate its own status on every line", () =
     expect(out).toContain("FAIL");
   });
 });
+
+/**
+ * The hoist has to survive a section that isn't uniform.
+ *
+ * It required EVERY entry to carry byte-identical evidence, so a single rule
+ * with its own message reinstated the wall for all the others. Shipped in
+ * 0.1.35 and visible immediately: fourteen judgment rules, twelve of them
+ * repeating the same 300-character paragraph, because two carried
+ * claim-evidence text instead. Whether it happened at all depended on what
+ * was in the transcript that minute, which is the worst kind of fragility —
+ * it passes locally and breaks for the reader.
+ *
+ * Hoist what the majority share; show the exceptions inline where they mean
+ * something.
+ */
+describe("the shared explanation hoists even when a section is mixed", () => {
+  const SHARED = "NEEDS HUMAN REVIEW — this rule is a judgment call, not something settled by commands.";
+  const j = (id: string, title: string, evidence = SHARED): CheckResult => ({
+    ruleId: id, ruleTitle: title, ruleSource: "global",
+    status: "UNCLEAR", needsHuman: true, evidence,
+  });
+  const meta = { sessionFilePath: null, ruleCount: 5 };
+  const count = (h: string, n: string) => h.split(n).length - 1;
+
+  it("prints the shared text once when most entries share it", () => {
+    const rs = [
+      j("1", "Rule one", "this one has its own message"),
+      j("2", "Rule two"), j("3", "Rule three"), j("4", "Rule four"), j("5", "Rule five"),
+    ];
+    expect(count(generateReport(rs, meta), SHARED)).toBe(1);
+  });
+
+  it("still shows the entry whose evidence differs", () => {
+    const rs = [
+      j("1", "Rule one", "this one has its own message"),
+      j("2", "Rule two"), j("3", "Rule three"), j("4", "Rule four"),
+    ];
+    const out = generateReport(rs, meta);
+    expect(out).toContain("this one has its own message");
+    expect(out).toContain("Rule one");
+  });
+
+  it("names every rule in the section either way", () => {
+    const rs = [
+      j("1", "Rule one", "different"), j("2", "Rule two"), j("3", "Rule three"),
+    ];
+    const out = generateReport(rs, meta);
+    for (const t of ["Rule one", "Rule two", "Rule three"]) expect(out, t).toContain(t);
+  });
+
+  it("does not hoist when nothing is actually shared", () => {
+    const rs = [j("1", "A", "alpha"), j("2", "B", "beta"), j("3", "C", "gamma")];
+    const out = generateReport(rs, meta);
+    for (const e of ["alpha", "beta", "gamma"]) expect(out).toContain(e);
+  });
+})
