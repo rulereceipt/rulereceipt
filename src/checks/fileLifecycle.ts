@@ -2,6 +2,7 @@ import type { TranscriptEvent, CheckResult } from "../types.js";
 import { violation } from "../types.js";
 import { isProjectPath } from "./projectPaths.js";
 import type { FileLifecycleClassification } from "./classify.js";
+import { withoutHeredocs } from "./shellCommand.js";
 
 /**
  * Third structured-check primitive: only counts real MUTATIONS of a
@@ -50,7 +51,17 @@ function pathPattern(filePath: string): string {
  */
 const CD_INTO_TEMP = /\bcd\s+["']?(?:\/private)?\/(?:tmp|var\/folders)\b|\bcd\s+["']?[^\s"'&|;]*\/(?:scratchpad|node_modules)\b/;
 
-function mutatesPathInBash(command: string, filePath: string): boolean {
+/**
+ * A path named only inside a heredoc body was not touched by the command
+ * that contains it.
+ *
+ * Real case, 2026-09-15: a command editing landing/index.html through a
+ * Python heredoc was reported as modifying `.claude/`, because the HTML it
+ * inserts tells readers to put a hook in `.claude/settings.json`. Writing a
+ * path into a file is not mutating that path.
+ */
+function mutatesPathInBash(rawCommand: string, filePath: string): boolean {
+  const command = withoutHeredocs(rawCommand);
   const p = pathPattern(filePath);
   const mutations = [
     // rm / rmdir / unlink targeting the path

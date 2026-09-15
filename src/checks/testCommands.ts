@@ -1,4 +1,5 @@
 import type { TranscriptEvent } from "../types.js";
+import { withoutHeredocs } from "./shellCommand.js";
 
 /**
  * Commands that run a project's test suite.
@@ -22,39 +23,6 @@ import type { TranscriptEvent } from "../types.js";
 export const TEST_COMMAND =
   /\b(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?(?:test|verify|check|ci)\b|\bnpx\s+(?:vitest|jest|mocha|ava)\b|\b(?:vitest|jest|mocha|pytest|phpunit|rspec|tox)\b|\bcargo\s+test\b|\bgo\s+test\b|\bmvn\s+(?:test|verify)\b|\bgradle\s+test\b|\bdotnet\s+test\b|\bpython\s+-m\s+(?:pytest|unittest)\b/i;
 
-/**
- * Removes heredoc bodies from a shell command.
- *
- * A command that WRITES a test command is not a command that RUNS one.
- * Found 2026-09-14 on a real session: two false failures whose "last test
- * run" was a shell variable assignment. The actual match came from a
- * heredoc further down, writing a demo fixture whose body contains the
- * string `npm test`. The literal was being generated, never executed — and
- * the tool then read its own report output as the failing result.
- *
- * Handles both quoted and bare delimiters, and leaves everything after the
- * closing delimiter intact, because a real test run often follows the
- * heredoc that set the fixture up.
- */
-export function withoutHeredocs(command: string): string {
-  const lines = command.split("\n");
-  const out: string[] = [];
-  let closing: string | null = null;
-  for (const line of lines) {
-    if (closing !== null) {
-      if (line.trim() === closing) closing = null;
-      continue;
-    }
-    const open = line.match(/<<-?\s*(?:'([^']+)'|"([^"]+)"|([A-Za-z_][A-Za-z0-9_]*))/);
-    if (open) {
-      closing = open[1] ?? open[2] ?? open[3];
-      out.push(line.slice(0, open.index));
-      continue;
-    }
-    out.push(line);
-  }
-  return out.join("\n");
-}
 
 /**
  * How many times a single shell command invokes a test suite.
@@ -88,3 +56,5 @@ export function findTestRun(events: TranscriptEvent[]): string | null {
   }
   return null;
 }
+
+export { withoutHeredocs } from "./shellCommand.js";

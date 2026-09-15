@@ -17,7 +17,7 @@
  * Session selection is deterministic and stated in the output, because a
  * measurement whose inputs move is not a measurement.
  *
- * Usage: npx tsx scripts/false-accusation-rate.ts [sessionCount]
+ * Usage: npx tsx scripts/false-accusation-rate.ts [sessionCount] [--all]
  */
 import { readdirSync, statSync, existsSync } from "node:fs";
 import { join } from "node:path";
@@ -107,8 +107,9 @@ console.log(`Reports carrying at least one FAIL: ${withFail}  (${((withFail / re
 console.log(`Total FAIL verdicts: ${failVerdicts}`);
 console.log(`Distinct FAIL texts: ${texts.size}`);
 
-const top = [...texts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8);
+const showAll = process.argv.includes("--all");
+const top = [...texts.entries()].sort((a, b) => b[1] - a[1]).slice(0, showAll ? Infinity : 8);
 if (top.length > 0) {
-  console.log(`\nMost frequent FAIL texts:`);
-  for (const [text, n] of top) console.log(`  ${String(n).padStart(5)}x  ${text.replace(/\s+/g, " ").slice(0, 110)}`);
+  console.log(`\n${showAll ? "All" : "Most frequent"} FAIL texts:`);
+  for (const [text, n] of top) console.log(`  ${String(n).padStart(5)}x  ${text.replace(/\s+/g, " ").slice(0, showAll ? 200 : 110)}`);
 }

@@ -406,7 +406,20 @@ function isBranchName(literal: string): boolean {
 // A function/method-call shape ("print(", "analytics.track(") is a strong,
 // simple signal that a backtick literal names actual CODE, not a CLI
 // command or flag ("git push --force", "npm test" never look like this).
-const CODE_CONSTRUCT_PATTERN = /\(/;
+//
+// It must be a CALL, not merely a parenthesis. The test used to be /\(/,
+// which is true of a great deal of ordinary prose: measured 2026-09-15
+// across 559 rules files, 74 of 1,086 literals reaching content matching
+// (6.8%) were not code — "(e.g.", "(soft)", a markdown link fragment, three
+// whole blocks of accounting formulae. "(in the" produced a real false
+// accusation, reported as having been "actually written into a file", which
+// is true of any file containing that phrase.
+//
+// An identifier immediately before the paren, optionally dotted or scoped,
+// so "console.log(", "std::cout(" and "obj->run(" all qualify and a bare
+// parenthesis does not.
+const CODE_CONSTRUCT_PATTERN =
+  /[A-Za-z_$][A-Za-z0-9_$]*(?:\s*(?:\.|::|->)\s*[A-Za-z_$][A-Za-z0-9_$]*)*\s*\(/;
 
 // A file-path shape: a known config/source extension, or a path with a
 // directory separator. Deliberately requires no spaces — a real path

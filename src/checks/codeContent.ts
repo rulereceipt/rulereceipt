@@ -29,6 +29,35 @@ function editedContentFromEvent(event: TranscriptEvent): string | null {
   return null;
 }
 
+/**
+ * Whether the content contains this literal AS A CALL, not merely as a
+ * substring of a longer identifier.
+ *
+ * Found 2026-09-15 by checking a corpus FAIL rather than assuming it was
+ * legitimate: a rule forbidding `fetch()` matched a file containing
+ * `_metar_fetch()`. The literal was present verbatim, and entirely the wrong
+ * function. The same bare-substring test makes `main()` match `domain()` and
+ * `run()` match `rerun()`, and short generic call names are exactly what
+ * these rules tend to name.
+ *
+ * Only the LEADING boundary is checked. The trailing side is already pinned
+ * by the pattern itself — every literal reaching this checker ends in an
+ * open paren or a call — so requiring a boundary after it would reject the
+ * arguments.
+ */
+function containsCall(content: string, pattern: string): boolean {
+  const leadsWithIdentifier = /^[A-Za-z0-9_$]/.test(pattern);
+  if (!leadsWithIdentifier) return content.includes(pattern);
+  let from = 0;
+  for (;;) {
+    const at = content.indexOf(pattern, from);
+    if (at === -1) return false;
+    const before = at === 0 ? "" : content[at - 1];
+    if (!/[A-Za-z0-9_$.]/.test(before)) return true;
+    from = at + 1;
+  }
+}
+
 export function runCodeContentChecks(
   classifications: CodeContentClassification[],
   events: TranscriptEvent[]
@@ -44,7 +73,7 @@ export function runCodeContentChecks(
     let foundContent: string | undefined;
     for (const content of editedContents) {
       for (const pattern of patterns) {
-        if (content.includes(pattern)) {
+        if (containsCall(content, pattern)) {
           foundPattern = pattern;
           foundContent = content;
           break;
