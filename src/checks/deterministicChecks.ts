@@ -58,8 +58,20 @@ const FLAG_ALIASES: Array<{ context: RegExp; short: RegExp; canonical: string }>
 function searchHaystack(event: TranscriptEvent): string {
   const raw = eventSearchText(event);
   if (event.kind !== "tool_use") return raw;
-  const extra = FLAG_ALIASES.filter((a) => a.context.test(raw) && a.short.test(raw)).map((a) => a.canonical);
-  return extra.length > 0 ? `${raw} ${extra.join(" ")}` : raw;
+  return canonicalise(raw);
+}
+
+/**
+ * Appends the canonical long spelling of any short destructive flag the
+ * text uses, so a rule banning `git push --force` also catches `git push -f`.
+ *
+ * Extracted from searchHaystack 2026-09-15 so the pre-execution guard uses
+ * exactly the same aliasing as the post-hoc checker. A guard that missed
+ * `-f` while the report caught it would be worse than having neither.
+ */
+export function canonicalise(text: string): string {
+  const extra = FLAG_ALIASES.filter((a) => a.context.test(text) && a.short.test(text)).map((a) => a.canonical);
+  return extra.length > 0 ? `${text} ${extra.join(" ")}` : text;
 }
 
 function escapeRegex(literal: string): string {
@@ -83,7 +95,7 @@ function escapeRegex(literal: string): string {
  * string: the old unconditional boundary made "http://" unmatchable
  * against any real URL, ever.
  */
-function matchesPattern(haystack: string, pattern: string): boolean {
+export function matchesPattern(haystack: string, pattern: string): boolean {
   const lastChar = pattern[pattern.length - 1];
   const needsTrailingBoundary = /[\w-]/.test(lastChar);
   const suffix = needsTrailingBoundary ? "(?![\\w-])" : "";

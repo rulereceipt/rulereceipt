@@ -17,6 +17,7 @@ import { runCodeContentChecks } from "./checks/codeContent.js";
 import { runFileLifecycleChecks } from "./checks/fileLifecycle.js";
 import { runClaimEvidenceChecks } from "./checks/claimEvidence.js";
 import { runHook } from "./hook.js";
+import { runGuard } from "./guard.js";
 import { runJudgmentChecks } from "./checks/judgmentChecks.js";
 import { generateReport, generateMarkdownReport, type ReportMeta } from "./report/generateReport.js";
 import { generateHtmlReport } from "./report/generateHtmlReport.js";
@@ -693,6 +694,13 @@ program
   .description("run as a Claude Code Stop hook - blocks Claude from finishing on a broken rule (payload on stdin)")
   .action(async () => {
     await runHook(needsLlmResult);
+  });
+
+program
+  .command("guard")
+  .description("run as a Claude Code PreToolUse hook - refuse a command that breaks a rule, before it runs (payload on stdin)")
+  .action(async () => {
+    await runGuard();
   });
 
 program
