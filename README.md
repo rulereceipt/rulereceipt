@@ -89,6 +89,7 @@ rulereceipt rules --exclude <handle>   # "this isn't" — stop reporting it
 rulereceipt rules --coverage   # which rules a configured hook might actually enforce
 rulereceipt doctor             # list hooks/auto-run tasks configured on this machine
 rulereceipt hook               # run AS a Claude Code Stop hook — block Claude finishing on a broken rule
+rulereceipt guard              # run AS a Claude Code PreToolUse hook — refuse a call before it runs
 rulereceipt lint               # find contradictions between CLAUDE.md and AGENTS.md
 rulereceipt digest             # summarise recent checks; --email to send it
 rulereceipt config             # set up email sending (stays on your machine)
@@ -127,10 +128,16 @@ is the part a model cannot talk its way around.
 
 Three properties worth knowing before you wire it in:
 
-- **It only blocks on things it can prove.** Never a judgment rule, never an
-  LLM opinion, never "couldn't tell". Only a matched literal or a claim
-  contradicted by a recorded tool result. Run against twelve real sessions it
-  blocked none of them.
+- **It blocks two things, both narrow.** A claim a recorded run contradicts,
+  and a claim of done that nothing in the session verified. Never a judgment
+  rule, never an LLM opinion. Run against thirteen real sessions it stopped
+  two, and both were read by hand.
+- **The report and the gate disagree in exactly one place.** When a session
+  claims work is done and nothing recorded verifies it, the report says
+  "couldn't tell" — the tests may have run in another terminal, and a
+  transcript cannot see that. The gate refuses the exit anyway, because it is
+  not saying the claim is false. It is declining to let "done" end a session
+  with nothing behind it.
 - **It cannot loop.** Claude Code sets `stop_hook_active` when a session is
   already continuing because of a block; the hook returns immediately in that
   case. One interruption per stop.
@@ -142,6 +149,36 @@ Three properties worth knowing before you wire it in:
 It runs when Claude stops, so it catches a finished session, not a command
 mid-flight. For that, use a `PreToolUse` hook of your own — `rulereceipt
 doctor` will show you what you already have.
+
+### Refusing a command before it runs
+
+`rulereceipt guard` runs as a `PreToolUse` hook and refuses a call outright:
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      { "hooks": [ { "type": "command", "command": "npx rulereceipt guard" } ] }
+    ]
+  }
+}
+```
+
+Read the limit before wiring it in, because it is most of the story. It
+enforces rules naming a **file** or a **branch** — "never modify `.env`",
+"never commit to `main`" — and nothing else.
+
+It does **not** block banned commands. That was the point of building it, and
+it did not survive measurement: replaying 16,336 real tool calls against every
+forbidding rule in a 559-file corpus, blocking on command literals refused
+62.8% of them. Narrowing twice reached 2.5%, and the residue was still wrong
+in a way no matcher fixes — one rule refused `npm run build` 112 times,
+because it forbids running Playwright unprompted and *recommends*
+`npm run build`, which is its only command-shaped literal.
+
+Nothing in a rules file marks which backtick is the prohibition. A report
+survives that by saying UNCLEAR. A gate cannot.
+
 
 ## Which rules actually have teeth
 
