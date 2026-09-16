@@ -42,14 +42,34 @@ function readStdin(): Promise<string> {
  * what to do and repeating it invites the model to argue with the wording
  * instead of going and running the thing.
  */
-function blockReason(failures: CheckResult[]): string {
-  const lines = failures.map((f) => `  • Rule ${f.ruleId} — ${f.ruleTitle}\n    ${f.evidence}`);
-  const n = failures.length;
-  return (
-    `RuleReceipt: ${n} rule${n === 1 ? "" : "s"} in CLAUDE.md ${n === 1 ? "was" : "were"} not followed in this session.\n\n` +
-    lines.join("\n\n") +
-    `\n\nDo not report this work as finished until the above is resolved or you have said plainly, to the user, that it is still open and why.`
+function blockReason(failures: CheckResult[], unverified: CheckResult[]): string {
+  const parts: string[] = [];
+
+  if (failures.length > 0) {
+    const n = failures.length;
+    parts.push(
+      `RuleReceipt: ${n} rule${n === 1 ? "" : "s"} in CLAUDE.md ${n === 1 ? "was" : "were"} not followed in this session.\n\n` +
+        failures.map((f) => `  • Rule ${f.ruleId} — ${f.ruleTitle}\n    ${f.evidence}`).join("\n\n")
+    );
+  }
+
+  // Worded as a question about evidence rather than as a finding, because
+  // that is what it is. Nothing here says the claim is false. It says
+  // nothing in this session shows it to be true, and that the difference
+  // belongs to the user rather than to the summary.
+  if (unverified.length > 0) {
+    parts.push(
+      `RuleReceipt: this session claims work is done, and nothing recorded here verifies it.\n\n` +
+        unverified.map((u) => `  • Rule ${u.ruleId} — ${u.ruleTitle}\n    ${u.evidence}`).join("\n\n") +
+        `\n\nThis is not a claim that you are wrong. It may well have been verified somewhere this transcript cannot see.`
+    );
+  }
+
+  parts.push(
+    `Do not report this work as finished until the above is resolved, or you have said plainly, to the user, ` +
+      `what was actually verified and what was not.`
   );
+  return parts.join("\n\n");
 }
 
 /**
@@ -113,9 +133,13 @@ export async function runHook(needsLlmResult: (rule: Rule) => CheckResult): Prom
     // it is part of the contract.
     const { results } = await evaluateSession(cwd, rules, events, false, needsLlmResult);
     const failures = results.filter((r) => r.status === "FAIL" && r.outcome !== "not_run");
+    // Deliberately NOT a FAIL. See CheckResult.unverifiedClaim: the report
+    // calls this unclear and the gate refuses it, and that is the only place
+    // the two are allowed to disagree.
+    const unverified = results.filter((r) => r.unverifiedClaim === true);
 
-    if (failures.length === 0) return void emit({});
-    return void emit({ decision: "block", reason: blockReason(failures) });
+    if (failures.length === 0 && unverified.length === 0) return void emit({});
+    return void emit({ decision: "block", reason: blockReason(failures, unverified) });
   } catch (err) {
     // Property 3: fail open, but never silently.
     process.stderr.write(`rulereceipt hook: allowing stop, check did not complete (${err instanceof Error ? err.message : String(err)})\n`);

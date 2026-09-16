@@ -125,7 +125,7 @@ export function parseLine(line: string): TranscriptEvent[] {
         if (b.type === "text" && typeof b.text === "string") {
           events.push({ role: "assistant", kind: "text", text: b.text, timestamp });
         } else if (b.type === "tool_use" && typeof b.name === "string") {
-          events.push({ role: "assistant", kind: "tool_use", toolName: b.name, input: b.input, timestamp });
+          events.push({ role: "assistant", kind: "tool_use", toolName: b.name, input: b.input, timestamp, toolUseId: typeof b.id === "string" ? b.id : undefined });
         }
       }
     }
@@ -145,6 +145,7 @@ export function parseLine(line: string): TranscriptEvent[] {
             content: extractToolResultText(b.content),
             isError: b.is_error === true,
             timestamp,
+            toolUseId: typeof b.tool_use_id === "string" ? b.tool_use_id : undefined,
           });
         }
       }

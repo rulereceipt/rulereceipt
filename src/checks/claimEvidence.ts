@@ -217,7 +217,11 @@ export function runClaimEvidenceChecks(
   events: TranscriptEvent[]
 ): CheckResult[] {
   let lastRun: TestRun | null = null;
-  let pendingRun: string | null = null;
+  // Keyed by tool_use id where the transcript has one, so a result can be
+  // matched to the call it belongs to rather than to the call above it.
+  // `null` is the key for id-less transcripts, which keeps the old
+  // positional behaviour for fixtures and older logs.
+  const pendingRuns = new Map<string | null, string>();
   let claimsMade = 0;
   let unknownSinceRed: string | null = null;
   const commandsSeen = new Set<string>();
@@ -230,7 +234,14 @@ export function runClaimEvidenceChecks(
   for (const event of events) {
     const command = commandOf(event);
     if (command !== null) {
-      pendingRun = TEST_COMMAND.test(withoutHeredocs(command)) ? command : null;
+      const id = event.kind === "tool_use" ? (event.toolUseId ?? null) : null;
+      if (TEST_COMMAND.test(withoutHeredocs(command))) {
+        pendingRuns.set(id, command);
+      } else if (id === null) {
+        // No id to distinguish calls, so a later call really does supersede
+        // an earlier one — the original positional rule, unchanged.
+        pendingRuns.delete(null);
+      }
       for (const action of ACTION_CLAIMS) {
         if (action.command.test(command)) commandsSeen.add(action.label);
       }
@@ -246,6 +257,8 @@ export function runClaimEvidenceChecks(
     // every turn contained exactly one tool call, so there is no parallel
     // fan-out to mis-attribute.
     if (event.kind === "tool_result") {
+      const resultId = event.toolUseId ?? null;
+      const pendingRun = pendingRuns.get(resultId) ?? null;
       if (pendingRun !== null) {
         // Prefer what the runner SAID over what the shell returned: the
         // words survive a pipe, the exit status does not.
@@ -262,7 +275,7 @@ export function runClaimEvidenceChecks(
           outcomeReadable: oneRun && (stated !== null || trustExitCode),
           output: event.content.slice(0, 200),
         };
-        pendingRun = null;
+        pendingRuns.delete(resultId);
         unknownSinceRed = null; // a recognised run supersedes anything before it
       }
       continue;
@@ -359,11 +372,15 @@ export function runClaimEvidenceChecks(
       };
     }
     if (claimsMade > 0) {
-      return unclear(
-        rule,
-        `the session claimed a passing test suite ${claimsMade} time(s), but no test command ran here — ` +
-          `it may have been run outside this session, which the transcript cannot show`
-      );
+      return {
+        ...unclear(
+          rule,
+          `the session claimed a passing test suite ${claimsMade} time(s), but no test command ran here — ` +
+            `it may have been run outside this session, which the transcript cannot show`
+        ),
+        // UNCLEAR in the report, refused by the gate. See CheckResult.unverifiedClaim.
+        unverifiedClaim: true,
+      };
     }
     return unclear(rule, "the session made no claim about passing tests, so there was nothing to check against the log");
   });

@@ -18,6 +18,17 @@ export interface TranscriptToolUseEvent {
   toolName: string;
   input: unknown;
   timestamp: string;
+  /**
+   * The tool_use id, when the transcript carries one.
+   *
+   * Added 2026-09-16. Without it a result can only be attributed to "the
+   * call immediately before", which was documented here as safe on the
+   * grounds that every turn contained exactly one tool call. Parallel tool
+   * calls are now ordinary — a real session issues three in a row and then
+   * one result — and under that shape the positional rule silently drops
+   * the test run that a completion claim depended on.
+   */
+  toolUseId?: string;
 }
 
 export interface TranscriptToolResultEvent {
@@ -26,6 +37,8 @@ export interface TranscriptToolResultEvent {
   content: string;
   isError: boolean;
   timestamp: string;
+  /** The id of the call this result belongs to, when the transcript has it. */
+  toolUseId?: string;
 }
 
 export type TranscriptEvent =
@@ -94,6 +107,24 @@ export interface CheckResult {
    * not blur them.
    */
   needsHuman?: boolean;
+
+  /**
+   * A completion claim that nothing in this session verified.
+   *
+   * The one place the report and the gate deliberately disagree. The report
+   * renders this UNCLEAR, because absence genuinely proves nothing — the
+   * tests may have run in another terminal and a transcript cannot see that.
+   * The Stop hook refuses the exit on it anyway, because it is not asserting
+   * a violation: it is declining to let "done" end a session when nothing
+   * here backs it, and the way out is one sentence saying so out loud.
+   *
+   * Added 2026-09-16. It is the case anthropics/claude-code#90542 is about
+   * from end to end — deploy artifacts produced and the application never
+   * opened, a completion whose evidence is a plan, "state what was VERIFIED
+   * versus only PLANNED" — and the gate was silent on all of it, firing only
+   * when a recorded run CONTRADICTED a claim.
+   */
+  unverifiedClaim?: boolean;
 
   /**
    * The outcome in the five-value vocabulary. Optional while the checkers
