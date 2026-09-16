@@ -48,7 +48,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.0",
     "commander": "^15.0.0",
-    "nodemailer": "^9.1.1"
+    "nodemailer": "^10.0.1"
   },
   "devDependencies": {
     "@types/node": "^26.4.0",
