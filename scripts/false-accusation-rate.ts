@@ -19,7 +19,8 @@
  *
  * Usage: npx tsx scripts/false-accusation-rate.ts [sessionCount] [--all]
  */
-import { readdirSync, statSync, existsSync } from "node:fs";
+import { readdirSync, statSync, existsSync, readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { parseClaudeMd } from "../src/parsers/readClaudeMd.js";
@@ -80,8 +81,26 @@ if (sessions.length === 0) {
   process.exit(1);
 }
 
+/**
+ * Each input is printed with the hash of the bytes actually read.
+ *
+ * "Pins its inputs" was not true when this script was first published, and
+ * the way it failed is worth keeping: the largest sessions on this machine
+ * include the session doing the measuring, which is appended to while the
+ * run happens. Two runs of identical code returned 26 and 27 distinct FAIL
+ * texts because ~2MB of transcript arrived in between. The selection rule
+ * was deterministic; the bytes were not.
+ *
+ * A hash does not stop that. It makes it visible: two runs are comparable
+ * only when these lines match, and a changed hash on an unchanged filename
+ * means the input moved, not the tool.
+ */
 console.log(`Sessions (largest ${sessions.length}, deterministic order):`);
-for (const s of sessions) console.log(`  ${s.replace(homedir(), "~")}  (${(statSync(s).size / 1024).toFixed(0)} KB)`);
+for (const s of sessions) {
+  const bytes = readFileSync(s);
+  const sha = createHash("sha256").update(bytes).digest("hex").slice(0, 12);
+  console.log(`  sha256:${sha}  ${(bytes.length / 1024).toFixed(0)} KB  ${s.replace(homedir(), "~")}`);
+}
 
 const parsed = sessions.map(readTranscriptFromFile);
 const files = readdirSync(CORPUS).filter((f) => statSync(join(CORPUS, f)).isFile());
