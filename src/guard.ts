@@ -3,7 +3,8 @@ import { classifyRules } from "./checks/classify.js";
 import { runCodeContentChecks } from "./checks/codeContent.js";
 import { runFileLifecycleChecks } from "./checks/fileLifecycle.js";
 import { runGitBranchPolicyChecks } from "./checks/gitBranchPolicy.js";
-import { loadOverrides, ruleFingerprint } from "./overrides.js";
+import { loadOverrides, ruleFingerprint, ratifiedForbids } from "./overrides.js";
+import { commandRunsLiteral } from "./checks/proposedAction.js";
 import type { CheckResult, Rule, TranscriptEvent } from "./types.js";
 
 interface PreToolUseInput {
@@ -72,7 +73,42 @@ function structuredBlocks(cwd: string, event: TranscriptEvent): Block[] {
 }
 
 /**
- * Literal command bans do NOT block. Measured, then cut.
+ * A command ban blocks only where a person marked the clause.
+ *
+ * The unratified version was measured before shipping and cut: blocking on a
+ * rule's command literals refused 62.8% of 16,336 real tool calls. Two
+ * narrowings reached 2.49% and the residue had no matcher fix — a rule
+ * titled "Feature Validation" refused `npm run build` 112 times, because it
+ * forbids running Playwright unprompted and RECOMMENDS the build command,
+ * which is its only command-shaped literal. Another refused plain
+ * `git status`, its backticks holding both the ban and the alternative.
+ *
+ * Nothing in a rules file marks which backtick is the prohibition. So this
+ * path reads only what someone declared, and yields nothing otherwise. The
+ * declaration is keyed on the rule's content hash and re-checked against the
+ * rule's current text, so a reworded rule loses its mark rather than
+ * carrying a judgement onto words nobody read.
+ *
+ * The important property is what happens by default: an unmarked rule cannot
+ * block, at any confidence, ever. That is the whole difference between this
+ * and the version that refused two thirds of everything.
+ */
+function ratifiedLiteralBlocks(cwd: string, command: string): Block[] {
+  const overrides = loadOverrides(cwd);
+  const blocks: Block[] = [];
+  for (const c of forbidRules(cwd)) {
+    if (c.kind !== "deterministic") continue;
+    for (const literal of ratifiedForbids(overrides, c.rule)) {
+      if (!commandRunsLiteral(command, literal)) continue;
+      blocks.push({ rule: c.rule, why: `the command about to run does \`${literal}\`, which this rule forbids (marked by you, not inferred)` });
+      break;
+    }
+  }
+  return blocks;
+}
+
+/**
+ * Literal command bans do NOT block unless ratified. Measured, then cut.
  *
  * This was the point of the feature and it does not survive its own
  * measurement. Replaying 16,336 real tool calls against every forbidding
@@ -172,7 +208,7 @@ export async function runGuard(): Promise<void> {
         role: "assistant", kind: "tool_use", toolName: "Bash",
         input: { command: toolInput.command }, timestamp: "",
       };
-      blocks = structuredBlocks(cwd, event);
+      blocks = [...structuredBlocks(cwd, event), ...ratifiedLiteralBlocks(cwd, toolInput.command)];
     } else if (tool === "Write" || tool === "Edit" || tool === "NotebookEdit") {
       const event: TranscriptEvent = {
         role: "assistant", kind: "tool_use", toolName: tool,

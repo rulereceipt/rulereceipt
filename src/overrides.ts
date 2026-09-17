@@ -32,6 +32,21 @@ export interface Override {
   decision: Decision;
   /** Stored for humans reading the file, and to explain a stale entry. */
   title: string;
+  /**
+   * The literal(s) a person has marked as the PROHIBITION in this rule.
+   *
+   * A rules file does not say which of its backticks is the thing being
+   * banned. Measured: blocking on all of them refused 62.8% of 16,336 real
+   * tool calls, and the residue after two narrowings still refused
+   * `npm run build` 112 times, because the rule that named it forbids
+   * running Playwright and RECOMMENDS the build command. No matcher fixes
+   * that — the information is not in the text.
+   *
+   * So it is declared, once, and only what is declared can block. Absent
+   * means absent: there is deliberately no fallback to "probably the first
+   * literal", because that fallback is the bug.
+   */
+  forbids?: string[];
 }
 
 interface OverridesFile {
@@ -70,7 +85,15 @@ export function loadOverrides(cwd: string): Map<string, Override> {
     if (!Array.isArray(parsed?.overrides)) return map;
     for (const o of parsed.overrides) {
       if (typeof o?.hash === "string" && (o.decision === "rule" || o.decision === "notARule")) {
-        map.set(o.hash, { hash: o.hash, decision: o.decision, title: String(o.title ?? "") });
+        const forbids = Array.isArray(o.forbids)
+          ? o.forbids.filter((x): x is string => typeof x === "string" && x.trim().length > 0)
+          : undefined;
+        map.set(o.hash, {
+          hash: o.hash,
+          decision: o.decision,
+          title: String(o.title ?? ""),
+          ...(forbids && forbids.length > 0 ? { forbids } : {}),
+        });
       }
     }
   } catch {
@@ -121,4 +144,28 @@ export function clearOverride(cwd: string, hash: string): boolean {
 export function staleOverrides(overrides: Map<string, Override>, rules: Rule[]): Override[] {
   const live = new Set(rules.map(ruleFingerprint));
   return [...overrides.values()].filter((o) => !live.has(o.hash));
+}
+
+/**
+ * The prohibition literals a person has declared for this rule, or none.
+ *
+ * Two conditions, both required, and both are refusals to infer:
+ *
+ * 1. The mark is keyed on the rule's CONTENT hash, so rewording the rule
+ *    drops it rather than reattaching a judgement to text nobody read. Same
+ *    reasoning as ruleFingerprint, one field down.
+ *
+ * 2. The literal must still appear in the rule. A mark that survives a
+ *    partial edit and names something the rule no longer mentions would
+ *    block on a phrase with nothing behind it — a gate refusing a command
+ *    for a reason that is no longer written anywhere, which is the worst
+ *    failure available to a gate.
+ *
+ * Returns [] for anything unratified. There is no fallback on purpose.
+ */
+export function ratifiedForbids(overrides: Map<string, Override>, rule: Rule): string[] {
+  const entry = overrides.get(ruleFingerprint(rule));
+  if (!entry?.forbids) return [];
+  const body = `${rule.title}\n${rule.text ?? ""}`;
+  return entry.forbids.filter((literal) => body.includes(literal));
 }

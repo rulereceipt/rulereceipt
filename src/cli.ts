@@ -553,7 +553,7 @@ function runCoverage() {
   }
 }
 
-async function runRules(opts: { include?: string; exclude?: string; clear?: string; list?: boolean; coverage?: boolean }) {
+async function runRules(opts: { include?: string; exclude?: string; clear?: string; list?: boolean; coverage?: boolean; forbid?: string; literal?: string }) {
   if (opts.coverage) {
     runCoverage();
     return;
@@ -582,6 +582,54 @@ async function runRules(opts: { include?: string; exclude?: string; clear?: stri
       console.log(`\nIt will report as needing your judgment. Knowing it is a rule says nothing`);
       console.log(`about which check can settle it, and guessing is what this tool avoids.`);
     }
+    return;
+  }
+
+  /**
+   * Marking WHICH clause of a rule is the prohibition.
+   *
+   * The one thing a rules file never says. Blocking on every backtick in a
+   * forbidding rule refused 62.8% of 16,336 real tool calls, and the worst
+   * survivor after two narrowings refused `npm run build` 112 times against
+   * a rule that recommends it. So the guard blocks on nothing here until a
+   * person names the clause, and this is where they name it.
+   */
+  if (opts.forbid) {
+    const rule = findRule(opts.forbid);
+    if (!rule) {
+      console.error(`No rule in this project has the handle ${opts.forbid}.`);
+      console.error(`Handles come from \`rulereceipt check --show-skipped\`, and change if the rule's wording changes.`);
+      process.exitCode = 1;
+      return;
+    }
+    const literal = opts.literal?.trim();
+    if (!literal) {
+      console.error(`--forbid needs --literal "<the exact command this rule bans>".`);
+      console.error(`Copy it from the rule itself; it has to appear in the rule's text.`);
+      process.exitCode = 1;
+      return;
+    }
+    if (!`${rule.title}\n${rule.text ?? ""}`.includes(literal)) {
+      console.error(`That rule does not contain "${literal}".`);
+      console.error(`The mark has to name something the rule actually says, or a gate would`);
+      console.error(`refuse a command for a reason written nowhere.`);
+      process.exitCode = 1;
+      return;
+    }
+    const prior = overrides.get(opts.forbid)?.forbids ?? [];
+    const forbids = [...new Set([...prior, literal])];
+    saveOverride(cwd, {
+      hash: opts.forbid,
+      decision: overrides.get(opts.forbid)?.decision ?? "rule",
+      title: rule.title.replace(/\s+/g, " ").trim().slice(0, 200),
+      forbids,
+    });
+    console.log(`Saved to ${OVERRIDES_PATH}.`);
+    console.log(`  "${rule.title.replace(/\s+/g, " ").trim().slice(0, 90)}"`);
+    console.log(`  now blocks on: ${forbids.map((f) => `\`${f}\``).join(", ")}`);
+    console.log(`\nThis only takes effect if you run \`rulereceipt guard\` as a PreToolUse hook.`);
+    console.log(`Rewording the rule drops the mark, on purpose — it would otherwise carry`);
+    console.log(`your judgment onto words you never read.`);
     return;
   }
 
@@ -720,6 +768,8 @@ program
   .description("correct what the classifier treats as a rule. Handles come from `check --show-skipped`.")
   .option("--include <handle>", "treat this item as a real rule and check it from now on")
   .option("--exclude <handle>", "treat this item as documentation and stop reporting it")
+  .option("--forbid <handle>", "mark which clause of this rule is the prohibition, so the guard may block on it")
+  .option("--literal <text>", "the exact banned command, used with --forbid; must appear in the rule")
   .option("--clear <handle>", "remove a stored correction")
   .option("--list", "show stored corrections (the default when no other flag is given)")
   .option("--coverage", "show which rules a configured hook might actually be enforcing, and which are prose only")
