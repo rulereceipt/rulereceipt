@@ -553,7 +553,7 @@ function runCoverage() {
   }
 }
 
-async function runRules(opts: { include?: string; exclude?: string; clear?: string; list?: boolean; coverage?: boolean; forbid?: string; literal?: string }) {
+async function runRules(opts: { include?: string; exclude?: string; clear?: string; list?: boolean; coverage?: boolean; forbid?: string; literal?: string; handles?: boolean }) {
   if (opts.coverage) {
     runCoverage();
     return;
@@ -630,6 +630,33 @@ async function runRules(opts: { include?: string; exclude?: string; clear?: stri
     console.log(`\nThis only takes effect if you run \`rulereceipt guard\` as a PreToolUse hook.`);
     console.log(`Rewording the rule drops the mark, on purpose — it would otherwise carry`);
     console.log(`your judgment onto words you never read.`);
+    return;
+  }
+
+  /**
+   * Every rule with its handle.
+   *
+   * --forbid needs a handle, and before this the only place handles were
+   * printed was `check --show-skipped`, which lists the items the classifier
+   * DISCARDED. A rule that is actually being checked had no handle anywhere,
+   * so the marking feature shipped in 0.1.39 could not be reached for any
+   * rule a user would want to mark. Found by trying to use it.
+   */
+  if (opts.handles) {
+    if (rules.length === 0) {
+      console.log("No CLAUDE.md or AGENTS.md rules found in this project.");
+      return;
+    }
+    console.log(`${rules.length} rule${rules.length === 1 ? "" : "s"} in this project:\n`);
+    for (const r of rules) {
+      const h = ruleFingerprint(r);
+      const marked = overrides.get(h)?.forbids;
+      console.log(`  ${h}  ${r.title.replace(/\s+/g, " ").trim().slice(0, 72)}`);
+      if (marked?.length) console.log(`                blocks on: ${marked.map((f) => `\`${f}\``).join(", ")}`);
+    }
+    console.log(`\nMark which clause of a rule is the prohibition:`);
+    console.log(`  rulereceipt rules --forbid <handle> --literal "<the banned command>"`);
+    console.log(`Only a marked clause can ever refuse a command, and only via \`rulereceipt guard\`.`);
     return;
   }
 
@@ -768,6 +795,7 @@ program
   .description("correct what the classifier treats as a rule. Handles come from `check --show-skipped`.")
   .option("--include <handle>", "treat this item as a real rule and check it from now on")
   .option("--exclude <handle>", "treat this item as documentation and stop reporting it")
+  .option("--handles", "list every rule with its handle, for use with --forbid")
   .option("--forbid <handle>", "mark which clause of this rule is the prohibition, so the guard may block on it")
   .option("--literal <text>", "the exact banned command, used with --forbid; must appear in the rule")
   .option("--clear <handle>", "remove a stored correction")

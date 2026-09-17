@@ -96,11 +96,20 @@ function structuredBlocks(cwd: string, event: TranscriptEvent): Block[] {
 function ratifiedLiteralBlocks(cwd: string, command: string): Block[] {
   const overrides = loadOverrides(cwd);
   const blocks: Block[] = [];
-  for (const c of forbidRules(cwd)) {
-    if (c.kind !== "deterministic") continue;
-    for (const literal of ratifiedForbids(overrides, c.rule)) {
+  // Read from the RULES, not from the classification. A human mark
+  // supersedes the classifier, including its refusal to classify — and that
+  // refusal is the common case here. "Never use `git push --force`; prefer
+  // `git push --force-with-lease`" goes to judgment via hasMixedPolarity,
+  // for a correct reason: literal matching cannot tell which half owns which
+  // token. A rule naming both the ban and the alternative is the canonical
+  // reason to have someone say which is which, so gating the mark behind the
+  // classifier made the feature unavailable in exactly the case that
+  // motivated it. Shipped that way in 0.1.39 and caught by running it.
+  for (const rule of loadRules(cwd)) {
+    if (overrides.get(ruleFingerprint(rule))?.decision === "notARule") continue;
+    for (const literal of ratifiedForbids(overrides, rule)) {
       if (!commandRunsLiteral(command, literal)) continue;
-      blocks.push({ rule: c.rule, why: `the command about to run does \`${literal}\`, which this rule forbids (marked by you, not inferred)` });
+      blocks.push({ rule, why: `the command about to run does \`${literal}\`, which this rule forbids (marked by you, not inferred)` });
       break;
     }
   }

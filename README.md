@@ -184,7 +184,7 @@ survives that by saying UNCLEAR. A gate cannot — so you mark it:
 rulereceipt rules --forbid <handle> --literal "git push --force"
 ```
 
-Handles come from `rulereceipt check --show-skipped`. The mark is stored
+Handles come from `rulereceipt rules --handles`. The mark is stored
 against the rule's content hash, and the guard blocks on that literal and no
 other. Three things it deliberately will not do:
 
