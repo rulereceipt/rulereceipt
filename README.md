@@ -168,16 +168,37 @@ Read the limit before wiring it in, because it is most of the story. It
 enforces rules naming a **file** or a **branch** — "never modify `.env`",
 "never commit to `main`" — and nothing else.
 
-It does **not** block banned commands. That was the point of building it, and
-it did not survive measurement: replaying 16,336 real tool calls against every
-forbidding rule in a 559-file corpus, blocking on command literals refused
-62.8% of them. Narrowing twice reached 2.5%, and the residue was still wrong
-in a way no matcher fixes — one rule refused `npm run build` 112 times,
-because it forbids running Playwright unprompted and *recommends*
-`npm run build`, which is its only command-shaped literal.
+It does **not** block a banned command unless you have said which command is
+banned. That was the point of building it, and the automatic version did not
+survive measurement: replaying 16,336 real tool calls against every forbidding
+rule in a 559-file corpus, blocking on command literals refused 62.8% of them.
+Narrowing twice reached 2.5%, and the residue was still wrong in a way no
+matcher fixes — one rule refused `npm run build` 112 times, because it forbids
+running Playwright unprompted and *recommends* `npm run build`, which is its
+only command-shaped literal.
 
 Nothing in a rules file marks which backtick is the prohibition. A report
-survives that by saying UNCLEAR. A gate cannot.
+survives that by saying UNCLEAR. A gate cannot — so you mark it:
+
+```bash
+rulereceipt rules --forbid <handle> --literal "git push --force"
+```
+
+Handles come from `rulereceipt check --show-skipped`. The mark is stored
+against the rule's content hash, and the guard blocks on that literal and no
+other. Three things it deliberately will not do:
+
+- An **unmarked** rule cannot block, at any confidence, ever. There is no
+  fallback to "probably the first literal" — that fallback is the bug.
+- **Rewording the rule drops the mark.** It would otherwise carry your
+  judgment onto words you never read.
+- A mark naming a literal the rule no longer contains is **ignored**. A gate
+  refusing a command for a reason written nowhere is the worst failure a gate
+  has.
+
+Of 99 forbidding rules in the corpus that name a command-shaped literal, only
+43 have a prohibition that actually introduces one. The rest could never be
+marked automatically, which is the point.
 
 
 ## Which rules actually have teeth
