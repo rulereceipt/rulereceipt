@@ -129,7 +129,7 @@ export type Classification =
 // Normative language — the thing that makes a line a rule rather than a
 // description. Deliberately broad on modals AND imperative verbs, because
 // a wrongly-excluded rule is a silent miss.
-const DIRECTIVE_LANGUAGE =
+export const DIRECTIVE_LANGUAGE =
   /\b(never|always|must|should|shall|do not|don't|dont|cannot|can't|required?|requires|ensure|avoid|prefer|forbidden|prohibited|only|make sure|be sure|need|needs|needed|need to|has to|have to|expected to|responsible for)\b/i;
 
 /**
@@ -142,7 +142,7 @@ const DIRECTIVE_LANGUAGE =
  * documentation ("the CLI can run migrations"), where they describe a
  * capability rather than instruct the agent.
  */
-const IMPERATIVE_INSTRUCTION =
+export const IMPERATIVE_INSTRUCTION =
   /(?:^|[.;:!?]\s+|^\s*[-*+]\s*|\n\s*[-*+]\s*)(use|run|keep|write|add|remove|delete|check|verify|test|commit|document|update|create|follow|apply|include|exclude|handle|validate|escape|sanitize|log|report|raise|throw|return|call|invoke|split|group|sort|name|place|put|store|read|load|save|close|open|start|stop|restart|install|build|deploy|review|refactor|rename|move|copy|merge|rebase|squash|tag|branch|push|pull|fetch|clone|stage|stash|lead|state|explain|describe|list|show|surface|flag|mark|label|note|treat|assume|confirm|ask|wait|stick|limit|cap|batch|cache|mock|stub|assert|expect|measure|quantify|label)\b/i;
 
 /**
@@ -193,10 +193,10 @@ const EVENT_RECORD_TITLE = /\b(incident|post-?mortem|retro(spective)?|outage|wha
  * happens to name an incident; "Real incident (2026-08-28): ..." is a
  * report that happens to contain the word never further along.
  */
-const TITLE_OPENS_WITH_DIRECTIVE =
+export const TITLE_OPENS_WITH_DIRECTIVE =
   /^\s*[-*+\d.\s]*(never|always|must|do not|don'?t|dont|avoid|ensure|prefer|only|make sure|be sure|no)\b/i;
 
-function isEventRecord(rule: Rule): boolean {
+export function isEventRecord(rule: Rule): boolean {
   if (TITLE_OPENS_WITH_DIRECTIVE.test(rule.title)) return false;
   if (IMPERATIVE_INSTRUCTION.test(rule.title)) return false;
   return EVENT_RECORD_TITLE.test(rule.title);
@@ -262,7 +262,7 @@ function looksLikeBareCommand(text: string): boolean {
  * Guarded by TITLE_OPENS_WITH_DIRECTIVE so a genuine prohibition whose body
  * is the forbidden command ("Never run: `rm -rf /`") is still a rule.
  */
-function isCommandDocumentation(rule: Rule): boolean {
+export function isCommandDocumentation(rule: Rule): boolean {
   if (TITLE_OPENS_WITH_DIRECTIVE.test(rule.title)) return false;
   if (FLAG_DOCUMENTATION.test(rule.text) || FLAG_DOCUMENTATION.test(rule.title)) return true;
   return looksLikeBareCommand(rule.text);
