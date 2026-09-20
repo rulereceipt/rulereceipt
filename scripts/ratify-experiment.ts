@@ -28,7 +28,8 @@
  * quietly dropped, because a proxy that reproduces the failure it is
  * measuring is worth exactly as much as a test that cannot fail.
  */
-import { readdirSync, statSync, existsSync } from "node:fs";
+import { readdirSync, statSync, existsSync, readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { readTranscriptFromFile } from "../src/parsers/transcriptParser.js";
@@ -64,6 +65,22 @@ for (const root of roots) for (const proj of readdirSync(root)) {
   for (const f of es) if (f.endsWith(".jsonl")) try { files.push({ path: join(root, proj, f), size: statSync(join(root, proj, f)).size }); } catch { /* skip */ }
 }
 const sessions = files.sort((a, b) => b.size - a.size || a.path.localeCompare(b.path)).slice(0, 3).map((f) => f.path);
+
+/**
+ * Inputs are hashed and printed, for the reason the other harness already
+ * learned: "largest sessions" is a selection rule, not a pin. The largest
+ * sessions on this machine include the one doing the measuring, which grows
+ * while the run happens. Two runs of identical code four days apart returned
+ * 14,033 and 9,605 Bash calls, and 4.04%/2.27% became 7.39%/4.64%. Nothing
+ * in the code had changed.
+ *
+ * Two runs are comparable only when these lines match.
+ */
+console.log("Sessions read:");
+for (const p of sessions) {
+  const b = readFileSync(p);
+  console.log(`  sha256:${createHash("sha256").update(b).digest("hex").slice(0, 12)}  ${(b.length / 1024).toFixed(0)} KB  ${p.replace(process.env.HOME ?? "~", "~")}`);
+}
 
 const CORPUS = join(process.cwd(), "corpus");
 const rules = readdirSync(CORPUS).filter((f) => statSync(join(CORPUS, f)).isFile())
