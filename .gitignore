@@ -31,3 +31,8 @@ tests/fixtures/real-sessions/
 # research artifact — regenerated from the seed, not source
 /enforceability-worksheet.txt
 /.local-notes/
+
+# Local session handoff — where to pick up. Never committed; it names
+# machine state and open decisions, not product history. CHANGELOG.md is
+# the record.
+/NEXT.md
