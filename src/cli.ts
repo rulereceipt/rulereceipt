@@ -21,6 +21,7 @@ import { runHook } from "./hook.js";
 import { runGuard } from "./guard.js";
 import { runJudgmentChecks } from "./checks/judgmentChecks.js";
 import { generateReport, generateMarkdownReport, type ReportMeta } from "./report/generateReport.js";
+import { gateOffer, hookIsInstalled } from "./report/gateOffer.js";
 import { generateHtmlReport } from "./report/generateHtmlReport.js";
 import { verifySessionHash } from "./verifyHash.js";
 import { saveEmailConfig, loadEmailConfig, detectSmtpHost, isValidEmail } from "./emailConfig.js";
@@ -305,6 +306,16 @@ async function runCheck(opts: CheckOptions) {
   const meta = { sessionFilePath, ruleCount: results.length };
   const reportText = markdown ? generateMarkdownReport(results, meta) : generateReport(results, meta);
   console.log(reportText);
+
+  // Shown only to someone who has just read their own broken rules, and only
+  // if they have not already wired it up. See report/gateOffer.ts.
+  if (!markdown) {
+    const offer = gateOffer({
+      failures: results.filter((r) => r.status === "FAIL").length,
+      hookInstalled: hookIsInstalled(cwd),
+    });
+    if (offer) console.log(`\n${offer}`);
+  }
 
   // Written before --share/--email so that a failure to send something
   // never costs the user the local artifact they explicitly asked for.
