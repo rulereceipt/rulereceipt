@@ -20,7 +20,12 @@ tests/fixtures/real-sessions/
 /dashboard.html
 /STRATEGY_NOTES.md
 /PLAN.md
-/rule_file_corpus.md
+# rule_file_corpus.md is NOT ignored: it is a list of public URLs, and every
+# figure this project publishes is measured over the files it names. Without
+# it the scripts are unrunnable and the numbers unverifiable, which is the one
+# standard this project argues for everywhere else.
+# corpus/ itself stays ignored — those are other people's files to fetch, not
+# ours to redistribute.
 /corpus/
 
 # research artifact — regenerated from the seed, not source

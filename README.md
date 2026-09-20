@@ -201,6 +201,32 @@ Of 99 forbidding rules in the corpus that name a command-shaped literal, only
 marked automatically, which is the point.
 
 
+### Reproducing the published numbers
+
+Every figure in the [postmortem](https://rulereceipt.dev/postmortem) and in the
+issue threads is measured over 559 public rules files. The list of those files
+is committed as `rule_file_corpus.md`; the files themselves are not, because
+they belong to other projects.
+
+```bash
+bash scripts/fetch-corpus.sh 600      # the default is 60
+npx tsx scripts/corpus-report.ts      # where real rules route: 63.2% not instructions
+npx tsx scripts/false-accusation-rate.ts   # reports carrying a false accusation
+npx tsx scripts/verb-gate.ts          # which gate admits each rule
+npx tsx scripts/guard-replay.ts corpus 3   # what the PreToolUse guard would refuse
+```
+
+The list holds 563 URLs and yields 559 files — four have moved or been deleted
+upstream since it was drawn on 2026-08-30. That gap is expected and will grow;
+if your count differs from 559, that is why, and the routing percentages move
+by a rounding error rather than meaningfully.
+
+Two of these print a sha256 for every session they read. That is deliberate:
+"the largest sessions on this machine" is a selection rule, not a pin, and the
+largest include the session doing the measuring. Two runs of identical code
+four days apart returned 14,033 and 9,605 tool calls. Numbers are comparable
+only when those hashes match.
+
 ## Which rules actually have teeth
 
 A rule in a file and a rule with a `PreToolUse` hook behind it look identical
