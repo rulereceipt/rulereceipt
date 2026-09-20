@@ -32,7 +32,7 @@ tests/fixtures/real-sessions/
 /enforceability-worksheet.txt
 /.local-notes/
 
-# Local session handoff — where to pick up. Never committed; it names
-# machine state and open decisions, not product history. CHANGELOG.md is
-# the record.
-/NEXT.md
+# Local session status — where work last left off. Never committed; it names
+# machine state, account details and open decisions, not product history.
+# CHANGELOG.md is the record. Convention is global Rule 17.
+/local/
