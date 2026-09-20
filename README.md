@@ -101,6 +101,22 @@ rulereceipt verify <session-file> <hash>   # spot-check a report you received ag
 
 `verify` isn't a routine check — trust your team day to day, same as any status update. It's there for the rare case it actually matters (a dispute, an incident review): give it the session file and the hash printed in the report, and it confirms whether they really match.
 
+### Claims of having read something
+
+A session that writes `PAGES READ: 1-20`, `STATUS: READ IN FULL` or "confirmed
+at source" while never opening a file is asserting provenance it does not
+have. Reported by a user in anthropics/claude-code#92505, where those headers
+went into tracked files and commit messages for material the model had never
+read.
+
+The check is narrow on purpose. It fires only when **nothing at all** was read
+in the session — no `Read`, no `Grep`, no `cat`. That much a transcript can
+prove, and it contradicts any claim of reading. It cannot tell you *which*
+document was read when reads did happen, so a session that read the wrong
+thing is still beyond it, and the report says so rather than guessing.
+
+"I will read the filing next" is a plan, not a claim, and does not fire.
+
 ## Blocking, not just reporting
 
 `rulereceipt check` tells you afterwards. `rulereceipt hook` refuses to let the

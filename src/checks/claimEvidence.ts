@@ -94,7 +94,47 @@ const ACTION_CLAIMS: Array<{ label: string; claim: RegExp; exclude: RegExp; comm
     exclude: /\bcommitted\s+to\b/i,
     command: /\bgit\s+commit\b/i,
   },
+  {
+    /**
+     * A claim to have READ a source, when nothing was read at all.
+     *
+     * From anthropics/claude-code#92505: "PAGES READ: 1-20", "STATUS: READ
+     * IN FULL", "confirmed at source" — emitted for material never opened,
+     * then written into tracked files and commit messages. The reporter's
+     * framing is the one that matters: the apparatus that certifies work was
+     * produced decoupled from the work, and a plainly-worded guess would
+     * have been safer, because a guess reads as a guess.
+     *
+     * Two claim shapes, because a provenance header has no "I" in it. The
+     * first-person form is gated like the others; the header form is matched
+     * literally, since "PAGES READ:" and "READ IN FULL" do not occur by
+     * accident.
+     *
+     * exclude carries the future tense. "I will read the filing next" is a
+     * plan, and a plan is not a claim.
+     *
+     * Ceiling: this fires only when NOTHING was read. The transcript can
+     * show that, and it contradicts any claim of reading. It cannot show
+     * WHICH document was read when reads did happen, so a session that read
+     * something else entirely is still beyond it.
+     */
+    label: "read of a source",
+    claim: /\b(?:i|we)(?:'ve|’ve| have| had)?\s+(?:\w+ly\s+|just\s+|already\s+|then\s+|also\s+|now\s+)*read\b|^\s*(?:pages?\s+read|status)\s*:\s*(?:[\d\s,-]+|read\s+in\s+full)|\bread\s+in\s+full\b|\bconfirmed\s+at\s+source\b/im,
+    exclude: /\b(?:will|going\s+to|need\s+to|should|next|plan\s+to|about\s+to|let\s+me|i'?ll|we'?ll)\s+(?:\w+\s+){0,3}read\b/i,
+    command: /\b(?:cat|head|tail|less|more|bat|nl|strings|pdftotext|xxd|od)\b/i,
+  },
 ];
+
+/**
+ * Tools that read a file, as distinct from shell commands that do.
+ *
+ * ACTION_CLAIMS matches Bash command text, which is the whole surface for
+ * push and commit. Reading is not: most reads go through Read, Grep, Glob
+ * or WebFetch and never touch a shell. Without these, a session that read
+ * twenty files through the proper tool would be reported as having read
+ * nothing.
+ */
+const READING_TOOLS = new Set(["Read", "Grep", "Glob", "NotebookRead", "WebFetch", "Fetch"]);
 
 /**
  * Removes what a message SHOWS, leaving what it SAYS.
@@ -232,6 +272,11 @@ export function runClaimEvidenceChecks(
   let backed: { claim: string; run: TestRun } | null = null;
 
   for (const event of events) {
+    // A read through Read/Grep/Glob never reaches the shell, so it has to be
+    // recorded here rather than by matching command text.
+    if (event.kind === "tool_use" && READING_TOOLS.has(event.toolName ?? "")) {
+      commandsSeen.add("read of a source");
+    }
     const command = commandOf(event);
     if (command !== null) {
       const id = event.kind === "tool_use" ? (event.toolUseId ?? null) : null;
