@@ -5,6 +5,7 @@ import { runGitBranchPolicyChecks } from "./checks/gitBranchPolicy.js";
 import { runCodeContentChecks } from "./checks/codeContent.js";
 import { runFileLifecycleChecks } from "./checks/fileLifecycle.js";
 import { runClaimEvidenceChecks } from "./checks/claimEvidence.js";
+import { runEmojiChecks } from "./checks/emojiOutput.js";
 import { runJudgmentChecks } from "./checks/judgmentChecks.js";
 import { loadOverrides, ruleFingerprint, staleOverrides } from "./overrides.js";
 import type { CheckResult, Rule, TranscriptEvent } from "./types.js";
@@ -52,6 +53,7 @@ export async function evaluateSession(
     ...runCodeContentChecks(of("codeContent") as never, events),
     ...runFileLifecycleChecks(of("fileLifecycle") as never, events),
     ...runClaimEvidenceChecks(of("claimEvidence") as never, events),
+    ...runEmojiChecks(of("emojiOutput") as never, events),
   ];
 
   const judgment = of("judgment");

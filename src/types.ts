@@ -83,7 +83,8 @@ export type CheckMethod =
   | "claim_vs_evidence"
   | "model_judgment"
   /** Nothing ran. */
-  | "none";
+  | "none"
+  | "emoji_output";
 
 export interface CheckResult {
   ruleId: string;

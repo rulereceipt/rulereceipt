@@ -16,6 +16,7 @@ import { runGitBranchPolicyChecks } from "./checks/gitBranchPolicy.js";
 import { runCodeContentChecks } from "./checks/codeContent.js";
 import { runFileLifecycleChecks } from "./checks/fileLifecycle.js";
 import { runClaimEvidenceChecks } from "./checks/claimEvidence.js";
+import { runEmojiChecks } from "./checks/emojiOutput.js";
 import { runHook } from "./hook.js";
 import { runGuard } from "./guard.js";
 import { runJudgmentChecks } from "./checks/judgmentChecks.js";
@@ -286,6 +287,7 @@ async function runCheck(opts: CheckOptions) {
     ...runCodeContentChecks(codeContent, events),
     ...runFileLifecycleChecks(fileLifecycle, events),
     ...runClaimEvidenceChecks(claimEvidence, events),
+    ...runEmojiChecks(classifications.filter((c) => c.kind === "emojiOutput") as never, events),
   ];
   // Deterministic checks run by default, always, with no key — judgment
   // rules only call out to an LLM with an explicit --llm on THIS run, never

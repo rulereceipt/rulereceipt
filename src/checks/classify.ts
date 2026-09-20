@@ -21,6 +21,12 @@ export interface IfEditThenTestClassification {
   rule: Rule;
 }
 
+export interface EmojiClassification {
+  kind: "emojiOutput";
+  rule: Rule;
+  polarity: "forbid";
+}
+
 export interface JudgmentClassification {
   kind: "judgment";
   rule: Rule;
@@ -124,6 +130,7 @@ export type Classification =
   | CodeContentClassification
   | FileLifecycleClassification
   | NotARuleClassification
+  | EmojiClassification
   | JudgmentClassification;
 
 // Normative language — the thing that makes a line a rule rather than a
@@ -620,6 +627,36 @@ function polarityWasInferred(rule: Rule): boolean {
  * defaults to judgment, per the spec: never silently skip a rule by
  * guessing it's safe to pattern-match.
  */
+
+/**
+ * A rule forbidding emoji in output.
+ *
+ * Checkable, and it was not being checked: every phrasing routed to
+ * judgment, including one naming an emoji in backticks, because an emoji
+ * literal carries no alphanumerics and is rejected as unusable. Raised by
+ * anthropics/claude-code#94219.
+ *
+ * Both halves are required. The subject must be emoji, and the rule must
+ * FORBID them — "Use these emoji consistently across all chat output" is a
+ * real corpus rule and prescribes the opposite. A rule that merely mentions
+ * emoji in passing ("the identity file holds its name, vibe and emoji") is
+ * not about output at all.
+ */
+const EMOJI_SUBJECT = /\bemojis?\b|\bemoticons?\b/i;
+const EMOJI_FORBID = /\b(no|never|avoid|don't|do not|without|free of|refrain from|must not|shall not|not use|zero)\b/i;
+
+function isEmojiRule(rule: Rule): boolean {
+  const text = `${rule.title} ${rule.text}`;
+  if (!EMOJI_SUBJECT.test(text)) return false;
+  if (!EMOJI_FORBID.test(text)) return false;
+  // The prohibition has to be near the subject, not merely present in the
+  // same section — the same adjacency argument as claim-evidence.
+  const m = text.match(EMOJI_SUBJECT);
+  if (!m || m.index === undefined) return false;
+  const window = text.slice(Math.max(0, m.index - 60), m.index + 40);
+  return EMOJI_FORBID.test(window);
+}
+
 export function classifyRule(rule: Rule): Classification {
   // Checked first: if this isn't a rule at all, no check of any kind
   // should run against it — not a keyword match, not an LLM call.
@@ -634,6 +671,12 @@ export function classifyRule(rule: Rule): Classification {
     return { kind: "claimEvidence", rule };
   }
   // (length guard applied inside isClaimEvidenceRule)
+
+  // Checked before the backtick test: an emoji literal is rejected as an
+  // unusable pattern, so these would otherwise fall through to judgment.
+  if (isEmojiRule(rule)) {
+    return { kind: "emojiOutput", rule, polarity: "forbid" };
+  }
 
   const patterns = new Set<string>();
   for (const match of rule.text.matchAll(BACKTICK_TOKEN)) {
