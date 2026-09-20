@@ -51,11 +51,16 @@ describe("enforceability scorer", { timeout: 120_000 }, () => {
   it("refuses to score a worksheet that doesn't match the drawn sample", () => {
     run(["corpus", "--n", "4", "--seed", "1"]);
     const ws = join(dir, "enforceability-worksheet.txt");
-    expect(existsSync(ws)).toBe(true);
+    // Reading IS the existence check. A separate existsSync first is a
+    // check-then-use window — flagged by CodeQL as js/file-system-race, and
+    // the same shape whether or not anything else races for the file. One
+    // syscall cannot disagree with itself; readFileSync throws if the
+    // worksheet was never written, which is the assertion either way.
     // Label everything, then corrupt one rule's title so the worksheet no
     // longer describes the sample a fresh draw produces.
-    let text = readFileSync(ws, "utf-8").replace(/^ANSWER:\s*$/gm, "ANSWER: p");
-    text = text.replace(/^\[1\] .*/m, "[1] a rule that is not in the corpus at all");
+    let text = readFileSync(ws, "utf-8");
+    expect(text).toContain("ANSWER:");
+    text = text.replace(/^ANSWER:\s*$/gm, "ANSWER: p").replace(/^\[1\] .*/m, "[1] a rule that is not in the corpus at all");
     writeFileSync(ws, text);
 
     const { out, code } = run(["corpus", "--n", "4", "--seed", "1", "--score", "--by-model"]);
