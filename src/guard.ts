@@ -230,15 +230,31 @@ export async function runGuard(): Promise<void> {
 
     if (blocks.length === 0) return allow();
 
+    const why = reason(blocks);
     process.stdout.write(
       JSON.stringify({
         hookSpecificOutput: {
           hookEventName: "PreToolUse",
           permissionDecision: "deny",
-          permissionDecisionReason: reason(blocks),
+          permissionDecisionReason: why,
         },
       })
     );
+    // The same reason on stderr, deliberately duplicated.
+    //
+    // Two refusal paths exist and they carry the message differently.
+    // anthropics/claude-code#91574, measured by yurukusa on 2.1.278: a
+    // top-level {"permissionDecision":"deny"} body is invoked and IGNORED;
+    // the nested hookSpecificOutput form refuses; and stderr with exit 2
+    // refuses. Nobody has measured the nested body together with exit 2,
+    // which is what this emits.
+    //
+    // On the exit-2 path the documented channel back to the model is
+    // stderr, and stdout JSON is not promised to be read. Writing only the
+    // JSON risks a refusal with no reason attached — the block lands and
+    // the model is told nothing, which is the one failure a gate cannot
+    // afford. Printing both costs a duplicate line at worst.
+    process.stderr.write(`${why}\n`);
     // Exit 2 is what actually blocks the call; the JSON carries the reason.
     process.exitCode = 2;
   } catch (err) {
