@@ -69,7 +69,12 @@
   .sub {
     color: var(--paper-dim);
     font-size: 0.95rem;
-    max-width: 52ch;
+    /* Wide enough that the deck sits on one line on a desktop instead of
+       breaking after "prove" — it is a single sentence and reads as one.
+       Still a max rather than a fixed width, so it wraps normally on a
+       narrow viewport where one line would not fit anyway. */
+    max-width: 84ch;
+    text-wrap: pretty;
     margin-bottom: 40px;
   }
   .grid {
@@ -160,7 +165,7 @@
     </div>
     <div class="note" id="note-installs" style="display:none; margin-bottom:28px;">
       "Distinct installs" counts a random, non-identifying ID sent only when someone opts in with <code>rulereceipt check --telemetry</code> — never rule text, file paths, or results, and off by default. See <a href="/privacy">Privacy</a>.<br><br>
-      <strong>Three is not a typo.</strong> The two numbers on this page differ by three orders of magnitude, and the small one is the real one. An install is somebody choosing to tell us; a download is mostly a machine copying a file. We publish both because a tool that checks whether claims have evidence behind them cannot quietly show you the flattering number.<br><br>"npm downloads" is the raw number npm reports — it counts CI pipelines and automated security scanners too, not just people. Shown for transparency, not as a user count.
+      <strong>If the install count looks too small, it is not a mistake.</strong> These two numbers can differ by orders of magnitude, and the smaller one is the real one. An install is somebody choosing to tell us; a download is mostly a machine copying a file. We publish both because a tool that checks whether claims have evidence behind them cannot quietly show you the flattering number.<br><br>"npm downloads" is the raw number npm reports — it counts CI pipelines and automated security scanners too, not just people. Shown for transparency, not as a user count.
     </div>
 
     <div id="grid" class="grid" style="display:none;">
