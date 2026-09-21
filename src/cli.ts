@@ -30,6 +30,7 @@ import { appendHistory, readHistorySince } from "./history.js";
 import { maybeShowWhatsNew } from "./whatsNew.js";
 import { verifyReceipt } from "./receipt.js";
 import { buildInitGuidance } from "./init.js";
+import { loadProjectConfig, handleMap, blockingFailures, warningFailures, PROJECT_CONFIG_PATH } from "./projectConfig.js";
 import { generateDigest } from "./digest.js";
 import { enableSchedule, disableSchedule, scheduleStatus, type Cadence } from "./schedule.js";
 import { findSplitBrainConflicts } from "./checks/splitBrain.js";
@@ -307,6 +308,14 @@ async function runCheck(opts: CheckOptions) {
   const judgmentResults = llm ? await runJudgmentChecks(judgment, events) : judgment.map(({ rule }) => needsLlmResult(rule));
   const results = [...deterministicResults, ...judgmentResults];
 
+  // Severity: rules a team marked as warnings in .rulereceipt/config.json are
+  // still reported but do not fail the build. handleFor maps a result back to
+  // its stable handle so the mark survives edits that renumber rule ids.
+  const projectConfig = loadProjectConfig(cwd);
+  const handleFor = handleMap(rules);
+  const blockingFails = blockingFailures(results, projectConfig, handleFor);
+  const warnedFails = warningFailures(results, projectConfig, handleFor);
+
   const meta = { sessionFilePath, ruleCount: results.length };
   // Kept in human/markdown form for --email and any other reader below, even
   // when stdout is JSON — a manager gets a readable report, not raw JSON.
@@ -383,6 +392,12 @@ async function runCheck(opts: CheckOptions) {
     );
   }
 
+  if (!json && !markdown && warnedFails.length > 0) {
+    console.log(
+      `\n(${warnedFails.length} failing rule${warnedFails.length === 1 ? "" : "s"} ${warnedFails.length === 1 ? "is" : "are"} set to warning in ${PROJECT_CONFIG_PATH} and did not fail the build.)`
+    );
+  }
+
   appendHistory(results, sessionFilePath);
 
   // A once-per-update footer so a returning user sees the tool improved and
@@ -425,7 +440,9 @@ async function runCheck(opts: CheckOptions) {
   // rules in a real CLAUDE.md need judgment, so without --llm they
   // legitimately report UNCLEAR. Gating on those would make every build
   // red on day one and the check would be deleted within a week.
-  if (!exitZero && results.some((r) => r.status === "FAIL")) {
+  // Gate on BLOCKING failures only — a rule marked warning in the project
+  // config is reported but does not fail the build.
+  if (!exitZero && blockingFails.length > 0) {
     process.exitCode = 1;
   }
 }
