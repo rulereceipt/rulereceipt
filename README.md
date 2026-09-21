@@ -341,10 +341,19 @@ Or run the pieces directly:
 rulereceipt verify-receipt .rulereceipt/receipt.json --max-age-days 7
 ```
 
-**Honest trust boundary:** CI has no session to re-hash, so it trusts the
-receipt you committed. A signed/attested receipt closes that gap and is the
-next step; until then, `verify-receipt` means "well-formed, current,
-passing" — not "CI independently re-derived it from the session."
+**Honest trust boundary:** with no session, CI trusts the receipt you
+committed. But if the session *is* available — agentic CI, or you upload the
+transcript — pass it and CI re-derives instead of trusting:
+
+```bash
+rulereceipt verify-receipt .rulereceipt/receipt.json --session path/to/session.jsonl
+```
+
+That re-hashes the session and **rejects a receipt that doesn't match it**
+(forged, tampered, or the wrong session) — no trust required. For the
+no-session case, trust remains until signed/attested receipts land; a
+self-signed receipt would not help (the author holds the key), so the honest
+closure is session re-verification where the session exists.
 
 ## Install
 

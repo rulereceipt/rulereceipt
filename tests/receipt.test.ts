@@ -70,3 +70,35 @@ describe("verifyReceipt", () => {
     expect(verifyReceipt(receipt(), { maxAgeDays: 7 }).ok).toBe(true);
   });
 });
+
+describe("session re-verification (the trustless path)", () => {
+  it("no session provided = trust mode: ok, not sessionVerified", () => {
+    const r = verifyReceipt(receipt()); // receipt()'s session.sha256 is "abc"
+    expect(r.ok).toBe(true);
+    expect(r.sessionVerified).toBeUndefined();
+  });
+
+  it("matching session hash: ok AND sessionVerified", () => {
+    const r = verifyReceipt(receipt(), { sessionHash: "abc" });
+    expect(r.ok).toBe(true);
+    expect(r.sessionVerified).toBe(true);
+  });
+
+  it("mismatched session hash is REJECTED (forged/wrong session)", () => {
+    const r = verifyReceipt(receipt(), { sessionHash: "different" });
+    expect(r.ok).toBe(false);
+    expect(r.problems.join(" ")).toMatch(/does NOT match the provided session/);
+  });
+
+  it("unreadable session (null) is rejected", () => {
+    const r = verifyReceipt(receipt(), { sessionHash: null });
+    expect(r.ok).toBe(false);
+    expect(r.problems.join(" ")).toMatch(/could not be read/);
+  });
+
+  it("session provided but receipt has no hash (demo data) is rejected", () => {
+    const r = verifyReceipt(receipt({ session: { path: null, sha256: null } }), { sessionHash: "abc" });
+    expect(r.ok).toBe(false);
+    expect(r.problems.join(" ")).toMatch(/no session hash/);
+  });
+});

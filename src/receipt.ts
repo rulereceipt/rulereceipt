@@ -30,12 +30,23 @@ export const KNOWN_SCHEMA = 1;
 export interface VerifyReceiptOptions {
   /** Reject a receipt whose generatedAt is older than this many days. */
   maxAgeDays?: number;
+  /**
+   * The sha256 of the actual session file, if it is available to the verifier
+   * (agentic CI, or a developer who uploaded the transcript). When set, the
+   * receipt is re-verified against it: a mismatch is rejected. This is the
+   * only path that closes the trust boundary — CI re-derives instead of
+   * trusting. `null` means "a session was named but could not be read".
+   * `undefined` means "no session provided" (the normal, trust-the-receipt case).
+   */
+  sessionHash?: string | null;
 }
 
 export interface VerifyResult {
   ok: boolean;
   problems: string[];
   receipt?: Receipt;
+  /** True only when a session was provided AND its hash matched the receipt — i.e. CI re-derived, not trusted. */
+  sessionVerified?: boolean;
 }
 
 /**
@@ -88,5 +99,21 @@ export function verifyReceipt(text: string, opts: VerifyReceiptOptions = {}): Ve
     }
   }
 
-  return { ok: problems.length === 0, problems, receipt: r };
+  // Session re-verification: the only check that does not require trust. When
+  // the actual session is available, re-derive its hash and confirm the
+  // receipt was produced from THAT session — a mismatch means forged or wrong.
+  let sessionVerified: boolean | undefined;
+  if (opts.sessionHash !== undefined) {
+    if (opts.sessionHash === null) {
+      problems.push("a session file was named but could not be read");
+    } else if (r.session.sha256 === null) {
+      problems.push("receipt has no session hash (demo data?), so it cannot be re-verified against a session");
+    } else if (opts.sessionHash !== r.session.sha256) {
+      problems.push("receipt does NOT match the provided session (sha256 mismatch) — forged, tampered, or the wrong session");
+    } else {
+      sessionVerified = true;
+    }
+  }
+
+  return { ok: problems.length === 0, problems, receipt: r, sessionVerified };
 }

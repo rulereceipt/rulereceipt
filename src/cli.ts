@@ -20,7 +20,7 @@ import { runEmojiChecks } from "./checks/emojiOutput.js";
 import { runHook } from "./hook.js";
 import { runGuard } from "./guard.js";
 import { runJudgmentChecks } from "./checks/judgmentChecks.js";
-import { generateReport, generateMarkdownReport, generateJsonReport, type ReportMeta } from "./report/generateReport.js";
+import { generateReport, generateMarkdownReport, generateJsonReport, computeTranscriptHash, type ReportMeta } from "./report/generateReport.js";
 import { gateOffer, hookIsInstalled } from "./report/gateOffer.js";
 import { generateHtmlReport } from "./report/generateHtmlReport.js";
 import { verifySessionHash } from "./verifyHash.js";
@@ -1015,7 +1015,11 @@ program
     "CI gate: verify a receipt (produced locally with `check --json` and committed) — that it is a real, current, passing RuleReceipt receipt. No session needed. Exits non-zero if invalid, stale, or anything FAILED."
   )
   .option("--max-age-days <n>", "reject a receipt older than N days (freshness gate)")
-  .action((path: string, opts: { maxAgeDays?: string }) => {
+  .option(
+    "--session <path>",
+    "if the session transcript is available (agentic CI, or you uploaded it), re-hash it and confirm the receipt was produced from THAT session. This is the only check that needs no trust — a mismatch is rejected."
+  )
+  .action((path: string, opts: { maxAgeDays?: string; session?: string }) => {
     let text: string;
     try {
       text = readFileSync(path, "utf-8");
@@ -1030,11 +1034,17 @@ program
       process.exitCode = 1;
       return;
     }
-    const res = verifyReceipt(text, { maxAgeDays });
+    // Only pass sessionHash when a session was actually requested; null (path
+    // given but unreadable) is a rejection inside verifyReceipt.
+    const sessionHash = opts.session !== undefined ? computeTranscriptHash(opts.session) : undefined;
+    const res = verifyReceipt(text, { maxAgeDays, sessionHash });
     if (res.ok && res.receipt) {
       const r = res.receipt;
+      const trust = res.sessionVerified
+        ? "re-verified against the session (no trust needed)"
+        : "trusted (no session provided to re-verify against)";
       console.log(
-        `✓ receipt OK — rulereceipt v${r.version}, ${r.summary.pass} passed / ${r.summary.fail} failed / ${r.summary.unclear} unclear, generated ${r.generatedAt}`
+        `✓ receipt OK — rulereceipt v${r.version}, ${r.summary.pass} passed / ${r.summary.fail} failed / ${r.summary.unclear} unclear, generated ${r.generatedAt}\n  ${trust}`
       );
     } else {
       console.error("✕ receipt rejected:");
