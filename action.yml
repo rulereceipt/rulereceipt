@@ -1,0 +1,79 @@
+name: "RuleReceipt"
+description: "Audit your CLAUDE.md / AGENTS.md and verify a RuleReceipt receipt on every PR. No Claude Code session is needed in CI."
+author: "RuleReceipt"
+branding:
+  icon: "check-circle"
+  color: "yellow"
+
+inputs:
+  version:
+    description: "rulereceipt version to run (an npm dist-tag like 'latest', or an exact version)."
+    required: false
+    default: "latest"
+  working-directory:
+    description: "Directory to run in — where CLAUDE.md / AGENTS.md / the receipt live."
+    required: false
+    default: "."
+  audit-rules:
+    description: "Run the session-independent rules-file audit (coverage of CLAUDE.md). 'true' or 'false'. Informational; does not fail the build."
+    required: false
+    default: "true"
+  receipt:
+    description: "Path to a committed receipt (produced locally with `rulereceipt check --json`). If set, the build FAILS unless it is a valid, current, passing receipt. Empty = skip."
+    required: false
+    default: ""
+  max-age-days:
+    description: "With `receipt`: reject a receipt older than this many days. Empty = no freshness check."
+    required: false
+    default: ""
+  anthropic-api-key:
+    description: "Optional. If set, also run the CLAUDE.md-vs-AGENTS.md contradiction check (needs judgment), which FAILS the build on a contradiction. Pass a secret, never a literal."
+    required: false
+    default: ""
+
+runs:
+  using: "composite"
+  steps:
+    # Node >=18 is enough (see package.json engines); pinned by SHA to match
+    # this repo's supply-chain hardening rather than a mutable tag.
+    - name: Set up Node
+      uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      with:
+        node-version: "20"
+
+    # Informational: which of your rules actually have teeth. No key, no
+    # session, never fails the build — it surfaces a weak CLAUDE.md in the log.
+    - name: Rules-file audit
+      if: ${{ inputs.audit-rules == 'true' }}
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        RR_VERSION: ${{ inputs.version }}
+      run: npx --yes "rulereceipt@$RR_VERSION" rules --coverage
+
+    # The gate: verify a receipt the developer produced locally and committed.
+    # Inputs go through env and are quoted, never interpolated into the script
+    # — the exact shell-injection shape RuleReceipt itself checks for.
+    - name: Verify receipt
+      if: ${{ inputs.receipt != '' }}
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        RR_VERSION: ${{ inputs.version }}
+        RR_RECEIPT: ${{ inputs.receipt }}
+        RR_MAX_AGE: ${{ inputs.max-age-days }}
+      run: |
+        args=(verify-receipt "$RR_RECEIPT")
+        if [ -n "$RR_MAX_AGE" ]; then args+=(--max-age-days "$RR_MAX_AGE"); fi
+        npx --yes "rulereceipt@$RR_VERSION" "${args[@]}"
+
+    # Optional gate: contradictions between CLAUDE.md and AGENTS.md. Needs a
+    # key because it takes judgment; fails the build on a contradiction.
+    - name: Contradiction check
+      if: ${{ inputs.anthropic-api-key != '' }}
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        RR_VERSION: ${{ inputs.version }}
+        ANTHROPIC_API_KEY: ${{ inputs.anthropic-api-key }}
+      run: npx --yes "rulereceipt@$RR_VERSION" lint --llm

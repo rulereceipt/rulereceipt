@@ -309,6 +309,43 @@ on a session it never found.
 For most people the honest answer is simpler: run `rulereceipt check --html`
 locally and attach the report to the PR.
 
+### The GitHub Action and the receipt flow
+
+The concrete way to gate in CI: produce a **receipt** where the session
+lives, verify it where it doesn't.
+
+Locally (the session is on your machine), produce and commit a receipt:
+
+```bash
+rulereceipt check --json > .rulereceipt/receipt.json   # commit this file
+```
+
+In CI (no session), verify the committed receipt with the Action:
+
+```yaml
+- uses: rulereceipt/rulereceipt@main   # pin to a release tag once one is cut
+  with:
+    receipt: .rulereceipt/receipt.json
+    max-age-days: "7"                  # optional: reject a stale receipt
+    # anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}  # optional: also fail on CLAUDE.md↔AGENTS.md contradictions
+```
+
+The build **fails** unless the receipt is a real, current, passing
+RuleReceipt receipt. The Action also prints a session-independent audit of
+your CLAUDE.md (`rules --coverage`), and — only if you pass an API key —
+fails on a CLAUDE.md-vs-AGENTS.md contradiction.
+
+Or run the pieces directly:
+
+```bash
+rulereceipt verify-receipt .rulereceipt/receipt.json --max-age-days 7
+```
+
+**Honest trust boundary:** CI has no session to re-hash, so it trusts the
+receipt you committed. A signed/attested receipt closes that gap and is the
+next step; until then, `verify-receipt` means "well-formed, current,
+passing" — not "CI independently re-derived it from the session."
+
 ## Install
 
 ```bash
