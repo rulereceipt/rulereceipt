@@ -20,6 +20,14 @@ export interface Release {
  * overstates is the exact failure this tool exists to catch.
  */
 export const RELEASES: Release[] = [
+  {
+    version: "0.1.46",
+    highlights: [
+      "Run RuleReceipt in CI: `--json` output, `verify-receipt`, and a GitHub Action (uses: rulereceipt/rulereceipt).",
+      "`rulereceipt init` for guided setup, and per-rule warnings via .rulereceipt/config.json so CI gates on what matters.",
+      "Opt-in `--check-updates` to hear when a new version ships.",
+    ],
+  },
   { version: "0.1.45", highlights: ["The tool now shows what's improved since you last ran it, like this note."] },
   { version: "0.1.44", highlights: ["The report now offers to install enforcement, but only when a rule was actually broken."] },
   { version: "0.1.43", highlights: ["New check: a claim to have read or verified something, with nothing in the session behind it."] },
