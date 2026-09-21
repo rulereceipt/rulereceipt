@@ -29,6 +29,7 @@ import { sendReportEmail } from "./sendReport.js";
 import { appendHistory, readHistorySince } from "./history.js";
 import { maybeShowWhatsNew } from "./whatsNew.js";
 import { verifyReceipt } from "./receipt.js";
+import { buildInitGuidance } from "./init.js";
 import { generateDigest } from "./digest.js";
 import { enableSchedule, disableSchedule, scheduleStatus, type Cadence } from "./schedule.js";
 import { findSplitBrainConflicts } from "./checks/splitBrain.js";
@@ -856,6 +857,21 @@ program
       console.error("Something went wrong:", err instanceof Error ? err.message : err);
       process.exitCode = 1;
     });
+  });
+
+program
+  .command("init")
+  .description("Guided setup: shows what's configured and the exact next steps. Read-only — writes nothing.")
+  .action(() => {
+    const cwd = process.cwd();
+    console.log(
+      buildInitGuidance({
+        hasClaudeMd: existsSync(join(cwd, "CLAUDE.md")),
+        hasAgentsMd: existsSync(join(cwd, "AGENTS.md")),
+        hookInstalled: hookIsInstalled(cwd),
+        hasApiKey: Boolean(process.env.ANTHROPIC_API_KEY),
+      })
+    );
   });
 
 program
