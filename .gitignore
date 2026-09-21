@@ -36,3 +36,7 @@ tests/fixtures/real-sessions/
 # machine state, account details and open decisions, not product history.
 # CHANGELOG.md is the record. Convention is global Rule 17.
 /local/
+
+# machine-local Claude Code settings (guard hook, absolute paths)
+.claude/settings.local.json
+.claude/rules/guardtest.md
