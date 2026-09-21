@@ -27,6 +27,7 @@ import { verifySessionHash } from "./verifyHash.js";
 import { saveEmailConfig, loadEmailConfig, detectSmtpHost, isValidEmail } from "./emailConfig.js";
 import { sendReportEmail } from "./sendReport.js";
 import { appendHistory, readHistorySince } from "./history.js";
+import { maybeShowWhatsNew } from "./whatsNew.js";
 import { generateDigest } from "./digest.js";
 import { enableSchedule, disableSchedule, scheduleStatus, type Cadence } from "./schedule.js";
 import { findSplitBrainConflicts } from "./checks/splitBrain.js";
@@ -374,6 +375,13 @@ async function runCheck(opts: CheckOptions) {
   }
 
   appendHistory(results, sessionFilePath);
+
+  // A once-per-update footer so a returning user sees the tool improved and
+  // comes back. Offline (notes ship in the package), fails open, and never
+  // on --markdown (that output is meant to be pasted into a PR/Slack).
+  if (!markdown) {
+    maybeShowWhatsNew(pkg.version);
+  }
 
   if (share) {
     await shareResults(results);
