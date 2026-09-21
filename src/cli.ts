@@ -31,6 +31,7 @@ import { maybeShowWhatsNew } from "./whatsNew.js";
 import { verifyReceipt } from "./receipt.js";
 import { buildInitGuidance } from "./init.js";
 import { loadProjectConfig, handleMap, blockingFailures, warningFailures, PROJECT_CONFIG_PATH } from "./projectConfig.js";
+import { maybeCheckUpdates, isUpdateCheckEnabled } from "./updateCheck.js";
 import { generateDigest } from "./digest.js";
 import { enableSchedule, disableSchedule, scheduleStatus, type Cadence } from "./schedule.js";
 import { findSplitBrainConflicts } from "./checks/splitBrain.js";
@@ -160,6 +161,7 @@ function writeHtmlReport(
 interface CheckOptions {
   markdown: boolean;
   json: boolean;
+  checkUpdates: boolean;
   share: boolean;
   email: boolean;
   emailAlways: boolean;
@@ -177,7 +179,7 @@ interface CheckOptions {
 }
 
 async function runCheck(opts: CheckOptions) {
-  const { markdown, json, share, email, emailAlways, llm, telemetry, html, exitZero, requireSession, showSkipped, transcriptOverride } = opts;
+  const { markdown, json, checkUpdates, share, email, emailAlways, llm, telemetry, html, exitZero, requireSession, showSkipped, transcriptOverride } = opts;
   const cwd = process.cwd();
   const rules = loadRules(cwd);
 
@@ -406,6 +408,8 @@ async function runCheck(opts: CheckOptions) {
   // --json (that output must be a single parseable object, nothing else).
   if (!markdown && !json) {
     maybeShowWhatsNew(pkg.version);
+    // Opt-in only; makes no network call unless enabled. Fails open.
+    await maybeCheckUpdates(pkg.version, isUpdateCheckEnabled(checkUpdates));
   }
 
   if (share) {
@@ -464,6 +468,7 @@ program
   .description("Check the current project's latest Claude Code session against CLAUDE.md/AGENTS.md")
   .option("--markdown", "output as markdown, for pasting into a PR or Slack")
   .option("--json", "output a machine-readable JSON report instead of text — for CI, a GitHub Action, or any other consumer. Suppresses all human-only output; exit code is unchanged.")
+  .option("--check-updates", "opt-in: check npm for a newer rulereceipt and print a one-line nudge if there is one (at most once a day). Off by default; RULERECEIPT_CHECK_UPDATES=1 also enables it.")
   .option(
     "--share",
     "opt-in: send anonymous pass/fail/unclear counts only (no rule text, no file paths, no session content). Off by default — no network call happens without this flag."
@@ -505,6 +510,7 @@ program
     runCheck({
       markdown: Boolean(opts.markdown),
       json: Boolean(opts.json),
+      checkUpdates: Boolean(opts.checkUpdates),
       share: Boolean(opts.share),
       email: Boolean(opts.email),
       emailAlways: Boolean(opts.emailAlways),
