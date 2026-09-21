@@ -25,7 +25,7 @@ export const RELEASES: Release[] = [
     highlights: [
       "Run RuleReceipt in CI: `--json` output, `verify-receipt`, and a GitHub Action (uses: rulereceipt/rulereceipt).",
       "`rulereceipt init` for guided setup, and per-rule warnings via .rulereceipt/config.json so CI gates on what matters.",
-      "Opt-in `--check-updates` to hear when a new version ships.",
+      "A README status badge (`rulereceipt badge`), and opt-in `--check-updates`.",
     ],
   },
   { version: "0.1.45", highlights: ["The tool now shows what's improved since you last ran it, like this note."] },

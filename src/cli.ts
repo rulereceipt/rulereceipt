@@ -28,7 +28,8 @@ import { saveEmailConfig, loadEmailConfig, detectSmtpHost, isValidEmail } from "
 import { sendReportEmail } from "./sendReport.js";
 import { appendHistory, readHistorySince } from "./history.js";
 import { maybeShowWhatsNew } from "./whatsNew.js";
-import { verifyReceipt } from "./receipt.js";
+import { verifyReceipt, parseReceipt } from "./receipt.js";
+import { buildBadge } from "./badge.js";
 import { buildInitGuidance } from "./init.js";
 import { loadProjectConfig, handleMap, blockingFailures, warningFailures, PROJECT_CONFIG_PATH } from "./projectConfig.js";
 import { maybeCheckUpdates, isUpdateCheckEnabled } from "./updateCheck.js";
@@ -1051,6 +1052,29 @@ program
       for (const p of res.problems) console.error(`  - ${p}`);
       process.exitCode = 1;
     }
+  });
+
+program
+  .command("badge <receiptPath>")
+  .description(
+    "Emit a shields.io endpoint JSON from a receipt (from `check --json`), for a README badge. Commit the output and reference it: ![rules](https://img.shields.io/endpoint?url=<raw-url>)"
+  )
+  .action((receiptPath: string) => {
+    let text: string;
+    try {
+      text = readFileSync(receiptPath, "utf-8");
+    } catch {
+      console.error(`Could not read receipt file: ${receiptPath}`);
+      process.exitCode = 1;
+      return;
+    }
+    const parsed = parseReceipt(text);
+    if (parsed.error || !parsed.receipt) {
+      console.error(`Not a valid receipt: ${parsed.error}`);
+      process.exitCode = 1;
+      return;
+    }
+    console.log(JSON.stringify(buildBadge(parsed.receipt.summary), null, 2));
   });
 
 program.parse();
