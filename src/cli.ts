@@ -28,6 +28,7 @@ import { saveEmailConfig, loadEmailConfig, detectSmtpHost, isValidEmail } from "
 import { sendReportEmail } from "./sendReport.js";
 import { appendHistory, readHistorySince } from "./history.js";
 import { maybeShowWhatsNew } from "./whatsNew.js";
+import { verifyReceipt } from "./receipt.js";
 import { generateDigest } from "./digest.js";
 import { enableSchedule, disableSchedule, scheduleStatus, type Cadence } from "./schedule.js";
 import { findSplitBrainConflicts } from "./checks/splitBrain.js";
@@ -749,6 +750,12 @@ async function runLint(markdown: boolean, llm: boolean) {
     return;
   }
 
+  // A contradiction between the two rule files is a real defect, not just
+  // information: it means the agent is being given conflicting instructions.
+  // Exit non-zero so CI (and the GitHub Action) can gate on it, the same way
+  // `check` exits 1 on a FAIL.
+  process.exitCode = 1;
+
   if (markdown) {
     const lines = ["## CLAUDE.md vs AGENTS.md — contradictions found", ""];
     for (const c of result.conflicts) {
@@ -959,6 +966,40 @@ program
       console.log("✕ MISMATCH — this file does NOT match the hash you checked against.");
       console.log(`  this file's real hash: sha256:${result.fullHash}`);
       console.log(`  checked against:       ${result.checkedAgainst}`);
+      process.exitCode = 1;
+    }
+  });
+
+program
+  .command("verify-receipt <path>")
+  .description(
+    "CI gate: verify a receipt (produced locally with `check --json` and committed) — that it is a real, current, passing RuleReceipt receipt. No session needed. Exits non-zero if invalid, stale, or anything FAILED."
+  )
+  .option("--max-age-days <n>", "reject a receipt older than N days (freshness gate)")
+  .action((path: string, opts: { maxAgeDays?: string }) => {
+    let text: string;
+    try {
+      text = readFileSync(path, "utf-8");
+    } catch {
+      console.error(`Could not read receipt file: ${path}`);
+      process.exitCode = 1;
+      return;
+    }
+    const maxAgeDays = opts.maxAgeDays !== undefined ? Number(opts.maxAgeDays) : undefined;
+    if (maxAgeDays !== undefined && !Number.isFinite(maxAgeDays)) {
+      console.error(`--max-age-days must be a number, got: ${opts.maxAgeDays}`);
+      process.exitCode = 1;
+      return;
+    }
+    const res = verifyReceipt(text, { maxAgeDays });
+    if (res.ok && res.receipt) {
+      const r = res.receipt;
+      console.log(
+        `✓ receipt OK — rulereceipt v${r.version}, ${r.summary.pass} passed / ${r.summary.fail} failed / ${r.summary.unclear} unclear, generated ${r.generatedAt}`
+      );
+    } else {
+      console.error("✕ receipt rejected:");
+      for (const p of res.problems) console.error(`  - ${p}`);
       process.exitCode = 1;
     }
   });
