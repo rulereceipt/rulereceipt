@@ -20,7 +20,7 @@ import { runEmojiChecks } from "./checks/emojiOutput.js";
 import { runHook } from "./hook.js";
 import { runGuard } from "./guard.js";
 import { runJudgmentChecks } from "./checks/judgmentChecks.js";
-import { generateReport, generateMarkdownReport, type ReportMeta } from "./report/generateReport.js";
+import { generateReport, generateMarkdownReport, generateJsonReport, type ReportMeta } from "./report/generateReport.js";
 import { gateOffer, hookIsInstalled } from "./report/gateOffer.js";
 import { generateHtmlReport } from "./report/generateHtmlReport.js";
 import { verifySessionHash } from "./verifyHash.js";
@@ -156,6 +156,7 @@ function writeHtmlReport(
 
 interface CheckOptions {
   markdown: boolean;
+  json: boolean;
   share: boolean;
   email: boolean;
   emailAlways: boolean;
@@ -173,7 +174,7 @@ interface CheckOptions {
 }
 
 async function runCheck(opts: CheckOptions) {
-  const { markdown, share, email, emailAlways, llm, telemetry, html, exitZero, requireSession, showSkipped, transcriptOverride } = opts;
+  const { markdown, json, share, email, emailAlways, llm, telemetry, html, exitZero, requireSession, showSkipped, transcriptOverride } = opts;
   const cwd = process.cwd();
   const rules = loadRules(cwd);
 
@@ -305,12 +306,18 @@ async function runCheck(opts: CheckOptions) {
   const results = [...deterministicResults, ...judgmentResults];
 
   const meta = { sessionFilePath, ruleCount: results.length };
+  // Kept in human/markdown form for --email and any other reader below, even
+  // when stdout is JSON — a manager gets a readable report, not raw JSON.
   const reportText = markdown ? generateMarkdownReport(results, meta) : generateReport(results, meta);
-  console.log(reportText);
+  if (json) {
+    console.log(generateJsonReport(results, meta, pkg.version));
+  } else {
+    console.log(reportText);
+  }
 
   // Shown only to someone who has just read their own broken rules, and only
   // if they have not already wired it up. See report/gateOffer.ts.
-  if (!markdown) {
+  if (!markdown && !json) {
     const offer = gateOffer({
       failures: results.filter((r) => r.status === "FAIL").length,
       hookInstalled: hookIsInstalled(cwd),
@@ -336,7 +343,7 @@ async function runCheck(opts: CheckOptions) {
   // so, and a rule dropped here never appears in the report at all. Listing
   // them needs no key, works in any language, and lets the person who wrote
   // the rule be the one who decides.
-  if (notARule.length > 0) {
+  if (!json && notARule.length > 0) {
     const n = notARule.length;
     const plural = n === 1 ? "" : "s";
     console.log(
@@ -368,7 +375,7 @@ async function runCheck(opts: CheckOptions) {
     }
   }
 
-  if (stale.length > 0) {
+  if (!json && stale.length > 0) {
     console.log(
       `\n(${stale.length} saved correction${stale.length === 1 ? "" : "s"} no longer match any rule in this project — the rule was probably reworded. Run \`rulereceipt rules --list\` to see them.)`
     );
@@ -378,8 +385,9 @@ async function runCheck(opts: CheckOptions) {
 
   // A once-per-update footer so a returning user sees the tool improved and
   // comes back. Offline (notes ship in the package), fails open, and never
-  // on --markdown (that output is meant to be pasted into a PR/Slack).
-  if (!markdown) {
+  // on --markdown (that output is meant to be pasted into a PR/Slack) or
+  // --json (that output must be a single parseable object, nothing else).
+  if (!markdown && !json) {
     maybeShowWhatsNew(pkg.version);
   }
 
@@ -436,6 +444,7 @@ program
   .command("check", { isDefault: true })
   .description("Check the current project's latest Claude Code session against CLAUDE.md/AGENTS.md")
   .option("--markdown", "output as markdown, for pasting into a PR or Slack")
+  .option("--json", "output a machine-readable JSON report instead of text — for CI, a GitHub Action, or any other consumer. Suppresses all human-only output; exit code is unchanged.")
   .option(
     "--share",
     "opt-in: send anonymous pass/fail/unclear counts only (no rule text, no file paths, no session content). Off by default — no network call happens without this flag."
@@ -476,6 +485,7 @@ program
   .action((opts) => {
     runCheck({
       markdown: Boolean(opts.markdown),
+      json: Boolean(opts.json),
       share: Boolean(opts.share),
       email: Boolean(opts.email),
       emailAlways: Boolean(opts.emailAlways),

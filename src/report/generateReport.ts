@@ -277,3 +277,46 @@ export function generateMarkdownReport(results: CheckResult[], meta: ReportMeta)
 
   return lines.join("\n");
 }
+
+/**
+ * Machine-readable output for CI, a GitHub Action, or any other consumer.
+ *
+ * `schema` is versioned deliberately: this is a contract other tools will
+ * parse, so a breaking shape change must bump it rather than silently move
+ * fields under callers. The full (untruncated) sha256 is included so a
+ * consumer can `rulereceipt verify` the session independently — the human
+ * reports only show a prefix. Rule text and evidence are sanitized the same
+ * way as every other output: a hostile CLAUDE.md does not get to smuggle
+ * control characters through the JSON either.
+ */
+export function generateJsonReport(results: CheckResult[], meta: ReportMeta, toolVersion: string): string {
+  const clean = results.map(sanitize);
+  const count = (s: CheckResult["status"]): number => clean.filter((r) => r.status === s).length;
+  const report = {
+    tool: "rulereceipt",
+    schema: 1,
+    version: toolVersion,
+    generatedAt: new Date().toISOString(),
+    session: {
+      path: meta.sessionFilePath,
+      sha256: computeTranscriptHash(meta.sessionFilePath),
+    },
+    summary: {
+      total: clean.length,
+      pass: count("PASS"),
+      fail: count("FAIL"),
+      unclear: count("UNCLEAR"),
+    },
+    results: clean.map((r) => ({
+      ruleId: r.ruleId,
+      ruleTitle: r.ruleTitle,
+      ruleSource: r.ruleSource,
+      status: r.status,
+      outcome: r.outcome ?? null,
+      method: r.method ?? null,
+      needsHuman: r.needsHuman ?? false,
+      evidence: r.evidence,
+    })),
+  };
+  return JSON.stringify(report, null, 2);
+}
