@@ -10,6 +10,8 @@ export interface InitState {
   hasAgentsMd: boolean;
   hookInstalled: boolean;
   hasApiKey: boolean;
+  /** AGENTS.md files a CLAUDE.md shadows, so Claude Code never loads them. */
+  shadowedAgents?: string[];
 }
 
 /** The PreToolUse guard hook, as it goes into .claude/settings.json. */
@@ -57,6 +59,17 @@ export function buildInitGuidance(state: InitState): string {
         "   judgment graded. Without it those report UNCLEAR — deterministic checks run regardless,\n" +
         "   and nothing is ever sent without the --llm flag."
     );
+  }
+
+  const shadowed = state.shadowedAgents ?? [];
+  if (shadowed.length > 0) {
+    out.push("Warning — rules Claude Code never reads:");
+    for (const path of shadowed) {
+      out.push(`  ${path} sits next to a CLAUDE.md, so Claude Code ignores it.`);
+    }
+    out.push("  Since 2026-09, AGENTS.md is only read when there is NO CLAUDE.md at that");
+    out.push("  level. Move these rules into the CLAUDE.md, or they govern nothing.");
+    out.push("");
   }
 
   if (steps.length === 0) {

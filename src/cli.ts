@@ -9,6 +9,7 @@ import { parseClaudeMd } from "./parsers/readClaudeMd.js";
 import { readLatestTranscript, readTranscriptFromFile, findLatestSessionFile } from "./parsers/transcriptParser.js";
 import { loadRules } from "./rules.js";
 import { adviseRules } from "./checkability.js";
+import { shadowedAgentsMd } from "./shadowedAgents.js";
 import { classifyRules } from "./checks/classify.js";
 import { loadOverrides, saveOverride, clearOverride, staleOverrides, ruleFingerprint, OVERRIDES_PATH } from "./overrides.js";
 import { runDeterministicChecks } from "./checks/deterministicChecks.js";
@@ -936,6 +937,7 @@ program
         hasAgentsMd: existsSync(join(cwd, "AGENTS.md")),
         hookInstalled: hookIsInstalled(cwd),
         hasApiKey: Boolean(process.env.ANTHROPIC_API_KEY),
+        shadowedAgents: shadowedAgentsMd(cwd).map((s) => s.agents),
       })
     );
   });
