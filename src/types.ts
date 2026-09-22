@@ -84,7 +84,9 @@ export type CheckMethod =
   | "model_judgment"
   /** Nothing ran. */
   | "none"
-  | "emoji_output";
+  | "emoji_output"
+  | "attribution_scan"
+  | "approval_gate";
 
 export interface CheckResult {
   ruleId: string;

@@ -81,6 +81,50 @@ describe("guard — deny path", () => {
   });
 });
 
+describe("guard — attribution prevention", () => {
+  function attributionProject(): string {
+    const dir = mkdtempSync(join(tmpdir(), "rr-guard-attrib-"));
+    writeFileSync(
+      join(dir, "CLAUDE.md"),
+      [
+        "# Rules",
+        "",
+        "## No AI attribution in git",
+        "Never add `Co-Authored-By: Claude` to a commit, and never include",
+        "\"Generated with Claude Code\" in a PR. Commits are authored by the team.",
+        "",
+      ].join("\n")
+    );
+    return dir;
+  }
+
+  it("blocks a commit carrying a Co-Authored-By trailer before it is made", () => {
+    const dir = attributionProject();
+    try {
+      const r = guard(
+        { tool_name: "Bash", tool_input: { command: 'git commit -m "x" -m "Co-Authored-By: Claude <noreply@anthropic.com>"' } },
+        dir
+      );
+      expect(r.code).toBe(2);
+      expect(r.out).toContain('"permissionDecision":"deny"');
+      expect(r.out).toContain("No AI attribution in git");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("allows a clean commit with no trailer", () => {
+    const dir = attributionProject();
+    try {
+      const r = guard({ tool_name: "Bash", tool_input: { command: 'git commit -m "fix the parser"' } }, dir);
+      expect(r.code).toBe(0);
+      expect(r.out.trim()).toBe("{}");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
 describe("guard — allow path", () => {
   it("allows a command that touches an unrelated file", () => {
     const r = guard({ tool_name: "Bash", tool_input: { command: "rm data/other.txt" } });

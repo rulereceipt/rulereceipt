@@ -3,6 +3,7 @@ import { classifyRules } from "./checks/classify.js";
 import { runCodeContentChecks } from "./checks/codeContent.js";
 import { runFileLifecycleChecks } from "./checks/fileLifecycle.js";
 import { runGitBranchPolicyChecks } from "./checks/gitBranchPolicy.js";
+import { runAttributionChecks } from "./checks/attribution.js";
 import { loadOverrides, ruleFingerprint, ratifiedForbids } from "./overrides.js";
 import { commandRunsLiteral } from "./checks/proposedAction.js";
 import type { CheckResult, Rule, TranscriptEvent } from "./types.js";
@@ -63,6 +64,11 @@ function structuredBlocks(cwd: string, event: TranscriptEvent): Block[] {
     ...runCodeContentChecks(of("codeContent"), [event]),
     ...runFileLifecycleChecks(of("fileLifecycle"), [event]),
     ...runGitBranchPolicyChecks(of("gitBranchPolicy"), [event]),
+    // Prevention for the attribution rule: a commit/PR carrying a
+    // `Co-Authored-By: Claude` / "Generated with Claude Code" trailer is
+    // refused before it is made, not just reported after. Reuses the exact
+    // detection the report uses, so the two cannot disagree.
+    ...runAttributionChecks(of("attribution"), [event]),
   ];
   return results
     .filter((r) => r.status === "FAIL")

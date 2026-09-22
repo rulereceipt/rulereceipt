@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import { parseClaudeMd } from "./parsers/readClaudeMd.js";
 import { readLatestTranscript, readTranscriptFromFile, findLatestSessionFile } from "./parsers/transcriptParser.js";
 import { loadRules } from "./rules.js";
+import { adviseRules } from "./checkability.js";
 import { classifyRules } from "./checks/classify.js";
 import { loadOverrides, saveOverride, clearOverride, staleOverrides, ruleFingerprint, OVERRIDES_PATH } from "./overrides.js";
 import { runDeterministicChecks } from "./checks/deterministicChecks.js";
@@ -610,9 +611,49 @@ function runCoverage() {
   }
 }
 
-async function runRules(opts: { include?: string; exclude?: string; clear?: string; list?: boolean; coverage?: boolean; forbid?: string; literal?: string; handles?: boolean }) {
+/**
+ * `rules --advise`: for every rule the classifier can't check mechanically,
+ * one line saying why and the smallest edit that would fix it. The other
+ * half of `--coverage` — that says which rules a hook might guard; this says
+ * which rules can't be checked at all, and how to change that.
+ */
+function runAdvise() {
+  const cwd = process.cwd();
+  const rules = loadRules(cwd);
+  if (rules.length === 0) {
+    console.log("No CLAUDE.md or AGENTS.md found, so there are no rules to advise on.");
+    return;
+  }
+  const advice = adviseRules(rules);
+  const checkable = rules.length - advice.length;
+  console.log(`Rule checkability\n`);
+  console.log(`  ${checkable} of ${rules.length} rule${rules.length === 1 ? "" : "s"} can be checked mechanically as written.`);
+  if (advice.length === 0) {
+    console.log(`\n  Every rule names something a check can bind to. Nothing to fix.`);
+    return;
+  }
+  console.log(`  ${advice.length} cannot yet — here is what each one needs:\n`);
+  // Project rules first: those are the ones the reader can act on today.
+  const ordered = advice
+    .map((a, i) => ({ a, source: rules.find((r) => r.title === a.ruleTitle)?.source }))
+    .sort((x, y) => Number(x.source === "global") - Number(y.source === "global"))
+    .map((x) => x.a);
+  for (const a of ordered) {
+    const tag = a.kind === "notARule" ? "not a rule?" : "judgment";
+    console.log(`  [${tag}] ${a.ruleTitle.replace(/\s+/g, " ").trim().slice(0, 76)}`);
+    console.log(`    -> ${a.suggestion}\n`);
+  }
+  console.log(`Naming the exact command, file or branch a rule is about — in backticks —`);
+  console.log(`is what turns a "wish list" line into one this tool can hold to account.`);
+}
+
+async function runRules(opts: { include?: string; exclude?: string; clear?: string; list?: boolean; coverage?: boolean; forbid?: string; literal?: string; handles?: boolean; advise?: boolean }) {
   if (opts.coverage) {
     runCoverage();
+    return;
+  }
+  if (opts.advise) {
+    runAdvise();
     return;
   }
   const cwd = process.cwd();
@@ -864,6 +905,7 @@ program
   .option("--clear <handle>", "remove a stored correction")
   .option("--list", "show stored corrections (the default when no other flag is given)")
   .option("--coverage", "show which rules a configured hook might actually be enforcing, and which are prose only")
+  .option("--advise", "for each rule that can't be checked mechanically, show why and the smallest edit that would fix it")
   .action((opts) => {
     runRules(opts).catch((err) => {
       console.error("Something went wrong:", err instanceof Error ? err.message : err);

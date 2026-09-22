@@ -27,6 +27,20 @@ export interface EmojiClassification {
   polarity: "forbid";
 }
 
+export interface AttributionClassification {
+  kind: "attribution";
+  rule: Rule;
+  polarity: "forbid";
+}
+
+export interface ApprovalGateClassification {
+  kind: "approvalGate";
+  rule: Rule;
+  /** The gated actions this rule names, e.g. ["push", "delete"]. */
+  actions: string[];
+  polarity: "forbid";
+}
+
 export interface JudgmentClassification {
   kind: "judgment";
   rule: Rule;
@@ -131,6 +145,8 @@ export type Classification =
   | FileLifecycleClassification
   | NotARuleClassification
   | EmojiClassification
+  | AttributionClassification
+  | ApprovalGateClassification
   | JudgmentClassification;
 
 // Normative language — the thing that makes a line a rule rather than a
@@ -290,6 +306,11 @@ function isNotARule(rule: Rule): boolean {
   if (isCommandDocumentation(rule)) return true;
   const combined = `${rule.title} ${rule.text}`;
   if (DIRECTIVE_LANGUAGE.test(combined)) return false;
+  // A gate over a concrete action ("before you delete data, wait for
+  // confirmation") is a rule, even when its imperative sits after a comma
+  // where IMPERATIVE_INSTRUCTION's clause-start anchor cannot see it. Placed
+  // after the event-record and command-doc filters so those still win.
+  if (isApprovalGateRule(rule)) return false;
   // Title and text are tested SEPARATELY: the imperative pattern is
   // anchored to a clause start, and concatenating them pushes the text's
   // opening verb into mid-string where the anchor can never match. That
@@ -657,6 +678,78 @@ function isEmojiRule(rule: Rule): boolean {
   return EMOJI_FORBID.test(window);
 }
 
+/**
+ * A rule that forbids an AI-authorship mark in git commits, PRs or comments.
+ *
+ * Same shape as the emoji test: a subject (an attribution mark) and a
+ * prohibition next to it, plus a git/GitHub context so a general rule about
+ * crediting sources does not route here. Placed before the backtick pass
+ * because the rule quotes the exact trailer it forbids (`Co-Authored-By:
+ * Claude`), which would otherwise be extracted as a literal and searched for
+ * across written files — flagging the prohibition itself.
+ *
+ * From anthropics/claude-code#83813, #92169, #82690, #4287, one of the most-
+ * filed rule-following complaints. This repo's own CLAUDE.md carries this
+ * rule, so the check is dogfooded on every session here.
+ */
+const ATTRIBUTION_SUBJECT =
+  /co-?authored-by|generated with\s*\[?\s*claude|\bai\b[^.\n]{0,20}(?:trace|attribution|authorship)|\battribution\b/i;
+const ATTRIBUTION_CONTEXT = /\b(?:commit|git|pull request|\bpr\b|github|co-?author)\b/i;
+const ATTRIBUTION_FORBID =
+  /\b(?:no|never|don't|do not|without|must not|shall not|not add|zero|forbid)\b/i;
+
+function isAttributionRule(rule: Rule): boolean {
+  const text = `${rule.title} ${rule.text}`;
+  if (!ATTRIBUTION_SUBJECT.test(text)) return false;
+  if (!ATTRIBUTION_CONTEXT.test(text)) return false;
+  if (!ATTRIBUTION_FORBID.test(text)) return false;
+  const m = text.match(ATTRIBUTION_SUBJECT);
+  if (!m || m.index === undefined) return false;
+  const window = text.slice(Math.max(0, m.index - 60), m.index + 60);
+  return ATTRIBUTION_FORBID.test(window);
+}
+
+/**
+ * A rule that says the agent must ASK before a concrete, detectable action.
+ *
+ * "Wait for approval before you delete", "repeat-back before destructive
+ * actions", "ask first before you push". These already trip PRE_ACTION_GATE
+ * (which deflects them away from claimEvidence); routing them here lets the
+ * ONE mechanically-honest half be answered without the LLM: did the assistant
+ * seek approval before it did the thing.
+ *
+ * Only routes when the rule names an action this can actually find in a
+ * transcript — push, commit, delete/rm/drop/truncate. A gate over something
+ * vague ("ask before big changes") has no detectable action and stays a
+ * judgment call. The subtle half — whether a reply actually GRANTED approval,
+ * the #92505 "read my frustration as a yes" case — is not claimed here.
+ */
+const APPROVAL_GATE_ACTIONS: { key: string; inRule: RegExp }[] = [
+  { key: "push", inRule: /\bpush(?:es|ed|ing)?\b/i },
+  { key: "commit", inRule: /\bcommit(?:s|ted|ting)?\b/i },
+  { key: "delete", inRule: /\b(?:delet\w*|remov\w*|wip(?:e|ed|ing)?|truncat\w*|drop)\b|\brm\b/i },
+];
+
+/**
+ * The rule must actually ask for sign-off, not merely order two things in
+ * time. "Run `npm test` before committing" gates a commit temporally but
+ * seeks no approval — it is a require-an-action rule, not this. Requiring an
+ * approval-seeking phrase (not the bare "before <action>" clause) is what
+ * keeps those out.
+ */
+const APPROVAL_SIGNAL =
+  /\b(?:repeat[- ]back|restate\s+what|wait\s+for\s+(?:confirmation|approval|explicit|sign[- ]?off)|ask\s+(?:first|before|for\s+(?:permission|approval|confirmation|sign[- ]?off))|get\s+(?:approval|sign[- ]?off|permission)|(?:explicit\s+)?(?:approval|confirmation|sign[- ]?off|permission)\s+(?:is\s+)?(?:required|needed|first)|confirm\s+(?:first|before))\b/i;
+
+export function approvalGateActions(rule: Rule): string[] {
+  const text = `${rule.title} ${rule.text}`;
+  if (!APPROVAL_SIGNAL.test(text)) return [];
+  return APPROVAL_GATE_ACTIONS.filter((a) => a.inRule.test(text)).map((a) => a.key);
+}
+
+function isApprovalGateRule(rule: Rule): boolean {
+  return approvalGateActions(rule).length > 0;
+}
+
 export function classifyRule(rule: Rule): Classification {
   // Checked first: if this isn't a rule at all, no check of any kind
   // should run against it — not a keyword match, not an LLM call.
@@ -676,6 +769,20 @@ export function classifyRule(rule: Rule): Classification {
   // unusable pattern, so these would otherwise fall through to judgment.
   if (isEmojiRule(rule)) {
     return { kind: "emojiOutput", rule, polarity: "forbid" };
+  }
+
+  // Checked before the backtick test: the rule quotes the exact trailer it
+  // forbids, which would otherwise be extracted as a literal and searched
+  // for across written files, flagging the prohibition itself.
+  if (isAttributionRule(rule)) {
+    return { kind: "attribution", rule, polarity: "forbid" };
+  }
+
+  // Checked before the backtick pass: these carry action verbs, not literals,
+  // and would otherwise fall through to judgment. Only the ones naming a
+  // detectable action route here; the rest stay judgment.
+  if (isApprovalGateRule(rule)) {
+    return { kind: "approvalGate", rule, actions: approvalGateActions(rule), polarity: "forbid" };
   }
 
   const patterns = new Set<string>();

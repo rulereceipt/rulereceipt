@@ -6,6 +6,8 @@ import { runCodeContentChecks } from "./checks/codeContent.js";
 import { runFileLifecycleChecks } from "./checks/fileLifecycle.js";
 import { runClaimEvidenceChecks } from "./checks/claimEvidence.js";
 import { runEmojiChecks } from "./checks/emojiOutput.js";
+import { runAttributionChecks } from "./checks/attribution.js";
+import { runApprovalGateChecks } from "./checks/approvalGate.js";
 import { runJudgmentChecks } from "./checks/judgmentChecks.js";
 import { loadOverrides, ruleFingerprint, staleOverrides } from "./overrides.js";
 import type { CheckResult, Rule, TranscriptEvent } from "./types.js";
@@ -54,6 +56,8 @@ export async function evaluateSession(
     ...runFileLifecycleChecks(of("fileLifecycle") as never, events),
     ...runClaimEvidenceChecks(of("claimEvidence") as never, events),
     ...runEmojiChecks(of("emojiOutput") as never, events),
+    ...runAttributionChecks(of("attribution") as never, events),
+    ...runApprovalGateChecks(of("approvalGate") as never, events),
   ];
 
   const judgment = of("judgment");
