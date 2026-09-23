@@ -290,3 +290,34 @@ describe("loadRules does not report a home-directory rules file twice", () => {
     expect(countMarker(rules, "global-marker")).toBe(1);
   });
 });
+
+describe("loadRules mirrors Claude Code's CLAUDE.md-shadows-AGENTS.md precedence", () => {
+  let tempHome: string;
+  let projectDir: string;
+  const realHome = homeState.current;
+  beforeEach(() => {
+    tempHome = mkdtempSync(join(tmpdir(), "rr-shadow-home-"));
+    projectDir = mkdtempSync(join(tmpdir(), "rr-shadow-proj-"));
+    homeState.current = tempHome;
+    mkdirSync(join(projectDir, ".git")); // stop the upward walk here
+  });
+  afterEach(() => {
+    rmSync(tempHome, { recursive: true, force: true });
+    rmSync(projectDir, { recursive: true, force: true });
+    homeState.current = realHome;
+  });
+
+  it("does NOT load a shadowed AGENTS.md when a CLAUDE.md sits beside it", () => {
+    writeFileSync(join(projectDir, "CLAUDE.md"), "## Rule\n- claude-marker\n");
+    writeFileSync(join(projectDir, "AGENTS.md"), "## Rule\n- agents-marker\n");
+    const text = loadRules(projectDir).map((r) => `${r.title} ${r.text}`).join(" | ");
+    expect(text).toContain("claude-marker");
+    expect(text).not.toContain("agents-marker");
+  });
+
+  it("DOES load AGENTS.md when there is no CLAUDE.md at that level", () => {
+    writeFileSync(join(projectDir, "AGENTS.md"), "## Rule\n- agents-marker\n");
+    const text = loadRules(projectDir).map((r) => `${r.title} ${r.text}`).join(" | ");
+    expect(text).toContain("agents-marker");
+  });
+});

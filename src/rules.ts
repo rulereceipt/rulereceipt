@@ -15,8 +15,6 @@ import type { Rule } from "./types.js";
  * the tool never opened is the most misleading result this can produce,
  * worse than no report, because it looks like evidence.
  */
-const RULE_FILE_NAMES = ["CLAUDE.md", "AGENTS.md", "CLAUDE.local.md", "AGENTS.local.md"];
-const RULE_SUBDIR_FILES = [join(".claude", "CLAUDE.md"), join(".claude", "AGENTS.md")];
 const RULE_DIRS = [join(".claude", "rules")];
 
 /**
@@ -44,15 +42,30 @@ function markdownFilesIn(dir: string): string[] {
 /** Every rules file at one directory level, in documented load order. */
 function ruleFilesAtLevel(dir: string): string[] {
   const found: string[] = [];
-  for (const rel of RULE_SUBDIR_FILES) {
+  const push = (rel: string) => {
     const p = join(dir, rel);
     if (existsSync(p)) found.push(p);
-  }
+  };
+  const has = (rel: string) => existsSync(join(dir, rel));
+
+  // CLAUDE.md shadows AGENTS.md at the same level: as of 2026-09-19 Claude
+  // Code loads AGENTS.md ONLY when that level has no CLAUDE.md, and silently
+  // ignores it otherwise. Reading a shadowed AGENTS.md here would check the
+  // session against rules Claude never loaded — a false accusation. `init`
+  // separately WARNS about the shadowed file (see shadowedAgents.ts) so the
+  // rules are not lost silently. Mirrored for the `.claude/` subdir pair.
+  push(join(".claude", "CLAUDE.md"));
+  if (!has(join(".claude", "CLAUDE.md"))) push(join(".claude", "AGENTS.md"));
+
   for (const rel of RULE_DIRS) found.push(...markdownFilesIn(join(dir, rel)));
-  for (const name of RULE_FILE_NAMES) {
-    const p = join(dir, name);
-    if (existsSync(p)) found.push(p);
-  }
+
+  push("CLAUDE.md");
+  if (!has("CLAUDE.md")) push("AGENTS.md");
+  // .local variants: their precedence relative to the base files is not
+  // documented, so both are kept rather than guessing at a shadow rule.
+  push("CLAUDE.local.md");
+  push("AGENTS.local.md");
+
   return found;
 }
 

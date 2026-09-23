@@ -1,6 +1,6 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { join, dirname, basename } from "node:path";
 import type { TranscriptEvent } from "../types.js";
 
 /**
@@ -177,8 +177,39 @@ export function readTranscriptFromFile(filePath: string): TranscriptEvent[] {
   return events;
 }
 
+/**
+ * Subagent transcripts for a session.
+ *
+ * Claude Code writes each subagent (a Task/background agent, up to 20 at once
+ * and 3 deep as of mid-2026) to its own JSONL under a directory named after
+ * the PARENT session id — verified against real files 2026-09-23:
+ *   projects/<enc>/<sessionId>/subagents/agent-*.jsonl
+ * and each subagent line's own `sessionId` equals that parent id. So for a
+ * picked session file `<sessionId>.jsonl`, the subagents sit in a sibling
+ * directory named by its basename.
+ *
+ * These were invisible before: the reader took only the newest top-level
+ * file, so a rule broken by a subagent — the exact shape of the risk as
+ * Claude Code pushes toward fleets of unattended agents — was never checked.
+ *
+ * The events are appended to the main stream. Scan checks (git/file/
+ * attribution/emoji) simply gain more to inspect; claim-vs-evidence pairs on
+ * globally-unique tool ids so it cannot cross-match; the approval gate can at
+ * worst treat a main-session "ask" as covering a subagent action, which is a
+ * false negative — the safe direction for a tool that must not over-accuse.
+ */
+export function findSubagentFiles(sessionFile: string): string[] {
+  const sessionId = basename(sessionFile).replace(/\.jsonl$/, "");
+  const subagentDir = join(dirname(sessionFile), sessionId, "subagents");
+  return listSessionFiles(subagentDir);
+}
+
 export function readLatestTranscript(cwd: string): TranscriptEvent[] {
   const filePath = findLatestSessionFile(cwd);
   if (!filePath) return [];
-  return readTranscriptFromFile(filePath);
+  const events = readTranscriptFromFile(filePath);
+  for (const sub of findSubagentFiles(filePath)) {
+    events.push(...readTranscriptFromFile(sub));
+  }
+  return events;
 }
