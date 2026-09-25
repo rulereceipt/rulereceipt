@@ -393,6 +393,28 @@ report to the path you name, and `rules --include/--exclude` records a
 correction in `.rulereceipt/overrides.json`. Plain `rulereceipt check` writes
 nothing and makes no network calls.
 
+**Severity, per rule.** A committed, team-shared `.rulereceipt/config.json`
+sets how hard each rule bites in CI, by its stable handle (from `rulereceipt
+rules --list`):
+
+```json
+{
+  "rules": {
+    "a1b2c3": "off",     // hidden from the report, never gates
+    "d4e5f6": "warn",    // shown, but does not fail the build
+    "97h8i9": "error"    // shown, FAILS the build — the default for a checkable rule
+  }
+}
+```
+
+No config means today's behaviour: every checkable FAIL is an `error`. This is
+the one place severity lives — a team marks the must-not-break rules `error`
+and the nice-to-haves `warn`, so CI gates on what matters instead of going red
+on day one. (Refusing a command *before* it runs is separate, and stays with
+the guard's `rules --forbid` clause-mark — a config that could block on any
+rule would refuse far too much.) The older `{"warn": ["a1b2c3"]}` list still
+works and means the same as `"warn"` above.
+
 **You can verify the package came from this source.** Every release from
 0.1.19 on is built and published by GitHub Actions and signed with
 [npm provenance](https://docs.npmjs.com/generating-provenance-statements),

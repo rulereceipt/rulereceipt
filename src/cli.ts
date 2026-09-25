@@ -33,7 +33,7 @@ import { maybeShowWhatsNew } from "./whatsNew.js";
 import { verifyReceipt, parseReceipt } from "./receipt.js";
 import { buildBadge } from "./badge.js";
 import { buildInitGuidance } from "./init.js";
-import { loadProjectConfig, handleMap, blockingFailures, warningFailures, PROJECT_CONFIG_PATH } from "./projectConfig.js";
+import { loadProjectConfig, handleMap, blockingFailures, warningFailures, visibleResults, PROJECT_CONFIG_PATH } from "./projectConfig.js";
 import { maybeCheckUpdates, isUpdateCheckEnabled } from "./updateCheck.js";
 import { generateDigest } from "./digest.js";
 import { enableSchedule, disableSchedule, scheduleStatus, type Cadence } from "./schedule.js";
@@ -311,13 +311,15 @@ async function runCheck(opts: CheckOptions) {
   // sends only a random install ID, never rule text or transcript content,
   // regardless of --llm.
   const judgmentResults = llm ? await runJudgmentChecks(judgment, events) : judgment.map(({ rule }) => needsLlmResult(rule));
-  const results = [...deterministicResults, ...judgmentResults];
+  const rawResults = [...deterministicResults, ...judgmentResults];
 
-  // Severity: rules a team marked as warnings in .rulereceipt/config.json are
-  // still reported but do not fail the build. handleFor maps a result back to
-  // its stable handle so the mark survives edits that renumber rule ids.
+  // Severity ladder from .rulereceipt/config.json (per rule handle): `off`
+  // rules are hidden entirely, `warn` rules are shown but do not fail the
+  // build, everything else is `error` (the default). handleFor maps a result
+  // back to its stable handle so the mark survives edits that renumber ids.
   const projectConfig = loadProjectConfig(cwd);
   const handleFor = handleMap(rules);
+  const results = visibleResults(rawResults, projectConfig, handleFor);
   const blockingFails = blockingFailures(results, projectConfig, handleFor);
   const warnedFails = warningFailures(results, projectConfig, handleFor);
 
