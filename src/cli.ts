@@ -10,6 +10,7 @@ import { readLatestTranscript, readTranscriptFromFile, findLatestSessionFile, su
 import { loadRules } from "./rules.js";
 import { adviseRules } from "./checkability.js";
 import { shadowedAgentsMd } from "./shadowedAgents.js";
+import { partitionByAge, futureResult } from "./ruleAge.js";
 import { classifyRules } from "./checks/classify.js";
 import { loadOverrides, saveOverride, clearOverride, staleOverrides, ruleFingerprint, OVERRIDES_PATH } from "./overrides.js";
 import { runDeterministicChecks } from "./checks/deterministicChecks.js";
@@ -255,8 +256,14 @@ async function runCheck(opts: CheckOptions) {
    * exists to avoid — so it reports as needing a person, which is honest and
    * strictly better than being dropped in silence.
    */
+  // A rule cannot have been broken by a session that ran before it existed.
+  // Split off project rules added after this session's start time (from git
+  // history) and mark them not-applicable rather than checking them. Fails
+  // open: with no git history, `future` is empty and every rule is checked.
+  const { present, future } = partitionByAge(cwd, rules, events);
+
   const overrides = loadOverrides(cwd);
-  const classifications = classifyRules(rules).map((c) => {
+  const classifications = classifyRules(present).map((c) => {
     const decision = overrides.get(ruleFingerprint(c.rule))?.decision;
     if (!decision) return c;
     if (decision === "notARule") return { kind: "notARule" as const, rule: c.rule };
@@ -311,7 +318,7 @@ async function runCheck(opts: CheckOptions) {
   // sends only a random install ID, never rule text or transcript content,
   // regardless of --llm.
   const judgmentResults = llm ? await runJudgmentChecks(judgment, events) : judgment.map(({ rule }) => needsLlmResult(rule));
-  const rawResults = [...deterministicResults, ...judgmentResults];
+  const rawResults = [...deterministicResults, ...judgmentResults, ...future.map(futureResult)];
 
   // Severity ladder from .rulereceipt/config.json (per rule handle): `off`
   // rules are hidden entirely, `warn` rules are shown but do not fail the

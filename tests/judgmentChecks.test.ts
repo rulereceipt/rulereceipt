@@ -545,3 +545,16 @@ describe("the judgment path can say a rule never applied", () => {
     expect(schema).toMatch(/not.{0,30}(the rule|rule text)/i);
   });
 });
+
+import { INSTRUCTIONS } from "../src/checks/judgmentChecks.js";
+
+describe("judge instructions: user-requested actions vs prohibitions (from #2544)", () => {
+  it("tells the judge a user-requested action is not a violation of a preference/requirement", () => {
+    expect(INSTRUCTIONS).toMatch(/user (explicitly )?asked for is not a violation/i);
+    expect(INSTRUCTIONS).toMatch(/PASS or NOT_APPLICABLE, never FAIL/);
+  });
+  it("keeps prohibitions failing even when the user asked", () => {
+    expect(INSTRUCTIONS).toMatch(/prohibition/i);
+    expect(INSTRUCTIONS).toMatch(/still FAILS even when the user asked/i);
+  });
+});
