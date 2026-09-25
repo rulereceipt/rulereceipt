@@ -202,6 +202,55 @@ function reason(blocks: Block[]): string {
  * 3. It says which rule and why, in the refusal itself, because a block with
  *    no reason is indistinguishable from a broken tool.
  */
+export interface GuardDecision {
+  /** True when the proposed call breaks a rule and should be refused. */
+  deny: boolean;
+  /** The message for the model, or "" when allowed. */
+  reason: string;
+  /** The rules that would refuse it, empty when allowed. */
+  blocks: Block[];
+}
+
+/**
+ * The allow/deny decision for one proposed tool call, with no I/O.
+ *
+ * Extracted from runGuard 2026-09-25 so the decision is a pure function the
+ * shell hook calls today and any future host — an in-process function hook,
+ * a different runtime — calls tomorrow without re-deriving the logic. The
+ * function-hook interface is still an unshipped Anthropic proposal (#91870),
+ * so nothing here targets it; this is only the seam that keeps the adapter
+ * thin when it lands. Same reasoning as evaluateSession: one body of code so
+ * two callers can never disagree about whether a rule was broken.
+ */
+export function guardDecision(
+  cwd: string,
+  toolName: string,
+  toolInput: { command?: unknown } & Record<string, unknown>
+): GuardDecision {
+  const allow: GuardDecision = { deny: false, reason: "", blocks: [] };
+  if (loadRules(cwd).length === 0) return allow;
+
+  let blocks: Block[] = [];
+  if (toolName === "Bash" && typeof toolInput.command === "string") {
+    const event: TranscriptEvent = {
+      role: "assistant", kind: "tool_use", toolName: "Bash",
+      input: { command: toolInput.command }, timestamp: "",
+    };
+    blocks = [...structuredBlocks(cwd, event), ...ratifiedLiteralBlocks(cwd, toolInput.command)];
+  } else if (toolName === "Write" || toolName === "Edit" || toolName === "NotebookEdit") {
+    const event: TranscriptEvent = {
+      role: "assistant", kind: "tool_use", toolName,
+      input: toolInput, timestamp: "",
+    };
+    blocks = structuredBlocks(cwd, event);
+  } else {
+    return allow;
+  }
+
+  if (blocks.length === 0) return allow;
+  return { deny: true, reason: reason(blocks), blocks };
+}
+
 export async function runGuard(): Promise<void> {
   const allow = (): void => {
     process.stdout.write(JSON.stringify({}));
@@ -214,29 +263,10 @@ export async function runGuard(): Promise<void> {
     const tool = input.tool_name ?? "";
     const toolInput = input.tool_input ?? {};
 
-    if (loadRules(cwd).length === 0) return allow();
+    const decision = guardDecision(cwd, tool, toolInput);
+    if (!decision.deny) return allow();
 
-    let blocks: Block[] = [];
-
-    if (tool === "Bash" && typeof toolInput.command === "string") {
-      const event: TranscriptEvent = {
-        role: "assistant", kind: "tool_use", toolName: "Bash",
-        input: { command: toolInput.command }, timestamp: "",
-      };
-      blocks = [...structuredBlocks(cwd, event), ...ratifiedLiteralBlocks(cwd, toolInput.command)];
-    } else if (tool === "Write" || tool === "Edit" || tool === "NotebookEdit") {
-      const event: TranscriptEvent = {
-        role: "assistant", kind: "tool_use", toolName: tool,
-        input: toolInput as Record<string, unknown>, timestamp: "",
-      };
-      blocks = structuredBlocks(cwd, event);
-    } else {
-      return allow();
-    }
-
-    if (blocks.length === 0) return allow();
-
-    const why = reason(blocks);
+    const why = decision.reason;
     process.stdout.write(
       JSON.stringify({
         hookSpecificOutput: {
