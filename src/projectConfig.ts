@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { CheckResult, Rule } from "./types.js";
+import type { CheckResult, CheckMethod, Rule } from "./types.js";
 import { ruleFingerprint } from "./overrides.js";
 
 /**
@@ -38,7 +38,27 @@ const VALID_MODES: readonly string[] = ["off", "warn", "error"];
 export interface ProjectConfig {
   warn: string[];
   rules: Record<string, RuleMode>;
+  /** A whole check type, by friendly name (see CHECK_ALIASES) or raw method. */
+  checks: Record<string, RuleMode>;
 }
+
+/**
+ * Friendly names for a check type, so `checks: { "emoji": "off" }` silences
+ * every emoji verdict without listing each rule. A result carries a `method`
+ * (e.g. "emoji_output"); these are the human-facing aliases for those.
+ */
+export const CHECK_ALIASES: Record<string, CheckMethod> = {
+  emoji: "emoji_output",
+  attribution: "attribution_scan",
+  approval: "approval_gate",
+  git: "git_events",
+  files: "file_events",
+  code: "code_content",
+  claim: "claim_vs_evidence",
+  tests: "edit_test_pairing",
+  text: "text_scan",
+  judgment: "model_judgment",
+};
 
 export const PROJECT_CONFIG_PATH = join(".rulereceipt", "config.json");
 
@@ -47,24 +67,40 @@ export function loadProjectConfig(cwd: string): ProjectConfig {
     const parsed = JSON.parse(readFileSync(join(cwd, PROJECT_CONFIG_PATH), "utf-8")) as {
       warn?: unknown;
       rules?: unknown;
+      checks?: unknown;
     };
     const warn = Array.isArray(parsed?.warn) ? parsed.warn.filter((x): x is string => typeof x === "string") : [];
-    const rules: Record<string, RuleMode> = {};
-    if (parsed?.rules && typeof parsed.rules === "object" && !Array.isArray(parsed.rules)) {
-      for (const [handle, mode] of Object.entries(parsed.rules as Record<string, unknown>)) {
-        if (typeof mode === "string" && VALID_MODES.includes(mode)) rules[handle] = mode as RuleMode;
+    const readModes = (raw: unknown): Record<string, RuleMode> => {
+      const out: Record<string, RuleMode> = {};
+      if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+        for (const [key, mode] of Object.entries(raw as Record<string, unknown>)) {
+          if (typeof mode === "string" && VALID_MODES.includes(mode)) out[key] = mode as RuleMode;
+        }
       }
-    }
-    return { warn, rules };
+      return out;
+    };
+    return { warn, rules: readModes(parsed?.rules), checks: readModes(parsed?.checks) };
   } catch {
     // Missing or malformed config means no severities configured, never an
     // error — same fail-open discipline as the rest of the tool.
-    return { warn: [], rules: {} };
+    return { warn: [], rules: {}, checks: {} };
   }
 }
 
+/** The mode a `checks` entry sets for a result's method, if any. */
+function checkMode(method: CheckMethod | undefined, config: ProjectConfig): RuleMode | undefined {
+  if (!method || !config.checks || Object.keys(config.checks).length === 0) return undefined;
+  // A raw method key ("emoji_output") wins over its friendly alias ("emoji").
+  if (config.checks[method]) return config.checks[method];
+  for (const [alias, m] of Object.entries(CHECK_ALIASES)) {
+    if (m === method && config.checks[alias]) return config.checks[alias];
+  }
+  return undefined;
+}
+
 /**
- * The mode for one result. `rules` wins over the legacy `warn` list; anything
+ * The mode for one result. Precedence: a per-rule `rules` entry wins over a
+ * per-check `checks` entry, which wins over the legacy `warn` list; anything
  * unlisted is `error`, so the default is unchanged and no config means today's
  * behaviour exactly.
  */
@@ -75,6 +111,8 @@ export function modeForResult(
 ): RuleMode {
   const handle = handleFor(result);
   if (config.rules[handle]) return config.rules[handle];
+  const byCheck = checkMode(result.method, config);
+  if (byCheck) return byCheck;
   if (config.warn.includes(handle)) return "warn";
   return "error";
 }

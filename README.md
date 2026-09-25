@@ -403,11 +403,17 @@ rules --list`):
     "a1b2c3": "off",     // hidden from the report, never gates
     "d4e5f6": "warn",    // shown, but does not fail the build
     "97h8i9": "error"    // shown, FAILS the build — the default for a checkable rule
+  },
+  "checks": {
+    "emoji": "off",      // silence a whole check type by name
+    "git": "warn"        // emoji, attribution, approval, git, files, code, claim, tests, judgment
   }
 }
 ```
 
-No config means today's behaviour: every checkable FAIL is an `error`. This is
+A per-rule `rules` entry wins over a per-check `checks` entry, which wins over
+the default. No config means today's behaviour: every checkable FAIL is an
+`error`. This is
 the one place severity lives — a team marks the must-not-break rules `error`
 and the nice-to-haves `warn`, so CI gates on what matters instead of going red
 on day one. (Refusing a command *before* it runs is separate, and stays with

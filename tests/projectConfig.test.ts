@@ -60,6 +60,35 @@ describe("mode ladder: off | warn | error per rule handle", () => {
   });
 });
 
+describe("per-check silencing via checks: { <name>: <mode> }", () => {
+  const withMethod = (id: string, method: CheckResult["method"]): CheckResult =>
+    ({ ruleId: id, ruleTitle: `rule ${id}`, ruleSource: "project", status: "FAIL", evidence: "", method });
+  const emoji = withMethod("1", "emoji_output");
+  const git = withMethod("2", "git_events");
+
+  it("`checks: { emoji: off }` hides every emoji verdict", () => {
+    const cfg = { warn: [], rules: {}, checks: { emoji: "off" as const } };
+    expect(visibleResults([emoji, git], cfg, handleFor).map((r) => r.ruleId)).toEqual(["2"]);
+  });
+
+  it("`checks: { git: warn }` downgrades a git FAIL to a warning", () => {
+    const cfg = { warn: [], rules: {}, checks: { git: "warn" as const } };
+    expect(modeForResult(git, cfg, handleFor)).toBe("warn");
+    expect(warningFailures([emoji, git], cfg, handleFor).map((r) => r.ruleId)).toEqual(["2"]);
+  });
+
+  it("a per-rule mode wins over a per-check mode", () => {
+    // checks silences emoji, but rules pins THIS emoji rule back to error.
+    const cfg = { warn: [], rules: { [handleFor(emoji)]: "error" as const }, checks: { emoji: "off" as const } };
+    expect(modeForResult(emoji, cfg, handleFor)).toBe("error");
+  });
+
+  it("accepts the raw method name too", () => {
+    const cfg = { warn: [], rules: {}, checks: { emoji_output: "off" as const } };
+    expect(modeForResult(emoji, cfg, handleFor)).toBe("off");
+  });
+});
+
 describe("loadProjectConfig", () => {
   let dir: string;
   beforeEach(() => {
@@ -74,13 +103,19 @@ describe("loadProjectConfig", () => {
   });
 
   it("returns empty config when there is no config (fail open)", () => {
-    expect(loadProjectConfig(dir)).toEqual({ warn: [], rules: {} });
+    expect(loadProjectConfig(dir)).toEqual({ warn: [], rules: {}, checks: {} });
   });
 
   it("returns empty config on a malformed config, never throws", () => {
     mkdirSync(join(dir, ".rulereceipt"));
     writeFileSync(join(dir, ".rulereceipt", "config.json"), "not json {");
-    expect(loadProjectConfig(dir)).toEqual({ warn: [], rules: {} });
+    expect(loadProjectConfig(dir)).toEqual({ warn: [], rules: {}, checks: {} });
+  });
+
+  it("loads per-check modes by friendly name", () => {
+    mkdirSync(join(dir, ".rulereceipt"));
+    writeFileSync(join(dir, ".rulereceipt", "config.json"), JSON.stringify({ checks: { emoji: "off", git: "warn" } }));
+    expect(loadProjectConfig(dir).checks).toEqual({ emoji: "off", git: "warn" });
   });
 
   it("loads per-rule modes and drops invalid ones", () => {
