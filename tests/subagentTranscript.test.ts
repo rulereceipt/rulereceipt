@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { join } from "node:path";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { findSubagentFiles, readLatestTranscript } from "../src/parsers/transcriptParser.js";
+import { findSubagentFiles, readLatestTranscript, subagentNote } from "../src/parsers/transcriptParser.js";
 
 const homeState = vi.hoisted(() => ({ current: "" }));
 vi.mock("node:os", async (importOriginal) => {
@@ -43,6 +43,16 @@ describe("findSubagentFiles", () => {
     const sessionFile = join(dir, "SID.jsonl");
     writeFileSync(sessionFile, assistantToolUse("git status"));
     expect(findSubagentFiles(sessionFile)).toHaveLength(0);
+  });
+
+  it("subagentNote reports the count, or null when there are none", () => {
+    const sessionFile = join(dir, "SID.jsonl");
+    writeFileSync(sessionFile, assistantToolUse("git status"));
+    expect(subagentNote(sessionFile)).toBeNull();
+    expect(subagentNote(null)).toBeNull();
+    mkdirSync(join(dir, "SID", "subagents"), { recursive: true });
+    writeFileSync(join(dir, "SID", "subagents", "agent-x.jsonl"), assistantToolUse("git push"));
+    expect(subagentNote(sessionFile)).toMatch(/Checked 1 subagent session /);
   });
 });
 

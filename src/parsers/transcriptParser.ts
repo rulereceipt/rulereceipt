@@ -204,6 +204,18 @@ export function findSubagentFiles(sessionFile: string): string[] {
   return listSessionFiles(subagentDir);
 }
 
+/**
+ * A one-line note for the report so a user knows their subagents were included
+ * in the check — otherwise the coverage is invisible and they might think a
+ * violation a subagent committed went unseen. Null when there were none.
+ */
+export function subagentNote(sessionFile: string | null): string | null {
+  if (!sessionFile) return null;
+  const n = findSubagentFiles(sessionFile).length;
+  if (n === 0) return null;
+  return `Checked ${n} subagent session${n === 1 ? "" : "s"} alongside the main one — their actions are held to the same rules.`;
+}
+
 export function readLatestTranscript(cwd: string): TranscriptEvent[] {
   const filePath = findLatestSessionFile(cwd);
   if (!filePath) return [];

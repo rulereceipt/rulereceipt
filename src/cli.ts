@@ -6,7 +6,7 @@ import { join, dirname, resolve, isAbsolute } from "node:path";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { parseClaudeMd } from "./parsers/readClaudeMd.js";
-import { readLatestTranscript, readTranscriptFromFile, findLatestSessionFile } from "./parsers/transcriptParser.js";
+import { readLatestTranscript, readTranscriptFromFile, findLatestSessionFile, subagentNote } from "./parsers/transcriptParser.js";
 import { loadRules } from "./rules.js";
 import { adviseRules } from "./checkability.js";
 import { shadowedAgentsMd } from "./shadowedAgents.js";
@@ -331,6 +331,8 @@ async function runCheck(opts: CheckOptions) {
     console.log(generateJsonReport(results, meta, pkg.version));
   } else {
     console.log(reportText);
+    const subNote = subagentNote(sessionFilePath);
+    if (subNote) console.log(`\n${subNote}`);
   }
 
   // Shown only to someone who has just read their own broken rules, and only
