@@ -73,16 +73,19 @@ export function findClaudeHomeDirNames(): string[] {
   }
 }
 
-export function findLatestSessionFile(cwd: string): string | null {
+/** Every session file for this project, newest first. */
+export function listAllSessionFiles(cwd: string): string[] {
   const encoded = encodeProjectPath(cwd);
   const sessionFiles = findClaudeHomeDirNames().flatMap((dirName) =>
     listSessionFiles(join(homedir(), dirName, "projects", encoded))
   );
-
-  if (sessionFiles.length === 0) return null;
-
   sessionFiles.sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs);
-  return sessionFiles[0];
+  return sessionFiles;
+}
+
+export function findLatestSessionFile(cwd: string): string | null {
+  const all = listAllSessionFiles(cwd);
+  return all.length > 0 ? all[0] : null;
 }
 
 function extractToolResultText(content: unknown): string {

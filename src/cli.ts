@@ -11,6 +11,7 @@ import { loadRules } from "./rules.js";
 import { adviseRules } from "./checkability.js";
 import { shadowedAgentsMd } from "./shadowedAgents.js";
 import { partitionByAge, futureResult } from "./ruleAge.js";
+import { auditSessions, renderComplianceReport } from "./report/complianceReport.js";
 import { classifyRules } from "./checks/classify.js";
 import { loadOverrides, saveOverride, clearOverride, staleOverrides, ruleFingerprint, OVERRIDES_PATH } from "./overrides.js";
 import { runDeterministicChecks } from "./checks/deterministicChecks.js";
@@ -999,6 +1000,19 @@ const PERIOD_MS: Record<Cadence, number> = {
   weekly: 7 * 24 * 60 * 60 * 1000,
   monthly: 30 * 24 * 60 * 60 * 1000,
 };
+
+program
+  .command("report")
+  .description(
+    "Compliance report across your recent sessions (not just the latest): which policy rules were broken, where, with evidence. Deterministic, local, no network. The org-wide version runs via the Claude Compliance API for Enterprise orgs."
+  )
+  .option("--last <n>", "how many recent sessions to audit", "25")
+  .option("--markdown", "output as markdown, for a report you can send")
+  .action(async (opts) => {
+    const n = Number.parseInt(String(opts.last), 10);
+    const r = await auditSessions(process.cwd(), Number.isFinite(n) ? n : 25);
+    console.log(renderComplianceReport(r, Boolean(opts.markdown)));
+  });
 
 program
   .command("digest")
