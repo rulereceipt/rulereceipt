@@ -1046,6 +1046,22 @@
             <summary>Can this help with a vendor security review or DPA?</summary>
             <p>It can give you real evidence for the "how do you develop securely" questions — not certify you compliant. We put together a <a href="/templates/security-focused-CLAUDE.md">starting-point rule set</a> covering common asks (secrets, PII, input validation, auth checks); use it as a base and adjust it to what your actual reviewer asks for.</p>
           </details>
+          <details class="faq-item">
+            <summary>How do I know it won't just cry wolf?</summary>
+            <p>Because that's the thing it's built against. An early version did cry wolf — across 559 real rules files, about one report in six carried a false accusation. Most of the work since has gone into fixing that, not into catching more: it's under 3% now, and a "FAIL" can only be produced from a rule that actually forbids something — enforced at build time, not left to hope. When the evidence doesn't settle it, the answer is "couldn't tell," never a guess. A checker that accuses you wrongly is worse than no checker, so it's optimised to stay quiet unless it's sure.</p>
+          </details>
+          <details class="faq-item">
+            <summary>Can it check every session, not just one?</summary>
+            <p>Yes. <code>rulereceipt report</code> audits your recent sessions into one summary — which rules were broken, where, with the evidence — deterministic and local. For a whole organisation, the same report runs against the Claude Compliance API (Anthropic's own feed of every agent session, including Cowork and remote work). That org-wide, hosted version is in development for Enterprise — <a href="mailto:hello@rulereceipt.dev">get in touch</a> if you need it.</p>
+          </details>
+          <details class="faq-item">
+            <summary>How is this different from Anthropic's Compliance API or built-in guardrails?</summary>
+            <p>They're complementary — RuleReceipt sits on top of them. Anthropic's Compliance API hands you the raw session transcripts; hooks let you block specific tool calls before they run. Neither one tells you, in plain terms, which of <em>your</em> CLAUDE.md rules a given session actually followed or broke, with the quoted evidence. That's the gap RuleReceipt fills: it reads those transcripts — yours locally, or org-wide via their Compliance API — and turns them into a pass/fail receipt against your own policy. Anthropic gives you the data and the enforcement primitives; this gives you the verdict.</p>
+          </details>
+          <details class="faq-item">
+            <summary>Can I gate my CI on it?</summary>
+            <p>Yes. <code>rulereceipt check</code> exits non-zero when a rule is broken, and there's a <code>verify-receipt</code> command plus a GitHub Action so a pull request fails if a session broke policy. You mark which rules are hard errors versus warnings in a committed <code>.rulereceipt/config.json</code>, so CI gates on what actually matters instead of going red on day one.</p>
+          </details>
       </div>
     </div>
   </section>
