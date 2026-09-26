@@ -750,6 +750,15 @@ function isApprovalGateRule(rule: Rule): boolean {
   return approvalGateActions(rule).length > 0;
 }
 
+/**
+ * A subordinating condition that scopes when a prohibition applies. A literal
+ * matcher cannot read it, so a forbid carrying one is routed to judgment
+ * rather than flagged on every occurrence. Kept to clear scoping words so a
+ * flat prohibition that merely contains "if" in passing is not swept in.
+ */
+const CONDITIONAL_SCOPE =
+  /\b(?:when(?:ever)?|unless|except\s+when|only\s+(?:if|when)|as\s+long\s+as|provided\s+that|in\s+cases?\s+where)\b|\bif\s+(?:you|the|it|they|we|a|an|on|in|running|building|committing|pushing|deploying)\b/i;
+
 export function classifyRule(rule: Rule): Classification {
   // Checked first: if this isn't a rule at all, no check of any kind
   // should run against it — not a keyword match, not an LLM call.
@@ -823,6 +832,20 @@ export function classifyRule(rule: Rule): Classification {
   const branchName = [...patterns].find(isBranchName);
   if (BRANCH_WORD.test(text) && branchName !== undefined) {
     return { kind: "gitBranchPolicy", rule, branchName, polarity , polarityInferred };
+  }
+
+  // A forbid scoped by a condition the literal checkers cannot evaluate.
+  //
+  // Raised by etoryoki on anthropics/claude-code#2544: "Never run `terraform
+  // apply` when you're on main" read as "never run it" flags every correct run
+  // elsewhere. A deterministic literal match sees only the command, not the
+  // "when/unless/if" that scopes it, so it accuses every occurrence. Routing
+  // these to judgment lets the condition actually be weighed — the same choice
+  // etoryoki made ("treat conditional or hedged sentences as not checkable
+  // instead of guessing"). Placed AFTER the branch check on purpose:
+  // gitBranchPolicy evaluates its own branch condition and must keep those.
+  if (polarity === "forbid" && CONDITIONAL_SCOPE.test(text)) {
+    return { kind: "judgment", rule };
   }
 
   // Route on ANY code-shaped literal, but check ONLY the code-shaped ones.
