@@ -1,4 +1,4 @@
-import { statSync } from "node:fs";
+import { statSync, readFileSync } from "node:fs";
 import { basename } from "node:path";
 import type { TranscriptEvent } from "../types.js";
 import { listAllSessionFiles, readTranscriptFromFile, findSubagentFiles } from "../parsers/transcriptParser.js";
@@ -99,6 +99,54 @@ export function findLatestSession(cwd: string): LatestSession | null {
 export function readLatestSessionEvents(cwd: string): TranscriptEvent[] {
   const latest = findLatestSession(cwd);
   return latest ? latest.adapter.parse(latest.file) : [];
+}
+
+/**
+ * EVERY session across all supported tools for this cwd, newest first, each
+ * paired with the adapter that can parse it. Used by the multi-session
+ * compliance report so it audits Codex sessions alongside Claude ones, not
+ * just Claude Code's.
+ */
+export function listAllSessions(cwd: string): { adapter: SessionAdapter; file: string }[] {
+  const pairs: { adapter: SessionAdapter; file: string; mtimeMs: number }[] = [];
+  for (const adapter of ADAPTERS) {
+    for (const file of adapter.listSessions(cwd)) {
+      try {
+        pairs.push({ adapter, file, mtimeMs: statSync(file).mtimeMs });
+      } catch {
+        /* unreadable file: skip */
+      }
+    }
+  }
+  pairs.sort((a, b) => b.mtimeMs - a.mtimeMs);
+  return pairs.map(({ adapter, file }) => ({ adapter, file }));
+}
+
+/**
+ * Parse a single session file whose tool is not known ahead of time (a
+ * `--transcript <file>` the user pointed at directly). A Codex rollout opens
+ * with a `session_meta` or `response_item` line; anything else is read as a
+ * Claude transcript. Sniffing the first line beats guessing from the path,
+ * and it fails closed — an unreadable or unrecognised file yields no events,
+ * never a wrong parse presented as right.
+ */
+export function parseSessionFile(file: string): TranscriptEvent[] {
+  let raw: string;
+  try {
+    raw = readFileSync(file, "utf-8");
+  } catch {
+    return [];
+  }
+  const firstLine = raw.split("\n").find((l) => l.trim()) ?? "";
+  try {
+    const obj = JSON.parse(firstLine) as { type?: unknown };
+    if (obj && typeof obj === "object" && (obj.type === "session_meta" || obj.type === "response_item")) {
+      return parseCodexTranscript(file);
+    }
+  } catch {
+    /* first line is not JSON: treat as a Claude transcript below */
+  }
+  return readTranscriptFromFile(file);
 }
 
 /**

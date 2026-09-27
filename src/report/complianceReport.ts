@@ -1,7 +1,7 @@
 import { basename } from "node:path";
 import { loadRules } from "../rules.js";
 import { evaluateSession } from "../evaluate.js";
-import { readTranscriptFromFile, listAllSessionFiles } from "../parsers/transcriptParser.js";
+import { listAllSessions } from "../adapters/index.js";
 import type { CheckResult, Rule } from "../types.js";
 
 /**
@@ -45,14 +45,17 @@ function needsReview(rule: Rule): CheckResult {
 
 export async function auditSessions(cwd: string, limit: number): Promise<ComplianceReport> {
   const rules = loadRules(cwd);
-  const files = listAllSessionFiles(cwd).slice(0, Math.max(1, limit));
+  // Every session across all supported tools (Claude Code, Codex), newest
+  // first — the report audits a Codex session the same way it audits a Claude
+  // one, since the engine is agent-neutral.
+  const found = listAllSessions(cwd).slice(0, Math.max(1, limit));
 
   const sessions: SessionAudit[] = [];
   const byRule = new Map<string, number>();
   let totalViolations = 0;
 
-  for (const file of files) {
-    const events = readTranscriptFromFile(file);
+  for (const { adapter, file } of found) {
+    const events = adapter.parse(file);
     if (events.length === 0) continue;
     const { results } = await evaluateSession(cwd, rules, events, false, needsReview);
     const violations = results.filter((r) => r.status === "FAIL");

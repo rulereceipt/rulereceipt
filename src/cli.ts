@@ -6,8 +6,8 @@ import { join, dirname, resolve, isAbsolute } from "node:path";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { parseClaudeMd } from "./parsers/readClaudeMd.js";
-import { readTranscriptFromFile, subagentNote } from "./parsers/transcriptParser.js";
-import { findLatestSession, sessionSourceNote } from "./adapters/index.js";
+import { subagentNote } from "./parsers/transcriptParser.js";
+import { findLatestSession, sessionSourceNote, parseSessionFile } from "./adapters/index.js";
 import { loadRules } from "./rules.js";
 import { adviseRules } from "./checkability.js";
 import { shadowedAgentsMd } from "./shadowedAgents.js";
@@ -230,7 +230,7 @@ async function runCheck(opts: CheckOptions) {
   }
 
   const events = transcriptOverride
-    ? readTranscriptFromFile(sessionFilePath)
+    ? parseSessionFile(sessionFilePath) // sniffs Claude vs Codex format
     : latestSession
       ? latestSession.adapter.parse(latestSession.file)
       : [];

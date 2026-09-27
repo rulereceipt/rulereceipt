@@ -31,6 +31,36 @@ import type { TranscriptEvent } from "../types.js";
  * this is not advertised as supported on the site/README (see adapters/index).
  */
 
+// Codex function-call names that mean "run a shell command" — normalised to
+// the engine's canonical `Bash` tool so the command-scanning checks fire.
+// `local_shell_call` is handled by its payload type, not this list.
+const SHELL_TOOL_NAMES = new Set([
+  "exec_command", "shell", "bash", "sh", "exec", "run_command", "shell_command", "container.exec",
+]);
+
+/** Turn an argv array into the command string, unwrapping `sh -c "<script>"`. */
+function argvToString(argv: unknown[]): string {
+  const parts = argv.map((a) => String(a));
+  if (parts.length >= 3 && /^(?:\/(?:usr\/)?bin\/)?(?:ba|z)?sh$/.test(parts[0]) && /^-[a-z]*c$/.test(parts[1])) {
+    return parts[2]; // the -c/-lc script is the real command
+  }
+  return parts.join(" ");
+}
+
+/** The shell command string from a tool input, however Codex shaped it. */
+function shellCommandString(input: unknown): string | null {
+  if (typeof input === "string") return input;
+  if (Array.isArray(input)) return argvToString(input);
+  if (input && typeof input === "object") {
+    const o = input as Record<string, unknown>;
+    const action = o.action as Record<string, unknown> | undefined;
+    const cmd = o.command ?? o.cmd ?? action?.command;
+    if (typeof cmd === "string") return cmd;
+    if (Array.isArray(cmd)) return argvToString(cmd);
+  }
+  return null;
+}
+
 function textFromContent(content: unknown): string {
   if (typeof content === "string") return content;
   if (Array.isArray(content)) {
@@ -96,10 +126,9 @@ export function parseCodexLine(line: string): TranscriptEvent[] {
   }
 
   if (p.type === "function_call" || p.type === "local_shell_call" || p.type === "custom_tool_call") {
-    const toolName =
-      typeof p.name === "string" ? p.name : p.type === "local_shell_call" ? "shell" : "tool";
-    // `arguments` is a JSON string in Codex; keep it parsed when possible so
-    // the checks see structured input, else fall back to the raw value.
+    const rawName = typeof p.name === "string" ? p.name : "";
+    // `arguments` is a JSON string in Codex; parse when possible so the checks
+    // see structured input, else keep the raw value.
     let input: unknown = p.arguments ?? p.input ?? p.action ?? {};
     if (typeof input === "string") {
       try {
@@ -108,11 +137,36 @@ export function parseCodexLine(line: string): TranscriptEvent[] {
         /* leave as the raw string */
       }
     }
+
+    // NORMALISE shell execution to the engine's canonical shape. Every
+    // command-scanning check (git branch, file lifecycle, attribution,
+    // approval gate, proposed action, deterministic literals) keys on
+    // toolName === "Bash" with input.command as a STRING — Claude's shape.
+    // Codex runs shells under `local_shell_call` and `exec_command`-style
+    // function calls, so without this none of those checks would fire on a
+    // Codex session (found 2026-09-26 when a `git push origin main` in a Codex
+    // rollout produced zero violations). Non-shell tools (a real custom/MCP
+    // tool) keep their own name and input untouched.
+    const isShell = p.type === "local_shell_call" || SHELL_TOOL_NAMES.has(rawName.toLowerCase());
+    if (isShell) {
+      const command = shellCommandString(input);
+      return [
+        {
+          role: "assistant",
+          kind: "tool_use",
+          toolName: "Bash",
+          input: command !== null ? { command } : input,
+          timestamp,
+          toolUseId: typeof p.call_id === "string" ? p.call_id : undefined,
+        },
+      ];
+    }
+
     return [
       {
         role: "assistant",
         kind: "tool_use",
-        toolName,
+        toolName: rawName || "tool",
         input,
         timestamp,
         toolUseId: typeof p.call_id === "string" ? p.call_id : undefined,

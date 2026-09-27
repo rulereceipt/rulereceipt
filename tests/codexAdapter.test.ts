@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { parseCodexLine, parseCodexTranscript, listCodexSessions } from "../src/adapters/codex.js";
-import { findLatestSession } from "../src/adapters/index.js";
+import { findLatestSession, parseSessionFile } from "../src/adapters/index.js";
 
 const homeState = vi.hoisted(() => ({ current: "" }));
 vi.mock("node:os", async (importOriginal) => {
@@ -31,15 +31,24 @@ describe("parseCodexLine maps the verified response_item shapes", () => {
     expect(e).toMatchObject({ kind: "text", role: "assistant", text: "done" });
   });
 
-  it("maps a function_call to a tool_use with parsed input and call id", () => {
+  // A shell function_call is normalised to the engine's canonical Bash shape
+  // (toolName "Bash", input.command a string) so the command-scanning checks
+  // fire on Codex the same as on Claude.
+  it("normalises an exec_command shell call to a Bash tool_use", () => {
     const [e] = parseCodexLine(responseItem({ type: "function_call", name: "exec_command", arguments: '{"command":"npm test"}', call_id: "call_1" }));
-    expect(e).toMatchObject({ kind: "tool_use", role: "assistant", toolName: "exec_command", toolUseId: "call_1" });
+    expect(e).toMatchObject({ kind: "tool_use", role: "assistant", toolName: "Bash", toolUseId: "call_1" });
     expect((e as { input: { command: string } }).input.command).toBe("npm test");
   });
 
-  it("maps a local_shell_call to a tool_use", () => {
-    const [e] = parseCodexLine(responseItem({ type: "local_shell_call", action: { command: ["bash", "-lc", "ls"] }, call_id: "c2" }));
-    expect(e).toMatchObject({ kind: "tool_use", role: "assistant", toolName: "shell" });
+  it("normalises a local_shell_call, unwrapping sh -c to the real command", () => {
+    const [e] = parseCodexLine(responseItem({ type: "local_shell_call", action: { command: ["bash", "-lc", "git push --force origin main"] }, call_id: "c2" }));
+    expect(e).toMatchObject({ kind: "tool_use", role: "assistant", toolName: "Bash" });
+    expect((e as { input: { command: string } }).input.command).toBe("git push --force origin main");
+  });
+
+  it("leaves a non-shell custom tool call under its own name", () => {
+    const [e] = parseCodexLine(responseItem({ type: "function_call", name: "apply_patch", arguments: '{"path":"a.ts"}', call_id: "c3" }));
+    expect(e).toMatchObject({ kind: "tool_use", toolName: "apply_patch" });
   });
 
   it("maps a function_call_output to a tool_result paired by call id", () => {
@@ -106,5 +115,32 @@ describe("listCodexSessions filters a global store to one project by session_met
   it("findLatestSession selects the Codex session when it is the only tool present", () => {
     const latest = findLatestSession(projectA);
     expect(latest?.adapter.tool).toBe("codex");
+  });
+});
+
+describe("parseSessionFile sniffs Claude vs Codex from the file itself", () => {
+  let dir: string;
+  beforeEach(() => { dir = mkdtempSync(join(tmpdir(), "rr-sniff-")); });
+  afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
+
+  it("parses a Codex rollout passed by path", () => {
+    const f = join(dir, "rollout-x.jsonl");
+    writeFileSync(f, [
+      line({ timestamp: "t", type: "session_meta", payload: { id: "1", cwd: "/p" } }),
+      responseItem({ type: "function_call", name: "exec_command", arguments: '{"command":"git push --force"}', call_id: "c" }),
+    ].join("\n") + "\n");
+    const events = parseSessionFile(f);
+    expect(events.some((e) => e.kind === "tool_use" && e.toolName === "Bash" && (e.input as { command?: string }).command === "git push --force")).toBe(true);
+  });
+
+  it("parses a Claude transcript passed by path", () => {
+    const f = join(dir, "claude.jsonl");
+    writeFileSync(f, line({ type: "assistant", message: { content: [{ type: "text", text: "hello there" }] } }) + "\n");
+    const events = parseSessionFile(f);
+    expect(events.some((e) => e.kind === "text" && e.text === "hello there")).toBe(true);
+  });
+
+  it("returns [] for a missing file rather than throwing", () => {
+    expect(parseSessionFile(join(dir, "nope.jsonl"))).toEqual([]);
   });
 });

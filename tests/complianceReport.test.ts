@@ -73,3 +73,36 @@ describe("auditSessions aggregates violations across many sessions", () => {
     expect(r.byRule.some((x) => /ledger/i.test(x.title))).toBe(true);
   });
 });
+
+describe("auditSessions audits Codex sessions too, not just Claude", () => {
+  let home: string;
+  let project: string;
+  const realHome = homeState.current;
+
+  beforeEach(() => {
+    home = mkdtempSync(join(tmpdir(), "rr-cr-codex-home-"));
+    project = mkdtempSync(join(tmpdir(), "rr-cr-codex-proj-"));
+    homeState.current = home;
+    mkdirSync(join(project, ".git"));
+    writeFileSync(join(project, "CLAUDE.md"), "# Rules\n\n## 1. No main\nNever push to the `main` branch.\n");
+    const day = join(home, ".codex", "sessions", "2026", "03", "31");
+    mkdirSync(day, { recursive: true });
+    const lines = [
+      JSON.stringify({ timestamp: "2026-03-31T22:18:46Z", type: "session_meta", payload: { id: "1", cwd: project } }),
+      JSON.stringify({ timestamp: "2026-03-31T22:18:47Z", type: "response_item", payload: { type: "function_call", name: "exec_command", arguments: JSON.stringify({ command: "git push origin main" }), call_id: "c1" } }),
+    ];
+    writeFileSync(join(day, "rollout-c.jsonl"), lines.join("\n") + "\n");
+  });
+  afterEach(() => {
+    rmSync(home, { recursive: true, force: true });
+    rmSync(project, { recursive: true, force: true });
+    homeState.current = realHome;
+  });
+
+  it("flags a Codex session that pushed to a forbidden branch", async () => {
+    const r = await auditSessions(project, 25);
+    expect(r.sessionsChecked).toBe(1);
+    expect(r.totalViolations).toBeGreaterThanOrEqual(1);
+    expect(r.byRule.some((x) => /main/i.test(x.title))).toBe(true);
+  });
+});
