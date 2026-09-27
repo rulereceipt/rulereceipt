@@ -61,7 +61,7 @@
     <p>RuleReceipt is a command-line tool that runs on your own computer. This page explains, plainly, what that means for your data.</p>
 
     <h2>What RuleReceipt does with your data</h2>
-    <p>Nothing, by default. RuleReceipt reads your CLAUDE.md/AGENTS.md file and your local Claude Code session transcript on your machine, and prints a report to your terminal. None of that content — no rule text, no file paths, no session content — is ever sent to us, stored by us, or seen by us. Plain <code>rulereceipt check</code> makes zero network calls.</p>
+    <p>Nothing, by default. RuleReceipt reads your rules files (CLAUDE.md, AGENTS.md, and Cursor/Copilot/Windsurf rules) and your local agent session transcript on your machine, and prints a report to your terminal. None of that content — no rule text, no file paths, no session content — is ever sent to us, stored by us, or seen by us. Plain <code>rulereceipt check</code> makes zero network calls.</p>
 
     <p><strong>The shareable report is written locally, not uploaded.</strong> Passing <code>--html</code> writes a single self-contained file into your working directory and nothing else — no upload, no network call, no copy kept anywhere. That file does contain your rule text and evidence quoted from your session, because that's what makes it useful to send. It goes only where you choose to send it, and it's worth knowing what's in it before you forward it to someone.</p>
 

@@ -6,8 +6,10 @@
 [![npm](https://img.shields.io/npm/v/rulereceipt)](https://www.npmjs.com/package/rulereceipt)
 [![provenance](https://img.shields.io/badge/npm-provenance%20signed-blue)](https://www.npmjs.com/package/rulereceipt#provenance)
 
-Checks whether a Claude Code session actually followed the rules in your
-CLAUDE.md / AGENTS.md — with evidence, not just a vibe.
+Checks whether your AI coding agent actually followed your rules — with
+evidence, not just a vibe. Works with Claude Code today (OpenAI Codex CLI
+support is built and in testing), and reads rules from CLAUDE.md, AGENTS.md,
+Cursor (`.cursor/rules`), GitHub Copilot, Windsurf, and Claude Code memory.
 
 Runs entirely on your machine. Plain `rulereceipt check` makes zero network
 calls — [Trust, privacy and licensing](#trust-privacy-and-licensing) has the
@@ -28,11 +30,12 @@ Published and live on npm, actively developed.
 
 ## How it works
 
-1. Reads your CLAUDE.md / AGENTS.md and extracts individual rules —
-   from the current project directory and your global rules file.
-2. Reads your most recent Claude Code session transcript, wherever Claude
-   Code stored it — including hosted or enterprise variants that use a
-   different directory.
+1. Reads your rules and extracts individual ones — from CLAUDE.md / AGENTS.md,
+   Cursor / Copilot / Windsurf rule files, and Claude Code memory, across the
+   current project directory and your global rules file.
+2. Reads your most recent agent session transcript — Claude Code today
+   (including hosted/enterprise variants under a different directory), and
+   OpenAI Codex CLI (in testing); newest session across tools wins.
 3. Routes each rule to the narrowest check that can actually answer it:
    - **Structured checks** read what the session really did — an actual
      git command's branch argument, actual file edits, actual file
