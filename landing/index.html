@@ -14,7 +14,7 @@
 <title>RuleReceipt — see what your AI agent actually did</title>
 <link rel="canonical" href="https://rulereceipt.dev/" />
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23FAFAF7'/%3E%3Cpath d='M9 8h14v17l-3-2-3 2-3-2-3 2-2-2z' fill='none' stroke='%2317191C' stroke-width='1.6'/%3E%3Cpath d='M12 14h8M12 18h6' stroke='%2317805F' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E" />
-<meta name="description" content="RuleReceipt checks a Claude Code session against your own rules and shows precisely what was followed, what wasn't, and why — with evidence. Runs locally. Nothing stored, nothing sent anywhere." />
+<meta name="description" content="RuleReceipt checks an AI coding agent's session against your own rules and shows precisely what was followed, what wasn't, and why — with evidence. Works with Claude Code today (Codex in testing); reads rules from CLAUDE.md, AGENTS.md, Cursor, Copilot and Windsurf. Runs locally. Nothing stored, nothing sent anywhere." />
 <meta property="og:type" content="website" />
 <meta property="og:url" content="https://rulereceipt.dev/" />
 <meta property="og:title" content="RuleReceipt — see what your AI agent actually did" />
@@ -726,14 +726,14 @@
         <path class="draw" style="--len:12" d="M15 14h10"/>
         <polyline class="draw tick" style="--len:16" points="15,21 18.5,24.5 25,17"/>
       </svg>
-      <div class="eyebrow">for Claude Code &middot; runs locally</div>
+      <div class="eyebrow">for AI coding agents &middot; runs locally</div>
       <h1>See exactly what your<br><span>agent actually did</span></h1>
-      <p class="sub">Your CLAUDE.md says what should happen. This is the record of what happened.</p>
+      <p class="sub">Your rules say what should happen. This is the record of what happened.</p>
       <div class="install" id="copy-hero" data-copy="npx rulereceipt check" data-loc="hero" role="button" tabindex="0" title="Click to copy">
         <span class="prompt">$</span>
         <span class="cmd">npx rulereceipt check</span>
       </div>
-      <p style="margin-top:16px; font-size:0.9rem;">Quick check, nothing to install &mdash; <a href="/check">paste your CLAUDE.md</a> and see how much of it is checkable. Runs in your browser, nothing uploaded.</p>
+      <p style="margin-top:16px; font-size:0.9rem;">Quick check, nothing to install &mdash; <a href="/check">paste your rules file</a> and see how much of it is checkable. Runs in your browser, nothing uploaded.</p>
     </div>
 
     <div class="trace-stage">
@@ -1005,8 +1005,8 @@
       <p class="band-sub">Straight answers, including "not yet."</p>
       <div class="faq-columns">
           <details class="faq-item">
-            <summary>Does this work with Cursor or other AI agents?</summary>
-            <p>Not yet. v1 reads Claude Code sessions specifically. AGENTS.md as the rules format is already cross-tool, and support for other agents is the natural next step — but it isn't built yet, so it isn't claimed here.</p>
+            <summary>Does this work with Cursor, Codex, or other AI agents?</summary>
+            <p>Two halves, answered honestly. Your <em>rules</em>: yes — it reads CLAUDE.md, AGENTS.md, Cursor's <code>.cursor/rules</code> (and legacy <code>.cursorrules</code>), GitHub Copilot's <code>copilot-instructions.md</code> and Windsurf's <code>.windsurfrules</code>. Your <em>sessions</em> — what the agent actually did — Claude Code works today, and OpenAI Codex CLI support is built and in testing. Cursor, Copilot and Windsurf keep their session history inside the IDE in undocumented, version-changing formats, so reading those isn't built yet — and we won't claim it until it is.</p>
           </details>
           <details class="faq-item">
             <summary>Does this work if my team runs Claude Code through AWS Bedrock or Google Vertex, not the Anthropic API directly?</summary>
@@ -1022,7 +1022,7 @@
           </details>
           <details class="faq-item">
             <summary>Does this touch my CLAUDE.md or Claude Code settings?</summary>
-            <p>Read-only. It reads CLAUDE.md/AGENTS.md and your session transcript, and writes nothing back. No hooks get installed, no settings get modified — not automatically, not ever, without you explicitly asking.</p>
+            <p>Read-only. It reads your rules files (CLAUDE.md, AGENTS.md, and Cursor/Copilot/Windsurf rules) and your session transcript, and writes nothing back. No hooks get installed, no settings get modified — not automatically, not ever, without you explicitly asking.</p>
           </details>
           <details class="faq-item">
             <summary>Will the CLI start costing money later?</summary>
