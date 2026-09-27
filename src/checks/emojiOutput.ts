@@ -33,26 +33,41 @@ import { violation } from "../types.js";
 const DEFAULT_EMOJI = /\p{Emoji_Presentation}/u;
 const PICTOGRAPHIC = /\p{Extended_Pictographic}/u;
 const REGIONAL_INDICATOR = /[\u{1F1E6}-\u{1F1FF}]/u;
-const KEYCAP = /[0-9#*]\u{FE0F}?\u{20E3}/u;
 const VARIATION_SELECTOR_16 = "\u{FE0F}";
 
-/** Every distinct emoji in a string, in order of first appearance. */
+const KEYCAP_BASE = /[0-9#*]/;
+const COMBINING_KEYCAP = "\u{20E3}";
+
+/**
+ * Every distinct emoji in a string, in TRUE order of first appearance.
+ *
+ * The keycap sequence ([0-9#*] + optional FE0F + 20E3) is detected in the
+ * scan loop at its real position. It used to be unshifted to the FRONT of the
+ * list regardless of where it sat, so the evidence named the wrong "first"
+ * emoji and anchored its excerpt on it (finding #9, 2026-09-26).
+ */
 function emojiIn(text: string): string[] {
   const found: string[] = [];
   const chars = [...text];
-  if (KEYCAP.test(text)) {
-    const m = text.match(KEYCAP);
-    if (m) found.push(m[0]);
-  }
+  const add = (glyph: string) => {
+    if (!found.includes(glyph)) found.push(glyph);
+  };
   for (let i = 0; i < chars.length; i++) {
     const ch = chars[i];
+    // Keycap first: it starts on an ordinary digit/#/* that the emoji tests
+    // below would not catch on its own.
+    if (KEYCAP_BASE.test(ch)) {
+      if (chars[i + 1] === COMBINING_KEYCAP) { add(ch + chars[i + 1]); i += 1; continue; }
+      if (chars[i + 1] === VARIATION_SELECTOR_16 && chars[i + 2] === COMBINING_KEYCAP) {
+        add(ch + chars[i + 1] + chars[i + 2]); i += 2; continue;
+      }
+    }
     const isEmoji =
       DEFAULT_EMOJI.test(ch) ||
       REGIONAL_INDICATOR.test(ch) ||
       (PICTOGRAPHIC.test(ch) && chars[i + 1] === VARIATION_SELECTOR_16);
     if (!isEmoji) continue;
-    const glyph = chars[i + 1] === VARIATION_SELECTOR_16 ? ch + chars[i + 1] : ch;
-    if (!found.includes(glyph)) found.push(glyph);
+    add(chars[i + 1] === VARIATION_SELECTOR_16 ? ch + chars[i + 1] : ch);
   }
   return found;
 }

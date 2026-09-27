@@ -62,3 +62,41 @@ describe("rules that name a read-only command are still enforced", () => {
     expect(commandRunsLiteral("git config user.email x@y.z", "git config user.email")).toBe(true);
   });
 });
+
+// find/awk are read-only until they aren't: `-exec`/`-delete` and awk
+// `system(` run arbitrary commands. Classing the leading executable as
+// unconditionally read-only let a wrapped destructive command through the
+// guard (finding 2026-09-26).
+describe("find/awk that actually execute are not treated as read-only", () => {
+  it("blocks a destructive command wrapped in find -exec", () => {
+    expect(commandRunsLiteral("find /important -name '*.tmp' -exec rm -rf {} \\;", "rm -rf")).toBe(true);
+  });
+  it("blocks awk that shells out via system()", () => {
+    expect(commandRunsLiteral(`awk 'BEGIN{system("rm -rf /")}'`, "rm -rf")).toBe(true);
+  });
+  it("still allows a plain find that only searches", () => {
+    expect(commandRunsLiteral("find . -name '*.tmp'", "rm -rf")).toBe(false);
+  });
+});
+
+// sed's long-form in-place flag was not recognised, so a rule meant to block
+// in-place edits missed `--in-place` while catching `-i`.
+describe("sed --in-place (long form) is recognised as mutating", () => {
+  it("blocks the long form when that is banned", () => {
+    expect(commandRunsLiteral("sed --in-place 's/a/b/' config.yaml", "sed --in-place")).toBe(true);
+  });
+  it("still leaves a plain (stdout-only) sed alone", () => {
+    expect(commandRunsLiteral("sed 's/a/b/' config.yaml", "sed --in-place")).toBe(false);
+  });
+});
+
+// git subcommands with mutating forms (branch -D, config write, remote
+// set-url, tag -f) were classed unconditionally read-only.
+describe("mutating git subcommands are checkable", () => {
+  it("blocks git branch -D when a bare-flag literal bans it", () => {
+    expect(commandRunsLiteral("git branch -D main", "branch -D")).toBe(true);
+  });
+  it("still allows a read-only git log that only mentions the literal", () => {
+    expect(commandRunsLiteral('git log --grep "git push --force"', "git push --force")).toBe(false);
+  });
+});

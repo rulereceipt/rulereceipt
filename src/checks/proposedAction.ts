@@ -1,4 +1,4 @@
-import { withoutHeredocs } from "./shellCommand.js";
+import { segments, leadingCommand, withoutCommitMessage } from "./shellCommand.js";
 import { canonicalise, matchesPattern } from "./deterministicChecks.js";
 
 /**
@@ -24,42 +24,25 @@ const READ_ONLY = new Set([
   "which", "type", "file", "stat", "man", "help",
 ]);
 
-/** Read-only git subcommands — `git log` cannot delete anything. */
-const READ_ONLY_GIT = new Set(["log", "show", "diff", "status", "blame", "describe", "config", "remote", "branch", "tag", "ls-files", "rev-parse", "shortlog"]);
+/**
+ * Genuinely read-only git subcommands — `git log` cannot delete anything.
+ *
+ * `branch`, `config`, `remote`, `tag` were removed 2026-09-26: each has a
+ * common MUTATING form (`git branch -D`, `git config user.email x`, `git
+ * remote set-url`, `git tag -f`) that the guard must be able to check, and a
+ * bare-flag literal (`-D`, `--force`) slipped past the old escape hatch.
+ */
+const READ_ONLY_GIT = new Set(["log", "show", "diff", "status", "blame", "describe", "ls-files", "rev-parse", "shortlog"]);
 
 /**
- * Splits a shell command into the pieces that run separately.
- *
- * Crude by design: this is not a shell parser and must never pretend to be
- * one. It exists so that `grep "rm -rf" notes.txt && npm run build` is read
- * as two things, one of which searches for a string and one of which does
- * not, rather than as one blob containing a banned literal.
+ * A normally-read-only command that, in this segment, actually EXECUTES or
+ * DELETES: `find … -exec/-execdir/-delete`, `awk 'BEGIN{system("…")}'`.
+ * Without this, a destructive command wrapped in one was read as harmless.
  */
-function segments(command: string): string[] {
-  return withoutHeredocs(command)
-    .split(/\n|&&|\|\||[;|]/)
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
-}
-
-/** The executable a segment invokes, with env assignments and `sudo` skipped. */
-function leadingCommand(segment: string): string {
-  const words = segment.split(/\s+/).filter(Boolean);
-  let i = 0;
-  while (i < words.length && (/^[A-Za-z_][A-Za-z0-9_]*=/.test(words[i]) || words[i] === "sudo" || words[i] === "command" || words[i] === "time")) i++;
-  const exe = (words[i] ?? "").replace(/^.*\//, "");
-  return exe;
-}
-
-/**
- * A commit message is text the user wrote, not a command being run.
- *
- * Real case in this project's own history: a commit message containing
- * backticked shell examples. A message that quotes a banned command in order
- * to describe it must not be treated as running it.
- */
-function withoutCommitMessage(segment: string): string {
-  return segment.replace(/(-m|--message)(=|\s+)(['"])(?:\\.|(?!\3)[\s\S])*\3/g, "$1 <message>");
+function readOnlyCommandActuallyRuns(exe: string, segment: string): boolean {
+  if (exe === "find" && /\s-(?:exec(?:dir)?|delete)\b/.test(segment)) return true;
+  if (exe === "awk" && /\bsystem\s*\(/.test(segment)) return true;
+  return false;
 }
 
 /**
@@ -69,8 +52,10 @@ function withoutCommitMessage(segment: string): string {
  */
 function segmentRunsLiteral(segment: string, literal: string): boolean {
   const exe = leadingCommand(segment);
-  if (READ_ONLY.has(exe)) return false;
-  if (exe === "sed" && !/\s-[A-Za-z]*i\b/.test(segment)) return false;
+  if (READ_ONLY.has(exe) && !readOnlyCommandActuallyRuns(exe, segment)) return false;
+  // Plain `sed` prints to stdout; only an in-place edit mutates. Both the
+  // short `-i`/`-i.bak` and the long `--in-place` spellings count.
+  if (exe === "sed" && !/\s--in-place\b|\s-[A-Za-z]*i\b/.test(segment)) return false;
   if (exe === "git") {
     const sub = segment.split(/\s+/).filter(Boolean)[1] ?? "";
     // A read-only git subcommand cannot be the destructive act — unless the

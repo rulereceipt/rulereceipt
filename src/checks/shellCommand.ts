@@ -30,13 +30,78 @@ export function withoutHeredocs(command: string): string {
       if (line.trim() === closing) closing = null;
       continue;
     }
-    const open = line.match(/<<-?\s*(?:'([^']+)'|"([^"]+)"|([A-Za-z_][A-Za-z0-9_]*))/);
+    // A heredoc opener: `<<WORD`, `<<-WORD`, `<<'WORD'`, `<<"WORD"`, and the
+    // backslash-escaped `<<\WORD` (valid POSIX, same "no expansion" effect as
+    // quoting). All spellings must strip the body, or a command that WRITES a
+    // command is misread as one that RUNS it.
+    const open = line.match(/<<-?\s*(?:'([^']+)'|"([^"]+)"|\\([A-Za-z_][A-Za-z0-9_]*)|([A-Za-z_][A-Za-z0-9_]*))/);
     if (open) {
-      closing = open[1] ?? open[2] ?? open[3];
-      out.push(line.slice(0, open.index));
-      continue;
+      const delimiter = open[1] ?? open[2] ?? open[3] ?? open[4] ?? null;
+      const at = open.index ?? 0;
+      const before = line.slice(0, at);
+      const afterDelim = line.slice(at + open[0].length);
+      // Only a REAL opener starts a body. `echo "see <<EOF"` merely mentions
+      // one — treating it as an opener silently deletes every following line,
+      // which hid real later commands from every caller. A genuine opener is
+      // not inside an already-open quote, and is followed only by an optional
+      // redirect/target (`<<EOF > out.txt`), never by more words.
+      if (delimiter !== null && isHeredocOpener(before, afterDelim)) {
+        closing = delimiter;
+        out.push(line.slice(0, at));
+        continue;
+      }
     }
     out.push(line);
   }
   return out.join("\n");
+}
+
+/**
+ * Is a matched `<<WORD` an actual heredoc opener, given the text before it and
+ * the text after the delimiter token? Rejects a `<<WORD` sitting inside an
+ * already-open quote (it is data), and one followed by more command words
+ * (also not a real opener).
+ */
+function isHeredocOpener(before: string, afterDelim: string): boolean {
+  const singles = (before.match(/'/g) ?? []).length;
+  const doubles = (before.match(/"/g) ?? []).length;
+  if (singles % 2 === 1 || doubles % 2 === 1) return false;
+  return /^\s*(?:[0-9]*>>?\s*[^\s<>|;&]+\s*)?$/.test(afterDelim);
+}
+
+/**
+ * Splits a shell command into the pieces that run separately.
+ *
+ * Crude by design — not a shell parser. Heredoc bodies are stripped first, so
+ * a command that only WRITES another command is not split into it. Shared by
+ * every checker that needs to reason about what a compound command actually
+ * runs (proposedAction, attribution).
+ */
+export function segments(command: string): string[] {
+  return withoutHeredocs(command)
+    .split(/\n|&&|\|\||[;|]/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+}
+
+/** The executable a segment invokes, with env assignments and `sudo` skipped. */
+export function leadingCommand(segment: string): string {
+  const words = segment.split(/\s+/).filter(Boolean);
+  let i = 0;
+  while (i < words.length && (/^[A-Za-z_][A-Za-z0-9_]*=/.test(words[i]) || words[i] === "sudo" || words[i] === "command" || words[i] === "time")) i++;
+  return (words[i] ?? "").replace(/^.*\//, "");
+}
+
+/**
+ * Blanks out a git/gh commit or PR MESSAGE, leaving the command around it.
+ *
+ * A `-m "…"` / `--message "…"` value is text the author wrote, not a command
+ * being run, and not a path being touched — a message that quotes `rm …` or
+ * names a protected file must not be read as doing either. Shared so every
+ * checker that scans a Bash command string strips it the same way (this was
+ * present only in proposedAction, so fileLifecycle and testCommands each
+ * false-matched on commit-message text — findings 2026-09-26).
+ */
+export function withoutCommitMessage(command: string): string {
+  return command.replace(/(-m|--message)(=|\s+)(['"])(?:\\.|(?!\3)[\s\S])*\3/g, "$1 <message>");
 }

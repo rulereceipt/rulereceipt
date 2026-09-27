@@ -198,6 +198,73 @@ describe("claim-vs-evidence: the session said it passed and the log says otherwi
 });
 
 /**
+ * False accusations found 2026-09-26: planning/goal language read as a
+ * present-tense success claim, common idioms read as a git-push claim, and a
+ * bare "Status:" line read as a claim of having read a source. Each fires a
+ * FAIL (or blocks the Stop hook) against work that was never claimed done.
+ */
+describe("planning and idiom language is not a status claim", () => {
+  it("#5 does NOT treat 'Getting tests passing is the last step' as a claim", () => {
+    const events = [bash("npm test"), result("1 failed", true), says("Getting tests passing is the last step.")];
+    expect(runClaimEvidenceChecks([rule], events)[0].status).not.toBe("FAIL");
+  });
+
+  it("#5 does NOT treat 'All tests passing means the refactor is complete' as a claim", () => {
+    const events = [bash("npm test"), result("1 failed", true), says("All tests passing means the refactor is complete.")];
+    expect(runClaimEvidenceChecks([rule], events)[0].status).not.toBe("FAIL");
+  });
+
+  it("#6 does NOT treat 'I pushed myself to get this done' as a git push claim", () => {
+    const events = [says("I pushed myself to get this done by end of day.")];
+    expect(runClaimEvidenceChecks([rule], events)[0].status).not.toBe("FAIL");
+  });
+
+  it("#6 does NOT treat 'We pushed the button to deploy' as a git push claim", () => {
+    const events = [says("We pushed the button to deploy.")];
+    expect(runClaimEvidenceChecks([rule], events)[0].status).not.toBe("FAIL");
+  });
+
+  it("#7 does NOT treat 'Status: 3 of 5 tasks done' as a read-of-source claim", () => {
+    const events = [says("Status: 3 of 5 tasks done")];
+    expect(runClaimEvidenceChecks([rule], events)[0].status).not.toBe("FAIL");
+  });
+
+  it("#7 STILL treats a real 'PAGES READ: 1-20' provenance header as a claim", () => {
+    const events = [says("PAGES READ: 1-20")];
+    expect(runClaimEvidenceChecks([rule], events)[0].status).toBe("FAIL");
+  });
+
+  it("#5 still catches a genuine present-tense success claim after a red run", () => {
+    const events = [bash("npm test"), result("1 failed", true), says("All tests are passing now.")];
+    expect(runClaimEvidenceChecks([rule], events)[0].status).toBe("FAIL");
+  });
+});
+
+// #8: a partial-suite pass overwrote the last-run state, masking an earlier
+// failure of a different scope, so a broad "all passing" claim read as backed.
+describe("a partial-suite pass does not mask an earlier failure", () => {
+  it("#8 reports UNCLEAR (not PASS) when only a subset was re-run green after a failure", () => {
+    const events = [
+      bash("npm test -- backend"), result("2 failed", true),
+      bash("npm test -- frontend"), result("40 passed", false),
+      says("All tests passing now, ready to merge."),
+    ];
+    const r = runClaimEvidenceChecks([rule], events)[0];
+    expect(r.status).not.toBe("PASS");
+    expect(r.status).not.toBe("FAIL"); // never accuse — backend may have been fixed off-camera
+  });
+
+  it("#8 still reports PASS when the SAME full suite is re-run green after a failure", () => {
+    const events = [
+      bash("npm test"), result("1 failed", true),
+      bash("npm test"), result("42 passed", false),
+      says("All tests are passing now."),
+    ];
+    expect(runClaimEvidenceChecks([rule], events)[0].status).not.toBe("FAIL");
+  });
+});
+
+/**
  * The second and more valuable claim type: an action the session says it
  * performed, that never appears in the log.
  *

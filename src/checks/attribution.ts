@@ -1,7 +1,7 @@
 import type { AttributionClassification } from "./classify.js";
 import type { CheckResult, TranscriptEvent, TranscriptToolUseEvent } from "../types.js";
 import { violation } from "../types.js";
-import { withoutHeredocs } from "./shellCommand.js";
+import { segments, leadingCommand } from "./shellCommand.js";
 
 /**
  * Did the session add an AI-attribution trailer to a commit, PR or comment,
@@ -44,13 +44,37 @@ const GIT_WRITE =
  * mark, not merely the word "Claude" (a commit may legitimately say "fix the
  * Claude Code parser"): the co-author trailer, the generated-with line with
  * or without its robot, and the anthropic noreply address used as an author.
+ *
+ * The co-authored-by branch requires the `<email>` that a REAL trailer always
+ * carries. Without it, a commit message that merely DESCRIBES the trailer —
+ * `git commit -m "Add detection for Co-Authored-By: Claude trailer"`, or the
+ * same phrase sitting in a `node -e` string — was flagged as adding one
+ * (live-confirmed false positive, 2026-09-26, on this very repo whose own rule
+ * documents the trailer). A mention has no `<…>`; the injected trailer
+ * (`Co-Authored-By: Claude <noreply@anthropic.com>`) does. The claude/anthropic
+ * requirement keeps a legitimate HUMAN co-author (`… <jane@example.com>`) out.
  */
 const ATTRIBUTION_TRAILER =
-  /co-?authored-by:\s*[^\n]*(?:claude|anthropic)|generated with\s*\[?\s*claude code|🤖\s*generated with|<?noreply@anthropic\.com>?/i;
+  /co-?authored-by:[^\n]*(?:claude|anthropic)[^\n]*<[^>\n]+>|generated with\s*\[?\s*claude code|🤖\s*generated with|<?noreply@anthropic\.com>?/i;
 
 function commandText(event: TranscriptToolUseEvent): string {
   const input = event.input as { command?: unknown } | null;
   return input && typeof input.command === "string" ? input.command : "";
+}
+
+/**
+ * Is a git/gh write command actually INVOKED here — not merely quoted inside
+ * another command (a `node -e '…git commit…'` string, a `cat <<EOF` writing an
+ * example)? Requires git/gh to be the LEADING command of a real segment.
+ * Heredoc bodies are stripped first (by `segments`), so a heredoc that writes
+ * an example does not count, while `git commit -F- <<EOF` still does.
+ */
+function invokesGitWrite(rawCommand: string): boolean {
+  for (const seg of segments(rawCommand)) {
+    const exe = leadingCommand(seg);
+    if ((exe === "git" || exe === "gh") && GIT_WRITE.test(seg)) return true;
+  }
+  return false;
 }
 
 /** The first git-writing command in the session that carries a trailer. */
@@ -59,13 +83,10 @@ function firstOffendingCommand(events: TranscriptEvent[]): string | null {
   for (const event of events) {
     if (event.kind !== "tool_use" || event.toolName !== "Bash") continue;
     const command = commandText(event);
-    // Prove git is actually INVOKED, not merely quoted: a `cat <<EOF … git
-    // commit … Co-Authored-By … EOF` writes a file that contains the example,
-    // it does not commit. Strip heredoc bodies before testing the invocation,
-    // but match the trailer against the FULL command so a real heredoc that
-    // FEEDS the commit message is still caught.
-    if (!GIT_WRITE.test(withoutHeredocs(command))) continue;
+    if (!invokesGitWrite(command)) continue;
     sawGitWrite = true;
+    // Trailer matched against the FULL command (heredoc body included) so a
+    // real heredoc that FEEDS the commit message its trailer is still caught.
     if (ATTRIBUTION_TRAILER.test(command)) return command;
   }
   return sawGitWrite ? "" : null;

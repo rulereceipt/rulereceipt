@@ -26,6 +26,45 @@ const protectSettings: FileLifecycleClassification = {
   polarity: "forbid",
 };
 
+describe("commit-message / prose mentions are not mutations (findings 2026-09-26)", () => {
+  const protectChangelog: FileLifecycleClassification = {
+    kind: "fileLifecycle",
+    rule: { id: "70", title: "Changelog is release-only", text: "Never edit `CHANGELOG.md` by hand.", source: "project" },
+    filePath: "CHANGELOG.md",
+    polarity: "forbid",
+  };
+
+  it("#2 does NOT fail when a commit MESSAGE mentions rm-ing the protected path", () => {
+    const events = [bash('git commit -m "docs: warn against running rm .claude/settings.json by hand"')];
+    expect(runFileLifecycleChecks([protectSettings], events)[0].status).not.toBe("FAIL");
+  });
+
+  it("#2 does NOT fail when 'tee <path>' only appears inside an echoed string", () => {
+    const events = [bash('echo "please do not tee output to .claude/settings.json"')];
+    expect(runFileLifecycleChecks([protectSettings], events)[0].status).not.toBe("FAIL");
+  });
+
+  it("#9 does NOT fail when writing to a .new sibling of the protected file", () => {
+    const events = [bash("echo draft > CHANGELOG.md.new")];
+    expect(runFileLifecycleChecks([protectChangelog], events)[0].status).not.toBe("FAIL");
+  });
+
+  it("#10 does NOT fail on a stdout-only sed whose script text contains '-i'", () => {
+    const events = [bash("sed -e 's/api-id/api-identifier/' .claude/settings.json")];
+    expect(runFileLifecycleChecks([protectSettings], events)[0].status).not.toBe("FAIL");
+  });
+
+  it("STILL fails on a real redirect onto the protected file", () => {
+    const events = [bash("echo {} > CHANGELOG.md")];
+    expect(runFileLifecycleChecks([protectChangelog], events)[0].status).toBe("FAIL");
+  });
+
+  it("STILL fails on a real in-place sed edit of the protected file", () => {
+    const events = [bash("sed -i 's/a/b/' .claude/settings.json")];
+    expect(runFileLifecycleChecks([protectSettings], events)[0].status).toBe("FAIL");
+  });
+});
+
 describe("runFileLifecycleChecks", () => {
   // the exact real false positive: `cat` to VERIFY the file was intact
   // got reported as the file being touched

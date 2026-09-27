@@ -47,4 +47,19 @@ describe("content matching respects identifier boundaries", () => {
   it("still matches a dotted call", () => {
     expect(runCodeContentChecks(cls("console.log("), wrote("  console.log('x')"))[0].status).toBe("FAIL");
   });
+
+  // #4 (2026-09-26): a rule naming a bare METHOD missed the member-access
+  // call, because `.` was treated as identifier-continuation. `analytics.track(`
+  // IS a call to `track(`; the `.` is a separator.
+  it("matches a bare method-name rule against a member-access call", () => {
+    expect(runCodeContentChecks(cls("track("), wrote("  analytics.track(userId)"))[0].status).toBe("FAIL");
+  });
+
+  it("matches a bare method against a deeply-dotted call", () => {
+    expect(runCodeContentChecks(cls("log("), wrote("  this.logger.log('x')"))[0].status).toBe("FAIL");
+  });
+
+  it("still does not match a method name fused into a longer identifier", () => {
+    expect(runCodeContentChecks(cls("track("), wrote("  backtrack(state)"))[0].status).not.toBe("FAIL");
+  });
 });

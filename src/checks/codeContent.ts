@@ -53,7 +53,11 @@ function containsCall(content: string, pattern: string): boolean {
     const at = content.indexOf(pattern, from);
     if (at === -1) return false;
     const before = at === 0 ? "" : content[at - 1];
-    if (!/[A-Za-z0-9_$.]/.test(before)) return true;
+    // A `.` before the pattern is a member-access SEPARATOR, not identifier
+    // continuation — `analytics.track(` is a real call to `track(`. So `.` is
+    // NOT in the disqualifying class (fixed 2026-09-26); `_` still is, so
+    // `_metar_fetch(` does not match `fetch(`.
+    if (!/[A-Za-z0-9_$]/.test(before)) return true;
     from = at + 1;
   }
 }

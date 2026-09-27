@@ -53,4 +53,12 @@ describe("test-command detection ignores heredoc bodies", () => {
   it("still sees a plain test command", () => {
     expect(findTestRun([bash("npm test")])).toBe("npm test");
   });
+
+  // #6 (2026-09-26): a commit MESSAGE naming a test runner is not a test run.
+  // A Jest -> Vitest migration commit is the common real case.
+  it("does not treat a commit message that names a test runner as a test run", () => {
+    expect(
+      findTestRun([bash('git commit -m "refactor: rename legacy jest config to vitest.config.ts"')])
+    ).toBeNull();
+  });
 });

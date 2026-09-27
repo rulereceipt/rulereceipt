@@ -134,3 +134,22 @@ describe("emoji detection is defined by Unicode, not by examples", () => {
     for (const k of ["1\u{FE0F}\u{20E3}", "7\u{FE0F}\u{20E3}", "#\u{FE0F}\u{20E3}"]) expect(fires(`step ${k}`)).toBe(true);
   });
 });
+
+// #9 (2026-09-26): a keycap was always listed first regardless of where it sat,
+// so the evidence named the wrong "first" emoji and anchored the excerpt on it.
+describe("emoji evidence lists emoji in true order of appearance", () => {
+  const cls2 = [{ kind: "emojiOutput", rule: { id: "1", title: "No emoji", text: "Never use emojis in replies.", source: "project" as const }, polarity: "forbid" }] as unknown as EmojiClassification[];
+  it("names the earlier emoji first when a keycap appears later", () => {
+    const [r] = runEmojiChecks(cls2, [says("Step 1: \u{1F600} done! Then press 4\u{FE0F}\u{20E3} to continue.")]);
+    expect(r.status).toBe("FAIL");
+    const grinAt = r.evidence.indexOf("\u{1F600}");
+    const keycapAt = r.evidence.indexOf("4\u{FE0F}\u{20E3}");
+    expect(grinAt).toBeGreaterThanOrEqual(0);
+    expect(keycapAt).toBeGreaterThanOrEqual(0);
+    expect(grinAt).toBeLessThan(keycapAt);
+  });
+  it("still FAILs on a lone keycap", () => {
+    const [r] = runEmojiChecks(cls2, [says("Press 1\u{FE0F}\u{20E3} to start.")]);
+    expect(r.status).toBe("FAIL");
+  });
+});

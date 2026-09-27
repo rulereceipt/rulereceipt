@@ -1,5 +1,15 @@
 import type { TranscriptEvent } from "../types.js";
-import { withoutHeredocs } from "./shellCommand.js";
+import { withoutHeredocs, withoutCommitMessage } from "./shellCommand.js";
+
+/**
+ * What a shell command actually RUNS, for test-detection: heredoc bodies
+ * stripped (a command that writes `npm test` is not one that runs it) and
+ * commit/PR messages blanked (a commit message naming `jest`/`vitest` — e.g. a
+ * migration commit — is not a test run; finding #6, 2026-09-26).
+ */
+function runnableText(command: string): string {
+  return withoutCommitMessage(withoutHeredocs(command));
+}
 
 /**
  * Commands that run a project's test suite.
@@ -43,7 +53,7 @@ export const TEST_COMMAND =
  */
 export function countTestRuns(command: string): number {
   const global = new RegExp(TEST_COMMAND.source, "gi");
-  return (withoutHeredocs(command).match(global) ?? []).length;
+  return (runnableText(command).match(global) ?? []).length;
 }
 
 /** The first test command run in this session, or null if none ran. */
@@ -52,7 +62,7 @@ export function findTestRun(events: TranscriptEvent[]): string | null {
     if (event.kind !== "tool_use") continue;
     const input = event.input as { command?: unknown } | null | undefined;
     const command = input && typeof input.command === "string" ? input.command : "";
-    if (command && TEST_COMMAND.test(withoutHeredocs(command))) return command;
+    if (command && TEST_COMMAND.test(runnableText(command))) return command;
   }
   return null;
 }

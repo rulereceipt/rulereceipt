@@ -2,7 +2,7 @@ import type { TranscriptEvent, CheckResult } from "../types.js";
 import { violation } from "../types.js";
 import { isProjectPath } from "./projectPaths.js";
 import type { FileLifecycleClassification } from "./classify.js";
-import { withoutHeredocs } from "./shellCommand.js";
+import { segments, leadingCommand, withoutCommitMessage } from "./shellCommand.js";
 
 /**
  * Third structured-check primitive: only counts real MUTATIONS of a
@@ -61,21 +61,30 @@ const CD_INTO_TEMP = /\bcd\s+["']?(?:\/private)?\/(?:tmp|var\/folders)\b|\bcd\s+
  * path into a file is not mutating that path.
  */
 function mutatesPathInBash(rawCommand: string, filePath: string): boolean {
-  const command = withoutHeredocs(rawCommand);
   const p = pathPattern(filePath);
-  const mutations = [
-    // rm / rmdir / unlink targeting the path
-    new RegExp(`\\b(?:rm|rmdir|unlink)\\b[^|;&]*${p}`),
-    // mv / cp writing ONTO the path (path appears as the final argument)
-    new RegExp(`\\b(?:mv|cp)\\b[^|;&]*${p}\\s*(?:$|[;&|])`),
-    // truncation or append redirect onto the path
-    new RegExp(`>>?\\s*['"]?${escapeRegex(filePath.replace(/^\.\//, ""))}`),
-    // in-place edits
-    new RegExp(`\\bsed\\b[^|;&]*-i[^|;&]*${p}`),
-    new RegExp(`\\btee\\b[^|;&]*${p}`),
-    new RegExp(`\\btruncate\\b[^|;&]*${p}`),
-  ];
-  return mutations.some((re) => re.test(command));
+  const bare = escapeRegex(filePath.replace(/^\.\//, ""));
+  // A truncation/append redirect onto the path, with a trailing path boundary
+  // so `> CHANGELOG.md.new` does NOT count as touching `CHANGELOG.md` (#9).
+  const redirect = new RegExp(`>>?\\s*['"]?${bare}(?=$|[\\s'";)])`);
+  // sed only mutates with an in-place flag; matched as a real flag, not a bare
+  // "-i" substring that can sit inside a replacement like `s/api-id/…/` (#10).
+  const sedInPlace = /(?:^|\s)sed\b[^|;&]*\s(?:--in-place\b|-[A-Za-z]*i\b)/;
+
+  // Reason per SEGMENT: the mutating verb must be the segment's own leading
+  // command, so a path named inside a commit message, an echoed string, or
+  // another command's argument is not read as a mutation (#2). Heredoc bodies
+  // are already stripped by `segments`.
+  for (const raw of segments(rawCommand)) {
+    const seg = withoutCommitMessage(raw);
+    if (redirect.test(seg)) return true;
+    const exe = leadingCommand(seg);
+    if ((exe === "rm" || exe === "rmdir" || exe === "unlink") && new RegExp(`\\b(?:rm|rmdir|unlink)\\b[^|;&]*${p}`).test(seg)) return true;
+    if ((exe === "mv" || exe === "cp") && new RegExp(`\\b(?:mv|cp)\\b[^|;&]*${p}\\s*$`).test(seg)) return true;
+    if (exe === "tee" && new RegExp(`\\btee\\b[^|;&]*${p}`).test(seg)) return true;
+    if (exe === "truncate" && new RegExp(`\\btruncate\\b[^|;&]*${p}`).test(seg)) return true;
+    if (exe === "sed" && sedInPlace.test(seg) && new RegExp(p).test(seg)) return true;
+  }
+  return false;
 }
 
 function findMutation(events: TranscriptEvent[], filePath: string): string | null {

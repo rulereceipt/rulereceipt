@@ -173,6 +173,29 @@ describe("runDeterministicChecks", () => {
       const [result] = runDeterministicChecks([requireRule], []);
       expect(result.status).toBe("UNCLEAR");
     });
+
+    // 2026-09-26: a required action was reported satisfied when only MENTIONED
+    // (assistant text, or a grep/echo of it) — the mirror of the mention-vs-
+    // action confusion the forbid path already refuses to PASS on.
+    it("does NOT PASS when the required command only appears in assistant text", () => {
+      const events: TranscriptEvent[] = [
+        { role: "assistant", kind: "text", text: "Next I should run `npm test` before committing.", timestamp: "t" },
+      ];
+      const [result] = runDeterministicChecks([requireRule], events);
+      expect(result.status).not.toBe("PASS");
+    });
+
+    it("does NOT PASS when the required command is only grepped for, not run", () => {
+      const events = [toolUse("Bash", { command: 'grep -rn "npm test" package.json' })];
+      const [result] = runDeterministicChecks([requireRule], events);
+      expect(result.status).not.toBe("PASS");
+    });
+
+    it("STILL PASSes when the required command is actually run in a chain", () => {
+      const events = [toolUse("Bash", { command: "cd repo && npm test" })];
+      const [result] = runDeterministicChecks([requireRule], events);
+      expect(result.status).toBe("PASS");
+    });
   });
 
   describe("tool_result content is never scanned (real false-positive found 2026-08-30)", () => {

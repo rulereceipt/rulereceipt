@@ -1,5 +1,40 @@
 import type { TranscriptEvent, CheckResult } from "../types.js";
 import type { DeterministicClassification } from "./classify.js";
+import { segments, leadingCommand, withoutCommitMessage } from "./shellCommand.js";
+
+/**
+ * Commands that only READ/print/search their arguments — a required pattern
+ * appearing as an argument to one of these is being mentioned, not run.
+ */
+const MENTION_ONLY_CMDS = new Set([
+  "grep", "rg", "ag", "ack", "egrep", "fgrep", "echo", "printf", "cat", "bat",
+  "head", "tail", "less", "more", "ls", "find", "fd", "jq", "yq", "cut", "tr",
+  "sort", "uniq", "diff", "comm", "wc", "which", "type", "file", "stat", "man",
+]);
+
+/**
+ * Does this event actually PERFORM the required pattern, rather than mention
+ * it? A required action reported satisfied on a mention (assistant text, a
+ * grep/echo, a commit-message reference) is the mirror of the forbid path's
+ * mention-vs-action confusion, and it PASSes a rule that was never followed
+ * (finding 2026-09-26). Text and tool_result never count; a Bash command
+ * counts only when the pattern sits in a segment that is actually executed.
+ */
+function requirePerformedBy(event: TranscriptEvent, pattern: string): boolean {
+  if (event.kind !== "tool_use") return false;
+  if (event.toolName === "Bash") {
+    const input = event.input as { command?: unknown } | null;
+    const command = input && typeof input.command === "string" ? input.command : "";
+    for (const seg of segments(command)) {
+      if (MENTION_ONLY_CMDS.has(leadingCommand(seg))) continue;
+      if (matchesPattern(canonicalise(withoutCommitMessage(seg)), pattern)) return true;
+    }
+    return false;
+  }
+  // A non-Bash tool_use (Write/Edit/…) that carries the pattern in its input
+  // genuinely produced it (e.g. `Closes #N` written into a PR body).
+  return matchesPattern(searchHaystack(event), pattern);
+}
 
 /**
  * Real false-positive found 2026-08-30 on an actual complex session: a
@@ -186,14 +221,30 @@ export function runDeterministicChecks(
       // distinguish "should have run this and didn't" from "this session
       // never needed to" — so a required-but-absent pattern reports
       // UNCLEAR, never a fabricated FAIL or a fabricated PASS.
-      if (foundEvent && foundPattern) {
-        const haystack = eventSearchText(foundEvent);
+      // A match is only a PASS when the pattern was actually PERFORMED, not
+      // merely mentioned (in assistant text, a grep/echo, or a commit
+      // message) — otherwise a required action reads as done when it wasn't.
+      let performedEvent: TranscriptEvent | undefined;
+      let performedPattern: string | undefined;
+      for (const event of events) {
+        for (const pattern of patterns) {
+          if (requirePerformedBy(event, pattern)) {
+            performedEvent = event;
+            performedPattern = pattern;
+            break;
+          }
+        }
+        if (performedEvent) break;
+      }
+
+      if (performedEvent && performedPattern) {
+        const haystack = eventSearchText(performedEvent);
         return {
           ruleId: rule.id,
           ruleTitle: rule.title,
           ruleSource: rule.source,
           status: "PASS",
-          evidence: `found required pattern "${foundPattern}" in a ${foundEvent.kind === "tool_use" ? foundEvent.toolName + " call" : foundEvent.kind}: ${haystack.slice(0, 160)}`,
+          evidence: `found required pattern "${performedPattern}" in a ${performedEvent.kind === "tool_use" ? performedEvent.toolName + " call" : performedEvent.kind}: ${haystack.slice(0, 160)}`,
         };
       }
       return {
@@ -201,7 +252,7 @@ export function runDeterministicChecks(
         ruleTitle: rule.title,
         ruleSource: rule.source,
         status: "UNCLEAR",
-        evidence: `required pattern ${patterns.map((p) => `"${p}"`).join(" or ")} never appeared this session — can't tell if the rule didn't apply, or applied and was skipped`,
+        evidence: `required pattern ${patterns.map((p) => `"${p}"`).join(" or ")} was not actually run this session — can't tell if the rule didn't apply, or applied and was skipped`,
       };
     } catch (err) {
       // A pathological pattern (e.g. extremely long) can make `new RegExp`

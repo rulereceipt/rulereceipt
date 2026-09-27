@@ -40,6 +40,23 @@ describe("runIfEditThenTestChecks", () => {
     expect(result.status).toBe("FAIL");
   });
 
+  // #3 (2026-09-26): pytest and RSpec test files were unrecognised, so adding
+  // the idiomatic test file was reported as "no matching test file touched".
+  it("recognizes a pytest test_*.py companion", () => {
+    const events = [edit("mathhelpers.py"), edit("test_mathhelpers.py")];
+    expect(runIfEditThenTestChecks([rule], events)[0].status).toBe("PASS");
+  });
+
+  it("recognizes an RSpec spec/*_spec.rb companion", () => {
+    const events = [edit("app/models/user.rb"), edit("spec/models/user_spec.rb")];
+    expect(runIfEditThenTestChecks([rule], events)[0].status).toBe("PASS");
+  });
+
+  it("does not mistake a prod file with 'test' mid-name for a test file", () => {
+    const events = [edit("src/latest_data.py")];
+    expect(runIfEditThenTestChecks([rule], events)[0].status).toBe("FAIL");
+  });
+
   it("recognizes __tests__/ directory style test files, not just .test. suffix", () => {
     const events = [edit("src/foo.ts"), edit("src/__tests__/foo.ts")];
     const [result] = runIfEditThenTestChecks([rule], events);

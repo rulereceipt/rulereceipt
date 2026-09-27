@@ -120,4 +120,24 @@ describe("attribution violations are caught from the git command, honestly scope
     ]);
     expect(r.status).toBe("FAIL");
   });
+
+  // Live-confirmed false positive (2026-09-26): the tool's own hook blocked a
+  // harmless `node -e` diagnostic because a JS string inside it happened to
+  // contain "git commit ... Co-Authored-By: Claude". No git command ran.
+  it("does NOT fire when 'git commit' + trailer text sit inside a node -e script string", () => {
+    const [r] = runAttributionChecks(cls(FORBID_RULE), [
+      bash(`node -e 'console.log("git commit -m Co-Authored-By: Claude trailer in commits")'`),
+    ]);
+    expect(r.status).not.toBe("FAIL");
+  });
+
+  // A real commit whose MESSAGE merely describes the trailer (documenting the
+  // very feature) is not adding the trailer. The prose has no <email> trailer.
+  it("does NOT fire on a commit message that only DESCRIBES the trailer", () => {
+    const [r] = runAttributionChecks(cls(FORBID_RULE), [
+      bash('git commit -m "Add detection for Co-Authored-By: Claude trailer in commits"'),
+    ]);
+    expect(r.status).not.toBe("FAIL");
+    expect(r.outcome).toBe("pass");
+  });
 });

@@ -3,7 +3,13 @@ import type { IfEditThenTestClassification } from "./classify.js";
 import { findTestRun } from "./testCommands.js";
 import { isProjectPath } from "./projectPaths.js";
 
-const TEST_FILE_PATTERN = /(\.test\.|\.spec\.|__tests__\/|_test\.|\/tests?\/)/i;
+// Test-file conventions across ecosystems: JS `.test.`/`.spec.`, Go/Python
+// `_test.`, `__tests__/` and `/tests/` dirs, RSpec `_spec.`/`/spec/`, and
+// pytest's `test_*.py` (a `test_` prefix at a path boundary, so a prod file
+// with "test" mid-name like `latest_data.py` is not swept in). Added
+// pytest/RSpec 2026-09-26 — they were missing, so idiomatic Python/Ruby test
+// files read as "no test touched".
+const TEST_FILE_PATTERN = /(\.test\.|\.spec\.|_spec\.|__tests__\/|_test\.|(?:^|\/)test_|\/tests?\/|\/spec\/)/i;
 
 // Real false-positive found 2026-08-30 on an actual session: editing a
 // markdown documentation file flagged "no test file touched" four

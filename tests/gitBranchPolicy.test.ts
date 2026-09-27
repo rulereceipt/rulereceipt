@@ -150,6 +150,65 @@ describe("runGitBranchPolicyChecks", () => {
     });
   });
 
+  // GIT_PUSH matched only the bare `git push origin main`. Force-push, -u, a
+  // flag after the branch, and outright branch-deletes — the real destructive
+  // forms this file exists to catch — all reported not_applicable. Each proved
+  // red against the old single-anchored regex, 2026-09-26.
+  describe("push forms with flags, refspecs, and deletes (flagship miss)", () => {
+    const forbidMain: GitBranchPolicyClassification = {
+      kind: "gitBranchPolicy",
+      rule: { id: "50", title: "No push to main", text: "Never push to the `main` branch.", source: "project" },
+      branchName: "main",
+      polarity: "forbid",
+    };
+    const fails = (command: string) =>
+      expect(runGitBranchPolicyChecks([forbidMain], [bash(command)])[0].status).toBe("FAIL");
+    const clean = (command: string) =>
+      expect(runGitBranchPolicyChecks([forbidMain], [bash(command)])[0].status).not.toBe("FAIL");
+
+    it("FAILs on git push -f origin main", () => fails("git push -f origin main"));
+    it("FAILs on git push --force origin main", () => fails("git push --force origin main"));
+    it("FAILs on git push -u origin main", () => fails("git push -u origin main"));
+    it("FAILs on git push origin main --force (branch not last)", () => fails("git push origin main --force"));
+    it("FAILs on git push --force-with-lease origin main", () => fails("git push --force-with-lease origin main"));
+    it("FAILs on git push origin :main (remote branch delete)", () => fails("git push origin :main"));
+    it("FAILs on git push origin --delete main", () => fails("git push origin --delete main"));
+    it("FAILs on git push origin feature:main (writes remote main)", () => fails("git push origin feature:main"));
+    it("FAILs on a config flag before push: git -c x=y push -f origin main", () =>
+      fails("git -c x=y push -f origin main"));
+
+    it("does NOT fail on git push origin main:feature (writes remote feature, not main)", () =>
+      clean("git push origin main:feature"));
+    it("does NOT fail on a bare git push (current branch unknown)", () => clean("git push"));
+  });
+
+  // A rename INTO the protected branch creates/overwrites it. `git branch -m
+  // feature main` renames feature -> main; the old regex captured "feature".
+  it("FAILs on git branch -m <old> main (rename into the protected branch)", () => {
+    const forbidMain: GitBranchPolicyClassification = {
+      kind: "gitBranchPolicy",
+      rule: { id: "51", title: "No main", text: "Never touch the `main` branch.", source: "project" },
+      branchName: "main",
+      polarity: "forbid",
+    };
+    expect(runGitBranchPolicyChecks([forbidMain], [bash("git branch -m feature main")])[0].status).toBe("FAIL");
+  });
+
+  // `git checkout -- <path>` restores a FILE; the `--` means "this is a
+  // pathspec, not a ref". The old regex read the path as a branch switch, so a
+  // later unrelated commit produced a false FAIL when a file shared the
+  // protected branch's name.
+  it("does NOT treat git checkout -- <path> as switching to a same-named branch", () => {
+    const forbidDocs: GitBranchPolicyClassification = {
+      kind: "gitBranchPolicy",
+      rule: { id: "52", title: "No docs branch", text: "Never commit on the `docs` branch.", source: "project" },
+      branchName: "docs",
+      polarity: "forbid",
+    };
+    const events = [bash("git checkout -- docs"), bash("git commit -m 'unrelated fix'")];
+    expect(runGitBranchPolicyChecks([forbidDocs], events)[0].status).not.toBe("FAIL");
+  });
+
   describe("require polarity", () => {
     const requireMainRule: GitBranchPolicyClassification = {
       kind: "gitBranchPolicy",
