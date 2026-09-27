@@ -3,6 +3,7 @@ import { dirname, join, parse, resolve } from "node:path";
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { parseClaudeMd } from "./parsers/readClaudeMd.js";
 import { findClaudeHomeDirNames } from "./parsers/transcriptParser.js";
+import { loadMemoryRules } from "./parsers/readMemory.js";
 import type { Rule } from "./types.js";
 
 /**
@@ -173,5 +174,11 @@ export function loadRules(cwd: string): Rule[] {
   }
 
   for (const path of findProjectRuleFiles(cwd)) read(path, "project");
+
+  // Claude Code memory (feedback/project memories) as a rule source, so a
+  // standing correction the user moved into memory is still checked and the
+  // tool does not go stale against it. Non-office homes only; ids are
+  // "memory:<name>", distinct from file-rule ids, so no dedup collision.
+  rules.push(...loadMemoryRules(cwd));
   return rules;
 }
