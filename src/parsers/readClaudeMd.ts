@@ -19,6 +19,24 @@ import type { Rule } from "../types.js";
  * empty rule list, never a throw, because a missing global CLAUDE.md is a
  * normal state rather than an error.
  */
+/**
+ * Strips a leading YAML frontmatter block (`---\n…\n---`) if present.
+ *
+ * Cursor's `.mdc` rule files open with a frontmatter block (description,
+ * globs, alwaysApply) that is metadata, not a rule — without this it parses
+ * as prose and surfaces `alwaysApply: true` as a checkable "rule". Kept in
+ * the filesystem reader (not the browser parser) so the parser stays
+ * Node-free. Only strips a block that starts on the very first line, so a
+ * `---` divider mid-document is untouched.
+ */
+function stripFrontmatter(raw: string): string {
+  if (!/^---\r?\n/.test(raw)) return raw;
+  const end = raw.indexOf("\n---", 3);
+  if (end === -1) return raw;
+  const after = raw.indexOf("\n", end + 1);
+  return after === -1 ? "" : raw.slice(after + 1);
+}
+
 export function parseClaudeMd(filePath: string, source: "global" | "project"): Rule[] {
   let raw: string;
   try {
@@ -26,6 +44,6 @@ export function parseClaudeMd(filePath: string, source: "global" | "project"): R
   } catch {
     return [];
   }
-  return parseClaudeMdText(raw, source);
+  return parseClaudeMdText(stripFrontmatter(raw), source);
 }
 

@@ -6,7 +6,8 @@ import { join, dirname, resolve, isAbsolute } from "node:path";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { parseClaudeMd } from "./parsers/readClaudeMd.js";
-import { readLatestTranscript, readTranscriptFromFile, findLatestSessionFile, subagentNote } from "./parsers/transcriptParser.js";
+import { readTranscriptFromFile, subagentNote } from "./parsers/transcriptParser.js";
+import { findLatestSession, sessionSourceNote } from "./adapters/index.js";
 import { loadRules } from "./rules.js";
 import { adviseRules } from "./checkability.js";
 import { shadowedAgentsMd } from "./shadowedAgents.js";
@@ -201,11 +202,16 @@ async function runCheck(opts: CheckOptions) {
   // Code variant used ~/.claude-office/ instead of ~/.claude/ — the
   // multi-root scan in transcriptParser.ts now catches that automatically,
   // but this flag stays as a fallback for whatever variant shows up next).
-  const sessionFilePath = transcriptOverride ?? findLatestSessionFile(cwd);
+  // Auto-detect the session across every supported tool (Claude Code, Codex),
+  // newest-modified wins — the same rule the Claude reader already applies
+  // across .claude vs .claude-office, now extended across tools. A
+  // Claude-only machine picks exactly the file and events it always did.
+  const latestSession = transcriptOverride ? null : findLatestSession(cwd);
+  const sessionFilePath = transcriptOverride ?? latestSession?.file ?? null;
   if (!sessionFilePath) {
     console.log(
-      "No Claude Code session found for this project yet.\n" +
-        "Run Claude Code here at least once, then try `rulereceipt check` again — " +
+      "No coding-agent session found for this project yet.\n" +
+        "Run Claude Code (or Codex) here at least once, then try `rulereceipt check` again — " +
         "or pass --transcript <path-to-.jsonl> directly if your session lives somewhere non-standard."
     );
     // Exiting 0 here is right for a person running this locally for the
@@ -223,7 +229,11 @@ async function runCheck(opts: CheckOptions) {
     return;
   }
 
-  const events = transcriptOverride ? readTranscriptFromFile(sessionFilePath) : readLatestTranscript(cwd);
+  const events = transcriptOverride
+    ? readTranscriptFromFile(sessionFilePath)
+    : latestSession
+      ? latestSession.adapter.parse(latestSession.file)
+      : [];
 
   // A session file with nothing in it produces a report full of PASSes,
   // because no forbidden action appears in an empty session. That is
@@ -339,6 +349,10 @@ async function runCheck(opts: CheckOptions) {
     console.log(generateJsonReport(results, meta, pkg.version));
   } else {
     console.log(reportText);
+    // Name the tool when it is not the default Claude Code, so a Codex run is
+    // not silently reported as if it were a Claude session.
+    const sourceNote = transcriptOverride ? null : sessionSourceNote(cwd);
+    if (sourceNote) console.log(`\n${sourceNote}`);
     const subNote = subagentNote(sessionFilePath);
     if (subNote) console.log(`\n${subNote}`);
   }

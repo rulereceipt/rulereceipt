@@ -18,20 +18,22 @@ import type { Rule } from "./types.js";
 const RULE_DIRS = [join(".claude", "rules")];
 
 /**
- * Lists the markdown files in a rules directory, if it exists.
+ * Lists the rule-doc files in a directory, if it exists.
  *
  * Sorted so the same project always produces the same rule order — rule
  * ids are positional, and an unstable order would renumber rules between
  * runs on different machines, making two reports of the same session
- * impossible to compare. Non-markdown files are skipped: a rules
- * directory legitimately holds README fragments and notes.
+ * impossible to compare. Only the given extensions count: a rules
+ * directory legitimately holds README fragments and notes. `.mdc` is
+ * Cursor's rule-file extension (Markdown + a YAML frontmatter block, which
+ * the reader strips).
  */
-function markdownFilesIn(dir: string): string[] {
+function markdownFilesIn(dir: string, exts: string[] = [".md"]): string[] {
   if (!existsSync(dir)) return [];
   try {
     if (!statSync(dir).isDirectory()) return [];
     return readdirSync(dir)
-      .filter((f) => f.toLowerCase().endsWith(".md"))
+      .filter((f) => exts.some((e) => f.toLowerCase().endsWith(e)))
       .sort()
       .map((f) => join(dir, f));
   } catch {
@@ -65,6 +67,29 @@ function ruleFilesAtLevel(dir: string): string[] {
   // documented, so both are kept rather than guessing at a shadow rule.
   push("CLAUDE.local.md");
   push("AGENTS.local.md");
+
+  // Non-Claude rule-file conventions (added 2026-09-26 for multi-tool
+  // support). Each is a plain text/markdown file needing no special access,
+  // read IN ADDITION to Claude's files when present — a rule the project
+  // wrote is a rule to check, and silently ignoring one is the "clean report
+  // on rules never opened" failure this module already guards against. The
+  // engine (classify.ts) is agent-neutral, so it does not matter which tool a
+  // rule was authored for. Precedence is FIXED and documented so rule ids stay
+  // deterministic: Claude family (above), then Cursor, Copilot, Windsurf.
+  //
+  // Cursor: the modern `.cursor/rules/*.mdc|.md` directory SHADOWS the legacy
+  // single `.cursorrules` file — Cursor itself deprecated `.cursorrules` in
+  // favour of the directory, so reading both would double-count. Same
+  // shadow shape as CLAUDE.md over AGENTS.md above.
+  const cursorRules = markdownFilesIn(join(dir, ".cursor", "rules"), [".mdc", ".md"]);
+  if (cursorRules.length > 0) found.push(...cursorRules);
+  else push(".cursorrules");
+
+  // GitHub Copilot: repo-level custom instructions.
+  push(join(".github", "copilot-instructions.md"));
+
+  // Windsurf (Codeium): single rules file.
+  push(".windsurfrules");
 
   return found;
 }
