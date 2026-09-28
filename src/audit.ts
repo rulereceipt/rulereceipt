@@ -1,4 +1,5 @@
 import { classifyRules } from "./checks/classify.js";
+import { adviseRules } from "./checkability.js";
 import type { Rule } from "./types.js";
 
 /**
@@ -24,6 +25,8 @@ export interface RulesAudit {
   skipped: number;
   /** checkable / (checkable + judgment), whole %, 0 when there are no rules. */
   percentCheckable: number;
+  /** The highest-leverage rewrites — a concrete rule missing only its literal. */
+  topFixes: { title: string; suggestion: string }[];
 }
 
 export function auditRules(rules: Rule[]): RulesAudit {
@@ -36,12 +39,17 @@ export function auditRules(rules: Rule[]): RulesAudit {
     else checkable++;
   }
   const decided = checkable + judgment;
+  const topFixes = adviseRules(rules)
+    .filter((a) => a.actionable)
+    .slice(0, 5)
+    .map((a) => ({ title: a.ruleTitle, suggestion: a.suggestion }));
   return {
     total: checkable + judgment + skipped,
     checkable,
     judgment,
     skipped,
     percentCheckable: decided > 0 ? Math.round((checkable / decided) * 100) : 0,
+    topFixes,
   };
 }
 
@@ -64,6 +72,15 @@ export function renderAudit(a: RulesAudit, md = false): string {
   out.push(`  ${String(a.skipped).padStart(4)}  documentation    — structure/notes, not scored as rules`);
   out.push("");
   out.push(`${a.percentCheckable}% of your rules can be checked mechanically.`);
-  out.push("See which can't, and the smallest edit that would fix each:  rulereceipt rules --advise");
+  out.push("");
+  if (a.topFixes.length > 0) {
+    out.push(H("Top fixes to unlock more checks"));
+    for (const f of a.topFixes) {
+      out.push(`  • ${f.title.replace(/\s+/g, " ").trim().slice(0, 60)}`);
+      out.push(`      ${f.suggestion}`);
+    }
+    out.push("");
+  }
+  out.push("Full advice, rule by rule:  rulereceipt rules --advise");
   return out.join("\n");
 }

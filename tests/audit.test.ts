@@ -39,4 +39,16 @@ describe("auditRules buckets rules by checkability, no session needed", () => {
   it("tells the user when no rules were found", () => {
     expect(renderAudit(auditRules([]))).toMatch(/no rules/i);
   });
+
+  it("surfaces top fixes for a concrete rule missing its literal", () => {
+    const a = auditRules([r("1", "Deploy", "Never deploy to production without a review.")]);
+    expect(a.topFixes.length).toBeGreaterThanOrEqual(1);
+    expect(a.topFixes[0].suggestion).toMatch(/backtick/i);
+    expect(renderAudit(a)).toMatch(/top fixes/i);
+  });
+
+  it("does not list a genuine judgment call as a top fix", () => {
+    const a = auditRules([r("1", "Tone", "Always surface bad news first.")]);
+    expect(a.topFixes).toHaveLength(0);
+  });
 });

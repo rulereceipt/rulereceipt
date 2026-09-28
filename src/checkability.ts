@@ -25,6 +25,14 @@ export interface RuleAdvice {
   kind: "judgment" | "notARule";
   /** One line: what is missing and the smallest edit that fixes it. */
   suggestion: string;
+  /**
+   * True when there is a concrete, high-leverage rewrite (name the command/
+   * file/branch in backticks) that would turn this into a real check — as
+   * opposed to a genuine judgment call or plain documentation, where the
+   * honest answer is "no edit makes it mechanical." `audit` surfaces the
+   * actionable ones as the top fixes.
+   */
+  actionable?: boolean;
 }
 
 /** A concrete action the rule is plausibly about, so we can name what to quote. */
@@ -85,6 +93,7 @@ export function adviseRule(rule: Rule): RuleAdvice | null {
     return {
       ruleTitle: rule.title,
       kind,
+      actionable: true, // a concrete, high-leverage rewrite: just add the literal
       suggestion:
         `mentions ${subject} but names no exact term to match. Put the concrete command, file or branch in backticks (e.g. ${exampleFor(subject)}) and it becomes a mechanical check.`,
     };

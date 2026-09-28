@@ -76,6 +76,7 @@ Published and live on npm, actively developed.
 ## Usage
 
 ```bash
+rulereceipt audit              # score your rules file for checkability — NO session needed
 rulereceipt check              # check the latest session in this project
 rulereceipt check --markdown   # same, formatted for pasting into a PR/Slack
 rulereceipt check --html       # write a shareable single-file HTML report you can send
