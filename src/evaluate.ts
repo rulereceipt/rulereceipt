@@ -9,6 +9,7 @@ import { runEmojiChecks } from "./checks/emojiOutput.js";
 import { runAttributionChecks } from "./checks/attribution.js";
 import { runApprovalGateChecks } from "./checks/approvalGate.js";
 import { runJudgmentChecks } from "./checks/judgmentChecks.js";
+import { touchedPaths, ruleWasLoaded } from "./checks/pathScope.js";
 import { loadOverrides, ruleFingerprint, staleOverrides } from "./overrides.js";
 import type { CheckResult, Rule, TranscriptEvent } from "./types.js";
 
@@ -39,12 +40,33 @@ export async function evaluateSession(
   needsLlmResult: (rule: Rule) => CheckResult,
 ): Promise<Evaluation> {
   const overrides = loadOverrides(cwd);
-  const classifications = classifyRules(rules).map((c) => {
+  const touched = touchedPaths(events);
+  const classified = classifyRules(rules).map((c) => {
     const decision = overrides.get(ruleFingerprint(c.rule))?.decision;
     if (!decision) return c;
     if (decision === "notARule") return { kind: "notARule" as const, rule: c.rule };
     return c.kind === "notARule" ? { kind: "judgment" as const, rule: c.rule } : c;
   });
+
+  // A path-scoped rule (paths:/globs: frontmatter) is only loaded by the agent
+  // once the session touches a matching file. One the session never touched is
+  // reported not_applicable with the reason — never judged, so the report
+  // still lists every rule. Over-matches toward "loaded" (see pathScope.ts),
+  // so it can only ever REMOVE a false accusation, never hide a real one.
+  const notLoaded = classified.filter(
+    (c) => c.kind !== "notARule" && c.rule.paths && !ruleWasLoaded(c.rule.paths, touched)
+  );
+  const classifications = classified.filter((c) => !notLoaded.includes(c));
+  const scopeResults: CheckResult[] = notLoaded.map(({ rule }) => ({
+    ruleId: rule.id,
+    ruleTitle: rule.title,
+    ruleSource: rule.source,
+    status: "UNCLEAR",
+    outcome: "not_applicable",
+    method: "file_events",
+    reason: "path_scope_not_loaded",
+    evidence: `path-scoped rule (${rule.paths!.join(", ")}): this session touched no matching file, so Claude never loaded it`,
+  }));
 
   const of = (kind: Classification["kind"]) => classifications.filter((c) => c.kind === kind);
 
@@ -66,7 +88,7 @@ export async function evaluateSession(
     : judgment.map(({ rule }) => needsLlmResult(rule));
 
   return {
-    results: [...deterministicResults, ...judgmentResults],
+    results: [...deterministicResults, ...judgmentResults, ...scopeResults],
     notARule: of("notARule"),
     stale: staleOverrides(overrides, rules),
   };

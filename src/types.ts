@@ -3,6 +3,14 @@ export interface Rule {
   title: string;
   text: string;
   source: "global" | "project";
+  /**
+   * Path scope from the rules file's frontmatter (`paths:` in Claude Code
+   * `.claude/rules/*.md`, `globs:` in Cursor `.mdc` / agy `.agents/rules`).
+   * Claude Code only loads a path-scoped rule once the session touches a
+   * matching file, so judging it in a session that never did checks Claude
+   * against a rule it was never shown. Absent = always loaded.
+   */
+  paths?: string[];
 }
 
 export interface TranscriptTextEvent {

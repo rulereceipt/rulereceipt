@@ -37,6 +37,46 @@ function stripFrontmatter(raw: string): string {
   return after === -1 ? "" : raw.slice(after + 1);
 }
 
+/**
+ * Reads the path scope out of a leading frontmatter block, if it has one.
+ *
+ * Shapes seen in 343 real rule files (2026-09-28): `paths:` as a YAML list
+ * or inline array (Claude Code), `globs:` as inline array, comma list, bare
+ * scalar or YAML list (Cursor, agy). `alwaysApply: true` (Cursor) and
+ * `trigger: always_on` (agy) mean the file is always loaded whatever its
+ * globs say, so they clear the scope. Anything unreadable returns undefined,
+ * which means "always loaded": the pre-existing behaviour.
+ */
+export function readPathScope(raw: string): string[] | undefined {
+  if (!/^---\r?\n/.test(raw)) return undefined;
+  const end = raw.indexOf("\n---", 3);
+  if (end === -1) return undefined;
+  const lines = raw.slice(raw.indexOf("\n") + 1, end).split(/\r?\n/);
+  if (lines.some((l) => /^alwaysApply:\s*true\b/i.test(l) || /^trigger:\s*always_on\b/i.test(l))) return undefined;
+
+  const unquote = (v: string) => v.trim().replace(/^["']|["']$/g, "").trim();
+  for (let i = 0; i < lines.length; i++) {
+    const m = lines[i].match(/^(paths|globs):\s*(.*)$/);
+    if (!m) continue;
+    const value = m[2].trim();
+    let items: string[] = [];
+    if (value.startsWith("[")) {
+      items = value.replace(/^\[|\]$/g, "").split(",").map(unquote);
+    } else if (value.length > 0) {
+      items = value.split(",").map(unquote);
+    } else {
+      for (let j = i + 1; j < lines.length && /^\s*-\s+/.test(lines[j]); j++) {
+        items.push(unquote(lines[j].replace(/^\s*-\s+/, "")));
+      }
+    }
+    items = items.filter((x) => x.length > 0);
+    // `**/*` or `*` scopes to everything: same as no scope.
+    if (items.length === 0 || items.some((x) => x === "**/*" || x === "**" || x === "*")) return undefined;
+    return items;
+  }
+  return undefined;
+}
+
 export function parseClaudeMd(filePath: string, source: "global" | "project"): Rule[] {
   let raw: string;
   try {
@@ -44,6 +84,8 @@ export function parseClaudeMd(filePath: string, source: "global" | "project"): R
   } catch {
     return [];
   }
-  return parseClaudeMdText(stripFrontmatter(raw), source);
+  const rules = parseClaudeMdText(stripFrontmatter(raw), source);
+  const paths = readPathScope(raw);
+  return paths ? rules.map((r) => ({ ...r, paths })) : rules;
 }
 
