@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
-import { dirname, isAbsolute, relative, resolve } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { classifyRules } from "./checks/classify.js";
 import { adviseRules } from "./checkability.js";
 import { describeRuleSources, loadRules, type LoadGraphEntry } from "./rules.js";
@@ -103,9 +103,33 @@ export interface Diagnostic {
     | "shadowed-file"
     | "size-warn"
     | "template-text"
-    | "broken-import";
+    | "broken-import"
+    | "hook-config";
   severity: "info" | "warn";
   message: string;
+}
+
+/** Hook events Claude Code recognises. A hook under any other name never fires. */
+const KNOWN_HOOK_EVENTS = new Set([
+  "PreToolUse", "PostToolUse", "Stop", "SubagentStop", "UserPromptSubmit",
+  "SessionStart", "SessionEnd", "Notification", "PreCompact", "PostCompact",
+  "PermissionRequest", "PermissionDenied", "InstructionsLoaded",
+]);
+
+/** Hook event names in the project/user settings that Claude Code won't recognise. */
+function unknownHookEvents(cwd: string): string[] {
+  const bad = new Set<string>();
+  for (const p of [join(cwd, ".claude", "settings.json"), join(cwd, ".claude", "settings.local.json")]) {
+    try {
+      const hooks = (JSON.parse(readFileSync(p, "utf-8")) as { hooks?: Record<string, unknown> }).hooks;
+      if (hooks && typeof hooks === "object") {
+        for (const name of Object.keys(hooks)) if (!KNOWN_HOOK_EVENTS.has(name)) bad.add(name);
+      }
+    } catch {
+      /* absent or unreadable */
+    }
+  }
+  return [...bad];
 }
 
 /**
@@ -252,6 +276,16 @@ function buildDiagnostics(cwd: string, graph: LoadGraphEntry[], a: RulesAudit): 
         message: `${short(l.path)} imports ${broken.slice(0, 3).map((b) => `@${b}`).join(", ")}${broken.length > 3 ? ` (+${broken.length - 3} more)` : ""} — the file doesn't exist, so nothing loads from it.`,
       });
     }
+  }
+
+  // A hook wired under a misspelled/unknown event name never fires — silently.
+  const badHooks = unknownHookEvents(cwd);
+  if (badHooks.length > 0) {
+    diags.push({
+      id: "hook-config",
+      severity: "warn",
+      message: `.claude/settings.json has hook${badHooks.length === 1 ? "" : "s"} under ${badHooks.map((h) => `"${h}"`).join(", ")}, which ${badHooks.length === 1 ? "is not a" : "are not"} Claude Code hook event${badHooks.length === 1 ? "" : "s"} — ${badHooks.length === 1 ? "it never fires" : "they never fire"}. Check the spelling (e.g. PreToolUse, PostToolUse, Stop).`,
+    });
   }
 
   // A handbook, not a policy: mostly documentation, little to enforce.

@@ -94,6 +94,16 @@ describe("audit v2 doorstep", () => {
     expect(ids(repo({ "CLAUDE.md": big }))).toContain("size-warn");
   });
 
+  it("flags a hook wired under an unknown event name (it never fires)", () => {
+    const dir = repo({ "CLAUDE.md": "- Never push to `main`\n", ".claude/settings.json": JSON.stringify({ hooks: { PreToolus: [{ hooks: [] }] } }) });
+    expect(ids(dir)).toContain("hook-config");
+  });
+
+  it("does not flag a correctly-named hook", () => {
+    const dir = repo({ "CLAUDE.md": "- Never push to `main`\n", ".claude/settings.json": JSON.stringify({ hooks: { PreToolUse: [{ hooks: [] }], Stop: [{ hooks: [] }] } }) });
+    expect(ids(dir)).not.toContain("hook-config");
+  });
+
   it("top fixes carry a stable handle for rules --include/--exclude", () => {
     const a = auditProject(repo({ "CLAUDE.md": "## 1. Deploy carefully\nNever deploy to production without a review.\n" }));
     const fix = a.topFixes[0];
