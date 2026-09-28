@@ -63,7 +63,12 @@ function ruleFilesAtLevel(dir: string): string[] {
   for (const rel of RULE_DIRS) found.push(...markdownFilesIn(join(dir, rel)));
 
   push("CLAUDE.md");
-  if (!has("CLAUDE.md")) push("AGENTS.md");
+  // AGENTS.md (and the singular AGENT.md some tools use) are read only when
+  // there's no CLAUDE.md at this level, mirroring Claude Code's shadow rule.
+  if (!has("CLAUDE.md")) {
+    push("AGENTS.md");
+    push("AGENT.md");
+  }
   // .local variants: their precedence relative to the base files is not
   // documented, so both are kept rather than guessing at a shadow rule.
   push("CLAUDE.local.md");

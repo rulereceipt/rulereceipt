@@ -81,6 +81,11 @@ describe("loadRules reads non-Claude rule-file conventions", () => {
     expect(has("globs")).toBe(false);
   });
 
+  it("reads AGENT.md (singular) when there is no CLAUDE.md", () => {
+    writeFileSync(join(project, "AGENT.md"), "## Rules\n- singular-agent-marker\n");
+    expect(has("singular-agent-marker")).toBe(true);
+  });
+
   it("reads GEMINI.md (Gemini CLI)", () => {
     writeFileSync(join(project, "GEMINI.md"), "## Rules\n- gemini-marker\n");
     expect(has("gemini-marker")).toBe(true);

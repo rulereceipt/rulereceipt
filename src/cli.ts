@@ -13,6 +13,7 @@ import { adviseRules } from "./checkability.js";
 import { shadowedAgentsMd } from "./shadowedAgents.js";
 import { partitionByAge, futureResult } from "./ruleAge.js";
 import { auditSessions, renderComplianceReport } from "./report/complianceReport.js";
+import { auditRules, renderAudit } from "./audit.js";
 import { classifyRules } from "./checks/classify.js";
 import { loadOverrides, saveOverride, clearOverride, staleOverrides, ruleFingerprint, OVERRIDES_PATH } from "./overrides.js";
 import { runDeterministicChecks } from "./checks/deterministicChecks.js";
@@ -1026,6 +1027,22 @@ program
     const n = Number.parseInt(String(opts.last), 10);
     const r = await auditSessions(process.cwd(), Number.isFinite(n) ? n : 25);
     console.log(renderComplianceReport(r, Boolean(opts.markdown)));
+  });
+
+program
+  .command("audit")
+  .description(
+    "Score your rules files for checkability — NO session needed. How much can be checked mechanically vs needs a human vs is documentation. Works on CLAUDE.md, AGENTS.md, Cursor, Copilot, Windsurf and Gemini rules."
+  )
+  .option("--markdown", "output as markdown, for a report you can send")
+  .option("--json", "output machine-readable JSON (counts and the checkable %)")
+  .action((opts) => {
+    const a = auditRules(loadRules(process.cwd()));
+    if (opts.json) {
+      console.log(JSON.stringify(a, null, 2));
+      return;
+    }
+    console.log(renderAudit(a, Boolean(opts.markdown)));
   });
 
 program
