@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { guardDecision } from "../src/guard.js";
 
 /**
  * `rulereceipt guard` is the PreToolUse hook: it runs before EVERY tool call
@@ -161,5 +162,62 @@ describe("guard — fails open", () => {
     } finally {
       rmSync(empty, { recursive: true, force: true });
     }
+  });
+});
+
+/**
+ * Never claim a block that did not happen.
+ *
+ * Failproof's worst public bug was a "Blocked Bash" message printed when
+ * nothing was blocked (anthropics-style false claim). The whole product is
+ * trust, so the guard's block wording must appear ONLY when a real block
+ * occurred. Added 2026-09-28 after reading competitors' issue trackers.
+ */
+describe("guard never claims a block that did not happen", () => {
+  function decideNoRulesLeak(dir: string, tool: string, input: Record<string, unknown>, events: never[] = []) {
+    const prev = process.env.HOME;
+    const h = mkdtempSync(join(tmpdir(), "rr-blk-h-"));
+    process.env.HOME = h;
+    try {
+      return guardDecision(dir, tool, input, events);
+    } finally {
+      process.env.HOME = prev;
+      rmSync(h, { recursive: true, force: true });
+    }
+  }
+  function repo(rule: string): string {
+    const dir = mkdtempSync(join(tmpdir(), "rr-blk-"));
+    mkdirSync(join(dir, ".git"));
+    writeFileSync(join(dir, "CLAUDE.md"), rule);
+    return dir;
+  }
+
+  it("the ask path (unapproved push) does not claim a block", () => {
+    const dir = repo("- Never push without explicit user instruction.\n");
+    const d = decideNoRulesLeak(dir, "Bash", { command: "git push origin main" });
+    rmSync(dir, { recursive: true, force: true });
+    expect(d.deny).toBe(false);
+    expect(d.ask ?? "").not.toMatch(/block/i);
+    expect(d.reason).toBe("");
+  });
+
+  it("a command that breaks no rule carries no block claim", () => {
+    const dir = repo("- Never edit `.env`\n");
+    const d = decideNoRulesLeak(dir, "Bash", { command: "npm test" });
+    rmSync(dir, { recursive: true, force: true });
+    expect(d.deny).toBe(false);
+    expect(d.reason).toBe("");
+    expect(d.blocks).toEqual([]);
+  });
+
+  it("a 'blocked' reason implies a real deny (and only a real edit triggers it)", () => {
+    const dir = repo("- Never edit `.env`\n");
+    const blocked = decideNoRulesLeak(dir, "Edit", { file_path: join(dir, ".env"), old_string: "a", new_string: "b" });
+    const allowed = decideNoRulesLeak(dir, "Edit", { file_path: join(dir, "src", "app.ts"), old_string: "a", new_string: "b" });
+    rmSync(dir, { recursive: true, force: true });
+    // the invariant: if the reason mentions blocking, the call was really denied
+    for (const d of [blocked, allowed]) if (/block/i.test(d.reason)) expect(d.deny).toBe(true);
+    expect(allowed.deny).toBe(false);
+    expect(allowed.reason).toBe("");
   });
 });
