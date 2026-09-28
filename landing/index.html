@@ -864,8 +864,9 @@
           <p>"Rules in a text file are suggestions, and the AI decides whether to follow them based on how important they seem relative to the current task."</p>
           <span>— Mike Dolan, after growing a CLAUDE.md from 50 to 500+ lines</span>
         </a>
-        <!-- duplicated for seamless loop -->
-        <a class="quote-card" href="https://github.com/anthropics/claude-code/issues/28158" target="_blank" rel="noopener">
+        <!-- duplicated for the seamless scroll loop only; hidden from assistive tech and scrapers so the testimonials are not counted twice -->
+        <span class="quote-dup" aria-hidden="true" style="display:contents">
+        <a class="quote-card" href="https://github.com/anthropics/claude-code/issues/28158" target="_blank" rel="noopener" tabindex="-1">
           <p>"The file is confirmed present in context, agents acknowledge reading it, but 100% now ignore its directives."</p>
           <span>&mdash; Promethean-Pty-Ltd, on a CLAUDE.md rule that had worked reliably for two months</span>
         </a>
@@ -897,6 +898,7 @@
           <p>"Rules in a text file are suggestions, and the AI decides whether to follow them based on how important they seem relative to the current task."</p>
           <span>— Mike Dolan, after growing a CLAUDE.md from 50 to 500+ lines</span>
         </a>
+        </span>
 </div>
     </div>
   </section>
@@ -991,7 +993,7 @@
   <section class="band">
     <div class="wrap-wide">
       <h2>Pricing</h2>
-      <p class="band-sub">The CLI is free during early access. A paid team tier is coming.</p>
+      <p class="band-sub">The CLI is free, forever &mdash; the whole tool, not a trial. A paid Team tier (org-wide dashboards and compliance reports) is how we make money.</p>
       <div class="pricing">
         <div class="price-card accent"><div>The CLI</div><div class="amount">Free</div><p>Unlimited checks, no card, no account &mdash; the whole tool, not a cut-down trial. You&rsquo;ll hear well before that changes.</p></div>
         <div class="price-card"><div>For teams</div><div class="amount">Talk to us</div><p>A compliance report across <em>every</em> session &mdash; which rules were broken, with the evidence, for audits and vendor reviews. <code>rulereceipt report</code> does this locally today, free in the CLI. The org-wide, hosted version &mdash; reading every agent session via the Claude Compliance API &mdash; is in development for Enterprise. <a href="mailto:hello@rulereceipt.dev">Get in touch</a>.</p></div>
@@ -1026,7 +1028,7 @@
           </details>
           <details class="faq-item">
             <summary>Will the CLI start costing money later?</summary>
-            <p><code>rulereceipt check</code> is free during early access. It is the whole tool, not a cut-down trial. If that changes you will hear it here first, with notice &mdash; not by hitting a paywall part-way through a command.</p>
+            <p><code>rulereceipt check</code> is free, forever &mdash; the whole tool, not a cut-down trial. We make money from a paid Team tier (org-wide dashboards, compliance exports), never from the CLI itself. No paywall part-way through a command.</p>
             <p>A paid team tier is coming either way. That is a hosted view of trends across people and repos over time, which is a genuinely different product from the local check &mdash; and it will be announced with a real price when it exists. We are not quoting a number for something that is not built.</p>
           </details>
           <details class="faq-item">
