@@ -19,6 +19,7 @@ import { detectSelfEditedRuleFiles } from "./checks/selfEditedRules.js";
 import { scanHistory, renderHistory } from "./historyReport.js";
 import { observeSessions, renderNoRules, draftRulesFromHistory } from "./sessionObserve.js";
 import { listSessionRows, renderSessionList } from "./listSessions.js";
+import { runSelfTestChecks, renderSelfTest } from "./selftest.js";
 import { planProtect, applyProtect, undoProtect } from "./protect.js";
 import { cardSvg, renderCardShare, type CardData } from "./card.js";
 import { createInterface } from "node:readline";
@@ -968,6 +969,15 @@ program
         shadowedAgents: shadowedAgentsMd(cwd).map((s) => s.agents),
       })
     );
+  });
+
+program
+  .command("selftest")
+  .description("Run bundled golden fixtures on your machine and report how many verdicts are correct — proof the checkers work, with zero network calls (watch it with lsof if you like). Exits non-zero if any is wrong.")
+  .action(() => {
+    const r = runSelfTestChecks();
+    console.log(renderSelfTest(r));
+    if (r.failures.length > 0) process.exitCode = 1;
   });
 
 program

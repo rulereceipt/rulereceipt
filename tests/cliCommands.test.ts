@@ -40,7 +40,7 @@ function run(args: string[]): { out: string; ok: boolean } {
 
 // Every command registered in cli.ts. Adding a command here is the point:
 // a new subcommand that isn't routable should fail this suite.
-const COMMANDS = ["check", "audit", "history", "protect", "card", "rules", "init", "report", "doctor", "lint", "digest", "config", "demo", "verify"];
+const COMMANDS = ["check", "audit", "history", "protect", "card", "selftest", "rules", "init", "report", "doctor", "lint", "digest", "config", "demo", "verify"];
 
 describe("every subcommand is reachable, not swallowed by the default command", () => {
   for (const cmd of COMMANDS) {
