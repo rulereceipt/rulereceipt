@@ -811,7 +811,7 @@
       <div class="security-note"><strong>See one.</strong> <a href="/example-report" target="_blank" rel="noopener">Here is a real report</a>, produced by running the tool against a constructed session — two rules broken with the evidence quoted, one the tool refused to guess about, and three left for a human. <a href="/example-session.jsonl" download>The session file it read</a> is published next to it, so you can download both and run <code>rulereceipt verify</code> yourself. One command to check that.</div>
       <div style="height:14px"></div>
       <div class="fingerprint">
-        <div class="fp-label">every report is signed to the exact bytes it read</div>
+        <div class="fp-label">every report is hashed to the exact bytes it read</div>
         <h3>The person receiving it can check it's real.</h3>
         <p>Hand someone the report and the session file, and they can confirm the report describes <em>that exact file</em>, unaltered. They don't have to take the sender's word for it &mdash; and an edited session produces a different fingerprint.</p>
         <div class="fp-hash" data-copy="326ad7a4fd772e5dbbe33c32235480cf60646da0c46687a90ebb752fa0dd8469" data-loc="fingerprint" role="button" tabindex="0" title="Click to copy the full hash">
