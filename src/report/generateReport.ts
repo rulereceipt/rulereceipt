@@ -289,7 +289,7 @@ export function generateMarkdownReport(results: CheckResult[], meta: ReportMeta)
  * way as every other output: a hostile CLAUDE.md does not get to smuggle
  * control characters through the JSON either.
  */
-export function generateJsonReport(results: CheckResult[], meta: ReportMeta, toolVersion: string): string {
+export function generateJsonReport(results: CheckResult[], meta: ReportMeta, toolVersion: string, editedRuleFiles: string[] = []): string {
   const clean = results.map(sanitize);
   const count = (s: CheckResult["status"]): number => clean.filter((r) => r.status === s).length;
   const report = {
@@ -301,6 +301,9 @@ export function generateJsonReport(results: CheckResult[], meta: ReportMeta, too
       path: meta.sessionFilePath,
       sha256: computeTranscriptHash(meta.sessionFilePath),
     },
+    // Rules/settings files the session itself edited (a NOTE, not a verdict):
+    // the verdicts are against the rules as they are now.
+    agentEditedRuleFiles: editedRuleFiles,
     summary: {
       total: clean.length,
       pass: count("PASS"),

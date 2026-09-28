@@ -15,6 +15,7 @@ import { auditSessions, renderComplianceReport } from "./report/complianceReport
 import { auditProject, renderProjectAudit } from "./audit.js";
 import { evaluateSession } from "./evaluate.js";
 import { buildWrongReport, findTarget } from "./wrong.js";
+import { detectSelfEditedRuleFiles } from "./checks/selfEditedRules.js";
 import { loadOverrides, saveOverride, clearOverride, staleOverrides, ruleFingerprint, OVERRIDES_PATH } from "./overrides.js";
 import { runHook } from "./hook.js";
 import { runGuard } from "./guard.js";
@@ -281,12 +282,23 @@ async function runCheck(opts: CheckOptions) {
   const warnedFails = warningFailures(results, projectConfig, handleFor);
 
   const meta = { sessionFilePath, ruleCount: results.length };
+  // A NOTE, never a verdict: if the session rewrote the rules or settings it is
+  // being judged by, say so at the top. "Claude changed CLAUDE.md this session,
+  // then passed its own rules" is exactly what a reader needs to know.
+  const editedRuleFiles = detectSelfEditedRuleFiles(events);
+  const editedNote =
+    editedRuleFiles.length > 0
+      ? `Note: the agent changed ${editedRuleFiles.length === 1 ? "a rules/settings file" : `${editedRuleFiles.length} rules/settings files`} during this session (${editedRuleFiles
+          .map((f) => f.replace(`${cwd}/`, ""))
+          .join(", ")}). The verdicts below are against the rules as they are now.`
+      : "";
   // Kept in human/markdown form for --email and any other reader below, even
   // when stdout is JSON — a manager gets a readable report, not raw JSON.
   const reportText = markdown ? generateMarkdownReport(results, meta) : generateReport(results, meta);
   if (json) {
-    console.log(generateJsonReport(results, meta, pkg.version));
+    console.log(generateJsonReport(results, meta, pkg.version, editedRuleFiles));
   } else {
+    if (editedNote) console.log(`${editedNote}\n`);
     console.log(reportText);
     // Name the tool when it is not the default Claude Code, so a Codex run is
     // not silently reported as if it were a Claude session.
