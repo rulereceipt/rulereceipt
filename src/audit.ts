@@ -1,9 +1,36 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { classifyRules } from "./checks/classify.js";
 import { adviseRules } from "./checkability.js";
+import { ruleWasLoaded } from "./checks/pathScope.js";
 import { describeRuleSources, loadRules, type LoadGraphEntry } from "./rules.js";
 import type { Rule } from "./types.js";
+
+/** Files in the repo, for checking whether a path-scoped rule matches anything. */
+function repoFiles(cwd: string, cap = 4000): string[] {
+  const out: string[] = [];
+  const skip = new Set(["node_modules", ".git", "dist", "build", ".next", "out", "coverage", ".rulereceipt", ".vercel", ".turbo", "vendor"]);
+  const walk = (dir: string): void => {
+    if (out.length >= cap) return;
+    let entries: import("node:fs").Dirent[];
+    try {
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      if (out.length >= cap) return;
+      const full = join(dir, e.name);
+      if (e.isDirectory()) {
+        if (!skip.has(e.name)) walk(full);
+      } else {
+        out.push(full);
+      }
+    }
+  };
+  walk(cwd);
+  return out;
+}
 
 /**
  * A rules-only health score — how much of a rules file can actually be checked,
@@ -104,7 +131,8 @@ export interface Diagnostic {
     | "size-warn"
     | "template-text"
     | "broken-import"
-    | "hook-config";
+    | "hook-config"
+    | "dead-globs";
   severity: "info" | "warn";
   message: string;
 }
@@ -191,7 +219,7 @@ function isPointerFile(path: string): boolean {
   }
 }
 
-function buildDiagnostics(cwd: string, graph: LoadGraphEntry[], a: RulesAudit): Diagnostic[] {
+function buildDiagnostics(cwd: string, graph: LoadGraphEntry[], a: RulesAudit, rules: Rule[]): Diagnostic[] {
   const diags: Diagnostic[] = [];
   const loaded = graph.filter((g) => g.status === "loaded");
   const shadowed = graph.filter((g) => g.status === "shadowed");
@@ -278,6 +306,21 @@ function buildDiagnostics(cwd: string, graph: LoadGraphEntry[], a: RulesAudit): 
     }
   }
 
+  // A path-scoped rule whose globs match no file in the repo never loads.
+  const scoped = rules.filter((r) => r.paths && r.paths.length > 0);
+  if (scoped.length > 0) {
+    const files = repoFiles(cwd);
+    for (const r of scoped) {
+      if (!ruleWasLoaded(r.paths!, files)) {
+        diags.push({
+          id: "dead-globs",
+          severity: "warn",
+          message: `"${r.title.replace(/\s+/g, " ").trim().slice(0, 50)}" is scoped to ${r.paths!.join(", ")}, which matches no file in this repo — so it never loads and governs nothing. Fix the glob.`,
+        });
+      }
+    }
+  }
+
   // A hook wired under a misspelled/unknown event name never fires — silently.
   const badHooks = unknownHookEvents(cwd);
   if (badHooks.length > 0) {
@@ -309,7 +352,7 @@ export function auditProject(cwd: string): ProjectAudit {
   const rules = loadRules(cwd);
   const base = auditRules(rules);
   const loadGraph = describeRuleSources(cwd);
-  const diagnostics = buildDiagnostics(cwd, loadGraph, base);
+  const diagnostics = buildDiagnostics(cwd, loadGraph, base, rules);
   const memoryRules = rules.filter((r) => r.id.startsWith("memory:")).length;
   return { ...base, loadGraph, diagnostics, memoryRules };
 }

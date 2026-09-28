@@ -94,6 +94,16 @@ describe("audit v2 doorstep", () => {
     expect(ids(repo({ "CLAUDE.md": big }))).toContain("size-warn");
   });
 
+  it("flags a path-scoped rule whose glob matches no file in the repo", () => {
+    const dir = repo({ "CLAUDE.md": "- Never push to `main`\n", ".claude/rules/db.md": '---\npaths: ["db/**"]\n---\n- Never run `git push --force`\n' });
+    expect(ids(dir)).toContain("dead-globs");
+  });
+
+  it("does not flag a path-scoped rule when a matching file exists", () => {
+    const dir = repo({ "CLAUDE.md": "- Never push to `main`\n", ".claude/rules/db.md": '---\npaths: ["db/**"]\n---\n- Never run `git push --force`\n', "db/schema.sql": "select 1;" });
+    expect(ids(dir)).not.toContain("dead-globs");
+  });
+
   it("flags a hook wired under an unknown event name (it never fires)", () => {
     const dir = repo({ "CLAUDE.md": "- Never push to `main`\n", ".claude/settings.json": JSON.stringify({ hooks: { PreToolus: [{ hooks: [] }] } }) });
     expect(ids(dir)).toContain("hook-config");
