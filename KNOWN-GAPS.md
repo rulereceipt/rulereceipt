@@ -98,8 +98,16 @@ For agents without a readable session log, RuleReceipt can audit the rules file
 - The guard blocks only rules it can check for certain (branches, files, commands you
   marked with `rules --forbid`). Everything else is reported afterwards, not blocked.
 - For "never push without asking", the guard answers **ask**, so Claude Code shows its
-  permission prompt. We have **not yet verified** that this prompt still appears in
-  skip-permissions mode on current Claude Code versions.
+  permission prompt. Important platform caveat (Claude Code's own issue tracker, checked
+  2026-09-28): a hook's **"ask" is ignored in `bypassPermissions`/`auto`/`dontAsk` modes** —
+  the call just runs (#89561) — and an "ask" is silently denied in headless `claude -p`
+  (#95726). So in exactly the modes where nobody is asked, the guard's "ask" does **not** stop
+  the action today. An "ask" can also interact badly with a user's own `permissions.deny`
+  (#39344). Until the guard is made permission-mode-aware (planned, next release: "ask" only in
+  default/acceptEdits/plan and never over a deny rule; a clear **deny**-with-reason in
+  no-prompt modes so the per-action check can let a retry through after the user says yes in
+  chat), treat live blocking of an unapproved push as reliable **only in default/acceptEdits/
+  plan mode**. The after-the-fact `check` verdict is unaffected.
 - An agent with shell access can edit your settings to remove the hooks. RuleReceipt does
   not yet detect this during the session.
 
