@@ -1,0 +1,136 @@
+import { existsSync, readFileSync, writeFileSync, mkdirSync, renameSync, rmSync } from "node:fs";
+import { join, dirname } from "node:path";
+
+/**
+ * `rulereceipt protect` — the one-command "fix it" that pairs with history
+ * mode's "here's what broke". It wires RuleReceipt's enforcement into Claude
+ * Code: a PreToolUse guard (refuses a command that breaks a file/branch rule,
+ * and asks before an unapproved push/commit) and a Stop hook (won't let a
+ * session end on a broken rule or an unbacked "done").
+ *
+ * RuleReceipt's whole stance is that a tool must not silently write to your
+ * settings, so this is the ONE place it writes — and only after showing exactly
+ * what it will add and asking. `protect --undo` restores the settings file
+ * byte-for-byte (or removes it, if there was none before). Writes are atomic
+ * (temp file + rename) so a crash mid-write can never leave a half-file.
+ */
+
+const GUARD_CMD = "rulereceipt guard";
+const HOOK_CMD = "rulereceipt hook";
+
+function settingsPathFor(cwd: string): string {
+  return join(cwd, ".claude", "settings.json");
+}
+function backupPathFor(cwd: string): string {
+  return join(cwd, ".rulereceipt", "protect-backup.json");
+}
+
+interface HookEntry {
+  hooks?: { type?: string; command?: string }[];
+}
+interface Settings {
+  hooks?: Record<string, HookEntry[]>;
+  [k: string]: unknown;
+}
+
+function hasRuleReceiptHook(settings: Settings, event: string, cmdSubstring: string): boolean {
+  const arr = settings.hooks?.[event];
+  if (!Array.isArray(arr)) return false;
+  return arr.some((entry) => Array.isArray(entry.hooks) && entry.hooks.some((h) => typeof h.command === "string" && h.command.includes(cmdSubstring)));
+}
+
+function addHook(settings: Settings, event: string, command: string): void {
+  settings.hooks = settings.hooks ?? {};
+  const arr = Array.isArray(settings.hooks[event]) ? settings.hooks[event] : [];
+  arr.push({ hooks: [{ type: "command", command }] });
+  settings.hooks[event] = arr;
+}
+
+function atomicWrite(path: string, content: string): void {
+  mkdirSync(dirname(path), { recursive: true });
+  const tmp = `${path}.rr-tmp`;
+  writeFileSync(tmp, content);
+  renameSync(tmp, path);
+}
+
+export interface ProtectPlan {
+  settingsPath: string;
+  existed: boolean;
+  /** The exact original bytes, or null if the settings file did not exist. */
+  original: string | null;
+  /** The settings content protect would write. */
+  next: string;
+  /** Human labels of what will be added. */
+  toAdd: string[];
+  /** True when both hooks are already present — nothing to do. */
+  alreadyProtected: boolean;
+}
+
+export function planProtect(cwd: string): ProtectPlan {
+  const settingsPath = settingsPathFor(cwd);
+  const existed = existsSync(settingsPath);
+  let original: string | null = null;
+  let settings: Settings = {};
+  if (existed) {
+    try {
+      original = readFileSync(settingsPath, "utf-8");
+      const parsed = JSON.parse(original) as unknown;
+      if (parsed && typeof parsed === "object") settings = parsed as Settings;
+    } catch {
+      // Malformed JSON: we keep the ORIGINAL bytes (for a faithful undo) but
+      // build the new file from an empty object rather than guessing at a merge.
+      settings = {};
+    }
+  }
+
+  const toAdd: string[] = [];
+  if (!hasRuleReceiptHook(settings, "PreToolUse", GUARD_CMD)) {
+    addHook(settings, "PreToolUse", GUARD_CMD);
+    toAdd.push("PreToolUse guard — refuses a command that breaks a file/branch rule, and asks before an unapproved push/commit");
+  }
+  if (!hasRuleReceiptHook(settings, "Stop", HOOK_CMD)) {
+    addHook(settings, "Stop", HOOK_CMD);
+    toAdd.push("Stop hook — won't let a session end on a broken rule or a 'done' with no evidence");
+  }
+
+  return {
+    settingsPath,
+    existed,
+    original,
+    next: `${JSON.stringify(settings, null, 2)}\n`,
+    toAdd,
+    alreadyProtected: toAdd.length === 0,
+  };
+}
+
+export function applyProtect(cwd: string, plan: ProtectPlan): void {
+  // Record exactly what to restore (the original bytes, or that there was no
+  // file) BEFORE touching anything, so --undo is byte-for-byte.
+  atomicWrite(backupPathFor(cwd), `${JSON.stringify({ settingsPath: plan.settingsPath, existed: plan.existed, original: plan.original }, null, 2)}\n`);
+  atomicWrite(plan.settingsPath, plan.next);
+}
+
+export interface UndoResult {
+  ok: boolean;
+  message: string;
+}
+
+export function undoProtect(cwd: string): UndoResult {
+  const backupPath = backupPathFor(cwd);
+  if (!existsSync(backupPath)) {
+    return { ok: false, message: "Nothing to undo — no `protect` backup found in .rulereceipt/." };
+  }
+  let backup: { settingsPath: string; existed: boolean; original: string | null };
+  try {
+    backup = JSON.parse(readFileSync(backupPath, "utf-8"));
+  } catch {
+    return { ok: false, message: "The protect backup is unreadable, so undo was not attempted (your settings were left as they are)." };
+  }
+  if (backup.existed && typeof backup.original === "string") {
+    atomicWrite(backup.settingsPath, backup.original);
+  } else if (existsSync(backup.settingsPath)) {
+    rmSync(backup.settingsPath);
+  }
+  rmSync(backupPath);
+  return { ok: true, message: `Restored ${backup.settingsPath} to its state before protect. Start a new Claude Code session for it to take effect.` };
+}

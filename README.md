@@ -38,6 +38,17 @@ only proven breaks (a structured check with evidence); judgment rules stay on
 their own line, so the number never overstates. `rulereceipt check` still checks
 one session in full.
 
+To stop it happening again:
+
+```bash
+npx rulereceipt protect
+```
+
+Adds a PreToolUse guard and a Stop hook to `.claude/settings.json` — after
+showing you exactly what it will add and asking. `protect --undo` restores the
+file byte-for-byte. It's the only place RuleReceipt writes settings, and only
+with your yes.
+
 ## Status
 
 Published and live on npm, actively developed.

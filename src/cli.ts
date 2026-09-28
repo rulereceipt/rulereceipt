@@ -17,6 +17,8 @@ import { evaluateSession } from "./evaluate.js";
 import { buildWrongReport, findTarget } from "./wrong.js";
 import { detectSelfEditedRuleFiles } from "./checks/selfEditedRules.js";
 import { scanHistory, renderHistory } from "./historyReport.js";
+import { planProtect, applyProtect, undoProtect } from "./protect.js";
+import { createInterface } from "node:readline";
 import { loadOverrides, saveOverride, clearOverride, staleOverrides, ruleFingerprint, OVERRIDES_PATH } from "./overrides.js";
 import { runHook } from "./hook.js";
 import { runGuard } from "./guard.js";
@@ -1187,6 +1189,60 @@ program
       return;
     }
     console.log(JSON.stringify(buildBadge(parsed.receipt.summary), null, 2));
+  });
+
+function confirmYesNo(prompt: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    // No TTY (piped/CI) and no --yes: default to NO. protect never writes
+    // without an explicit yes, so a non-interactive run makes no changes.
+    if (!process.stdin.isTTY) {
+      resolve(false);
+      return;
+    }
+    const rl = createInterface({ input: process.stdin, output: process.stdout });
+    rl.question(prompt, (answer) => {
+      rl.close();
+      resolve(/^\s*y(es)?\s*$/i.test(answer));
+    });
+  });
+}
+
+program
+  .command("protect")
+  .description(
+    "Wire RuleReceipt's enforcement into Claude Code: a PreToolUse guard (refuses a command that breaks a file/branch rule; asks before an unapproved push/commit) and a Stop hook (won't let a session end on a broken rule). Shows exactly what it will add to .claude/settings.json and asks first. Undo anytime with --undo (restores the file byte-for-byte)."
+  )
+  .option("--undo", "remove what protect added, restoring .claude/settings.json byte-for-byte")
+  .option("--yes", "skip the confirmation prompt (for scripts)")
+  .action(async (opts: { undo?: boolean; yes?: boolean }) => {
+    const cwd = process.cwd();
+    if (opts.undo) {
+      const r = undoProtect(cwd);
+      console.log(r.message);
+      if (!r.ok) process.exitCode = 1;
+      return;
+    }
+    const plan = planProtect(cwd);
+    if (plan.alreadyProtected) {
+      console.log(`Already protected — the RuleReceipt hooks are in ${plan.settingsPath}. Nothing to add.`);
+      return;
+    }
+    console.log(`protect will add to ${plan.settingsPath}${plan.existed ? "" : " (new file)"}:`);
+    for (const a of plan.toAdd) console.log(`  + ${a}`);
+    console.log("\nThe file will read:\n");
+    console.log(plan.next.split("\n").map((l) => `    ${l}`).join("\n"));
+    console.log("Nothing else is touched. Undo anytime:  rulereceipt protect --undo");
+    if (!opts.yes) {
+      const ok = await confirmYesNo("\nAdd these hooks? [y/N] ");
+      if (!ok) {
+        console.log("No changes made.");
+        return;
+      }
+    }
+    applyProtect(cwd, plan);
+    console.log(`\nDone — added to ${plan.settingsPath}. Start a NEW Claude Code session so the hooks load.`);
+    console.log("The hooks call `rulereceipt` on your PATH (install once with `npm i -g rulereceipt`); they fail open if it's missing.");
+    console.log("Undo:  rulereceipt protect --undo");
   });
 
 program
