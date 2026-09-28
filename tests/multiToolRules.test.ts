@@ -81,6 +81,21 @@ describe("loadRules reads non-Claude rule-file conventions", () => {
     expect(has("globs")).toBe(false);
   });
 
+  it("reads GEMINI.md (Gemini CLI)", () => {
+    writeFileSync(join(project, "GEMINI.md"), "## Rules\n- gemini-marker\n");
+    expect(has("gemini-marker")).toBe(true);
+  });
+
+  it("reads .agents/rules/*.md (Google agy / agents-rules convention), frontmatter stripped", () => {
+    mkdirSync(join(project, ".agents", "rules"), { recursive: true });
+    writeFileSync(
+      join(project, ".agents", "rules", "backend.md"),
+      "---\ntrigger: always_on\n---\n\n## Backend\n- agentsrules-marker\n"
+    );
+    expect(has("agentsrules-marker")).toBe(true);
+    expect(has("always_on")).toBe(false); // frontmatter is not a rule
+  });
+
   it("still reads CLAUDE.md alongside the others", () => {
     writeFileSync(join(project, "CLAUDE.md"), "## Rules\n- claude-marker\n");
     writeFileSync(join(project, ".windsurfrules"), "## Rules\n- windsurf-too\n");

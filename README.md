@@ -9,7 +9,8 @@
 Checks whether your AI coding agent actually followed your rules — with
 evidence, not just a vibe. Works with Claude Code today (OpenAI Codex CLI
 support is built and in testing), and reads rules from CLAUDE.md, AGENTS.md,
-Cursor (`.cursor/rules`), GitHub Copilot, Windsurf, and Claude Code memory.
+Cursor (`.cursor/rules`), GitHub Copilot, Windsurf, Gemini (`GEMINI.md`),
+Google's `.agents/rules`, and Claude Code memory.
 
 Runs entirely on your machine. Plain `rulereceipt check` makes zero network
 calls — [Trust, privacy and licensing](#trust-privacy-and-licensing) has the

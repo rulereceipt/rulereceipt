@@ -92,6 +92,13 @@ function ruleFilesAtLevel(dir: string): string[] {
   // Windsurf (Codeium): single rules file.
   push(".windsurfrules");
 
+  // Google's newer agent convention (agy) / "agents rules": .agents/rules/*.md,
+  // each with a `trigger:` frontmatter block (stripped by the reader).
+  found.push(...markdownFilesIn(join(dir, ".agents", "rules"), [".md"]));
+
+  // Gemini CLI: single rules file (its AGENTS.md equivalent).
+  push("GEMINI.md");
+
   return found;
 }
 
