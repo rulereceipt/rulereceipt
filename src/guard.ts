@@ -185,8 +185,23 @@ function ratifiedLiteralBlocks(cwd: string, command: string): Block[] {
  * whoever asks for it, not a default.
  */
 
+/**
+ * What to do instead — every refusal names a concrete next step, so the model
+ * corrects rather than just retrying (Failproof's "corrective context" idea,
+ * built our own way). Inferred from the rule and the reason; falls back to
+ * "ask the user", which is always safe.
+ */
+function suggest(b: Block): string {
+  const t = `${b.rule.title} ${b.why}`.toLowerCase();
+  if (/co-?authored|generated with|attribution|trailer/.test(t)) return "Instead: make the commit without the AI trailer (no `Co-Authored-By` / `Generated with` line).";
+  if (/\bpush\b|\bbranch\b|\bmain\b|\bmaster\b/.test(t)) return "Instead: work on a feature branch (`git switch -c <name>`) and open a PR, or ask the user before pushing.";
+  if (/\.env|secret|credential|\btoken\b|\bkey\b|password/.test(t)) return "Instead: leave that file as it is; if it genuinely must change, ask the user first.";
+  if (/delet|remov|\bdrop\b|truncat|wipe|\brm\b/.test(t)) return "Instead: don't delete it; if it should be removed, confirm with the user first.";
+  return "Instead: ask the user before doing this, or explain why the rule shouldn't apply and let them decide.";
+}
+
 function reason(blocks: Block[]): string {
-  const lines = blocks.map((b) => `  • Rule ${b.rule.id} — ${b.rule.title}\n    ${b.why}`);
+  const lines = blocks.map((b) => `  • Rule ${b.rule.id} — ${b.rule.title}\n    ${b.why}\n    ${suggest(b)}`);
   const n = blocks.length;
   return (
     `RuleReceipt blocked this: it breaks ${n === 1 ? "a rule" : `${n} rules`} in CLAUDE.md.\n\n` +

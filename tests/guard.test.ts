@@ -74,6 +74,13 @@ describe("guard — deny path", () => {
     expect(r.out).toContain("Never delete the ledger");
   });
 
+  // Every refusal must name a concrete next step (what to do instead), not just say no.
+  it("tells the model what to do instead", () => {
+    const r = guard({ tool_name: "Bash", tool_input: { command: "rm data/ledger.db" } });
+    expect(r.out).toContain("Instead:");
+    expect(r.out).toMatch(/confirm with the user|don't delete/i);
+  });
+
   it("emits the deny as a nested hookSpecificOutput block", () => {
     const r = guard({ tool_name: "Bash", tool_input: { command: "rm data/ledger.db" } });
     expect(r.out).toContain('"hookEventName":"PreToolUse"');
