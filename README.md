@@ -25,6 +25,19 @@ npx rulereceipt demo
 No install, no config, no API key, no real session needed — prints a sample
 report so you can see the output shape immediately.
 
+Then, in a project you actually use an agent in:
+
+```bash
+npx rulereceipt
+```
+
+With no arguments it runs **history mode**: it checks *every* session for this
+project in the last 30 days and leads with the rules broken most — each with a
+count, the last date, and one quoted line from the session. The headline counts
+only proven breaks (a structured check with evidence); judgment rules stay on
+their own line, so the number never overstates. `rulereceipt check` still checks
+one session in full.
+
 ## Status
 
 Published and live on npm, actively developed.
