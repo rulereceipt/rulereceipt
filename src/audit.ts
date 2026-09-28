@@ -29,7 +29,7 @@ export interface RulesAudit {
   /** checkable / (checkable + judgment), whole %, 0 when there are no rules. */
   percentCheckable: number;
   /** The highest-leverage rewrites — a concrete rule missing only its literal. */
-  topFixes: { title: string; suggestion: string }[];
+  topFixes: { title: string; suggestion: string; handle?: string }[];
 }
 
 export function auditRules(rules: Rule[]): RulesAudit {
@@ -45,7 +45,7 @@ export function auditRules(rules: Rule[]): RulesAudit {
   const topFixes = adviseRules(rules)
     .filter((a) => a.actionable)
     .slice(0, 5)
-    .map((a) => ({ title: a.ruleTitle, suggestion: a.suggestion }));
+    .map((a) => ({ title: a.ruleTitle, suggestion: a.suggestion, handle: a.handle }));
   return {
     total: checkable + judgment + skipped,
     checkable,
@@ -323,7 +323,7 @@ export function renderProjectAudit(pa: ProjectAudit, md = false): string {
   if (pa.topFixes.length > 0) {
     out.push(H("Top fixes to unlock more checks"));
     for (const f of pa.topFixes) {
-      out.push(`  • ${f.title.replace(/\s+/g, " ").trim().slice(0, 60)}`);
+      out.push(`  • ${f.title.replace(/\s+/g, " ").trim().slice(0, 60)}${f.handle ? `  [${f.handle}]` : ""}`);
       out.push(`      ${f.suggestion}`);
     }
     out.push("");

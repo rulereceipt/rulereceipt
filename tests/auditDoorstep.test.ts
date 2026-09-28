@@ -94,6 +94,13 @@ describe("audit v2 doorstep", () => {
     expect(ids(repo({ "CLAUDE.md": big }))).toContain("size-warn");
   });
 
+  it("top fixes carry a stable handle for rules --include/--exclude", () => {
+    const a = auditProject(repo({ "CLAUDE.md": "## 1. Deploy carefully\nNever deploy to production without a review.\n" }));
+    const fix = a.topFixes[0];
+    expect(fix).toBeDefined();
+    expect(fix.handle).toMatch(/^[0-9a-f]{6,}$/);
+  });
+
   it("--json shape carries loadGraph + diagnostics + counts", () => {
     const a = auditProject(repo({ "CLAUDE.md": "- Never run `git push --force`\n" }));
     expect(a).toHaveProperty("loadGraph");

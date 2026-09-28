@@ -1,5 +1,6 @@
 import type { Rule } from "./types.js";
 import { classifyRule } from "./checks/classify.js";
+import { ruleFingerprint } from "./overrides.js";
 
 /**
  * Why a rule can't be checked mechanically, and what to change so it can.
@@ -33,6 +34,8 @@ export interface RuleAdvice {
    * actionable ones as the top fixes.
    */
   actionable?: boolean;
+  /** Stable content-hash handle for `rules --include/--exclude`. */
+  handle?: string;
 }
 
 /** A concrete action the rule is plausibly about, so we can name what to quote. */
@@ -109,5 +112,13 @@ export function adviseRule(rule: Rule): RuleAdvice | null {
 
 /** Advice for every rule that isn't already mechanically checked. */
 export function adviseRules(rules: Rule[]): RuleAdvice[] {
-  return rules.map(adviseRule).filter((a): a is RuleAdvice => a !== null);
+  const out: RuleAdvice[] = [];
+  for (const rule of rules) {
+    const a = adviseRule(rule);
+    // Attach the stable content-hash handle so `audit`'s top fixes can be acted
+    // on with `rules --include/--exclude <handle>` (ids are positional and
+    // renumber; the handle survives edits above the rule).
+    if (a) out.push({ ...a, handle: ruleFingerprint(rule) });
+  }
+  return out;
 }
