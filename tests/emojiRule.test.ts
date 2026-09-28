@@ -153,3 +153,27 @@ describe("emoji evidence lists emoji in true order of appearance", () => {
     expect(r.status).toBe("FAIL");
   });
 });
+
+// Real false accusation found on matched real sessions (2026-09-28): the rule
+// "Don't add emojis liberally, one or two in an entire post is the maximum"
+// (about blog POSTS, and a THRESHOLD not a ban) failed because Claude used one
+// ✅ in a chat reply. A permissive-threshold or off-target emoji rule must not
+// be a confident deterministic FAIL — it goes to judgment.
+describe("emoji rules that permit some, or target something the checker can't see", () => {
+  const kind = (t: string) => classifyRule(rule(t)).kind;
+  it("does NOT deterministically check a permissive-threshold rule (the real false positive)", () => {
+    expect(kind("Don't add emojis liberally, one or two in an entire post is the maximum.")).not.toBe("emojiOutput");
+  });
+  it("does NOT deterministically check 'don't use emojis excessively'", () => {
+    expect(kind("Don't use emojis excessively.")).not.toBe("emojiOutput");
+  });
+  it("does NOT deterministically check a rule scoped only to an off-target artifact", () => {
+    expect(kind("No emojis in the README.")).not.toBe("emojiOutput");
+  });
+  it("STILL checks a clean chat/replies emoji ban", () => {
+    expect(kind("Never use emojis in replies.")).toBe("emojiOutput");
+  });
+  it("STILL checks a rule banning emoji in commits AND chat (chat is visible to it)", () => {
+    expect(kind("Do not use emoji in commit messages or chat.")).toBe("emojiOutput");
+  });
+});

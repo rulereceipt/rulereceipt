@@ -461,6 +461,23 @@ const FILE_PATH_PATTERN = /^[^\s]*(\.(json|ya?ml|toml|md|env|lock|ini|cfg|conf|x
 // starting" names a path but isn't a protection rule).
 const FILE_MUTATION_INTENT = /\b(modif|chang|edit|delet|remov|overwrit|touch|writ|creat|rename|mov)\w*\b/i;
 
+/**
+ * A backtick literal distinctive enough to check INSIDE written code without
+ * matching ordinary prose. A single token (no whitespace), not a shell flag,
+ * carrying code punctuation (`. - / @ # :`) and at least three alphanumerics —
+ * so `lucide-react`, `#0af`, `@deprecated`, `react-dom` qualify, while plain
+ * words (`TODO`, `name`), shell commands (`git push --force`) and bare flags
+ * do not. Used to route a FORBID rule's token to codeContent: found in
+ * Write/Edit content it is an ACTION (a real FAIL), not a mention. Added
+ * 2026-09-28 to move import/value-style rules out of the UNCLEAR bucket.
+ */
+function isContentToken(literal: string): boolean {
+  if (/\s/.test(literal)) return false;
+  if (literal.startsWith("-")) return false;
+  if (!/[.\-/@#:]/.test(literal)) return false;
+  return (literal.match(/[A-Za-z0-9]/g) ?? []).length >= 3;
+}
+
 // Catches rules like "add tests for every change" or "every new function
 // needs a test" - no literal backtick token to pattern-match, so without
 // this they'd fall all the way through to judgment (an LLM call) even
@@ -665,6 +682,14 @@ function polarityWasInferred(rule: Rule): boolean {
  */
 const EMOJI_SUBJECT = /\bemojis?\b|\bemoticons?\b/i;
 const EMOJI_FORBID = /\b(no|never|avoid|don't|do not|without|free of|refrain from|must not|shall not|not use|zero)\b/i;
+// A permissive threshold means the rule allows SOME emoji — not a zero-ban the
+// deterministic checker can decide.
+const EMOJI_THRESHOLD = /\b(?:liberal|sparing|minimal|excessive|overus|one or two|a couple|a few|maximum|at most|no more than|too many|limit)\w*/i;
+// A rule scoped only to an artifact the checker can't see (it reads the
+// assistant's chat text, not posts/commits/READMEs) can't be verified from
+// that text — unless it also names the chat/output the checker DOES see.
+const EMOJI_OFFTARGET = /\b(?:posts?|commits?|pull requests?|prs?|readme|docs?|documentation|blog|articles?|captions?|changelog)\b/i;
+const EMOJI_ONTARGET = /\b(?:output|repl(?:y|ies)|response|chat|message|answer|conversation|everywhere|anywhere)\b/i;
 
 function isEmojiRule(rule: Rule): boolean {
   const text = `${rule.title} ${rule.text}`;
@@ -675,7 +700,14 @@ function isEmojiRule(rule: Rule): boolean {
   const m = text.match(EMOJI_SUBJECT);
   if (!m || m.index === undefined) return false;
   const window = text.slice(Math.max(0, m.index - 60), m.index + 40);
-  return EMOJI_FORBID.test(window);
+  if (!EMOJI_FORBID.test(window)) return false;
+  // Real false positive 2026-09-28: "one or two emojis per post is the maximum"
+  // (a THRESHOLD, about POSTS) failed on a ✅ in a chat reply. A permissive
+  // threshold, or a rule scoped only to an artifact this checker can't see,
+  // is not a confident deterministic FAIL — it goes to judgment.
+  if (EMOJI_THRESHOLD.test(text)) return false;
+  if (EMOJI_OFFTARGET.test(text) && !EMOJI_ONTARGET.test(text)) return false;
+  return true;
 }
 
 /**
@@ -862,6 +894,17 @@ export function classifyRule(rule: Rule): Classification {
   const filePath = [...patterns].find((p) => FILE_PATH_PATTERN.test(p));
   if (filePath && FILE_MUTATION_INTENT.test(text)) {
     return { kind: "fileLifecycle", rule, filePath, polarity , polarityInferred };
+  }
+
+  // A forbid rule naming a distinctive token (an import, a value) is a real
+  // violation when the agent WRITES it — codeContent checks Write/Edit content
+  // only, so this is an action not a mention. Plain words and shell commands
+  // are excluded by isContentToken; protected files already routed above.
+  if (polarity === "forbid") {
+    const contentTokens = [...patterns].filter(isContentToken);
+    if (contentTokens.length > 0) {
+      return { kind: "codeContent", rule, patterns: contentTokens, polarity, polarityInferred };
+    }
   }
 
   return { kind: "deterministic", rule, patterns: [...patterns], polarity , polarityInferred };
