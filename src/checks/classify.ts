@@ -726,7 +726,11 @@ function isEmojiRule(rule: Rule): boolean {
  */
 const ATTRIBUTION_SUBJECT =
   /co-?authored-by|generated with\s*\[?\s*claude|\bai\b[^.\n]{0,20}(?:trace|attribution|authorship)|\battribution\b/i;
-const ATTRIBUTION_CONTEXT = /\b(?:commit|git|pull request|\bpr\b|github|co-?author)\b/i;
+// Plural and verb forms count: "no Co-Authored-By on commits" / "when
+// committing" / "on PRs" are the same rule as the singular. `\bcommit\b` alone
+// missed "commits"/"committing" and left the rule at judgment (KNOWN-GAPS,
+// fixed 2026-09-28).
+const ATTRIBUTION_CONTEXT = /\b(?:commit(?:s|ted|ting|ment|ments)?|git|pull\s+requests?|prs?|github|co-?authors?)\b/i;
 const ATTRIBUTION_FORBID =
   /\b(?:no|never|don't|do not|without|must not|shall not|not add|zero|forbid)\b/i;
 

@@ -40,6 +40,10 @@ describe("attribution rules route to the attribution check", () => {
     "Never add Co-Authored-By: Claude to a commit.",
     "Do not include 'Generated with Claude Code' in any pull request.",
     "Commits must never carry AI attribution: do not add a Co-Authored-By trailer to any git commit.",
+    // Plural / verb forms (KNOWN-GAPS fix 2026-09-28): these used to fall to judgment.
+    "Never add a Co-Authored-By trailer to commits.",
+    "Do not add a Co-Authored-By line when committing.",
+    "Never put a Co-Authored-By trailer on PRs.",
   ]) {
     it(`routes: ${t.slice(0, 40)}`, () => expect(classifyRule(rule(t)).kind).toBe("attribution"));
   }
