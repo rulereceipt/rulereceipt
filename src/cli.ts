@@ -18,6 +18,7 @@ import { buildWrongReport, findTarget } from "./wrong.js";
 import { detectSelfEditedRuleFiles } from "./checks/selfEditedRules.js";
 import { scanHistory, renderHistory } from "./historyReport.js";
 import { observeSessions, renderNoRules, draftRulesFromHistory } from "./sessionObserve.js";
+import { listSessionRows, renderSessionList } from "./listSessions.js";
 import { planProtect, applyProtect, undoProtect } from "./protect.js";
 import { cardSvg, renderCardShare, type CardData } from "./card.js";
 import { createInterface } from "node:readline";
@@ -505,7 +506,16 @@ program
     "--transcript <path>",
     "manual override: check this exact .jsonl session file instead of auto-detecting one. Useful if your Claude Code session lives somewhere non-standard that auto-detection doesn't cover."
   )
+  .option(
+    "--list-sessions",
+    "list recent sessions for this project (tool, time, first prompt) so you can pick one for --transcript, instead of checking."
+  )
   .action((opts) => {
+    if (opts.listSessions) {
+      const cwd = process.cwd();
+      console.log(renderSessionList(listSessionRows(cwd), cwd));
+      return;
+    }
     runCheck({
       markdown: Boolean(opts.markdown),
       json: Boolean(opts.json),
