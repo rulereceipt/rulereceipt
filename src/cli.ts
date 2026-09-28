@@ -17,6 +17,7 @@ import { evaluateSession } from "./evaluate.js";
 import { buildWrongReport, findTarget } from "./wrong.js";
 import { detectSelfEditedRuleFiles } from "./checks/selfEditedRules.js";
 import { scanHistory, renderHistory } from "./historyReport.js";
+import { observeSessions, renderNoRules, draftRulesFromHistory } from "./sessionObserve.js";
 import { planProtect, applyProtect, undoProtect } from "./protect.js";
 import { cardSvg, renderCardShare, type CardData } from "./card.js";
 import { createInterface } from "node:readline";
@@ -923,9 +924,31 @@ program
 
 program
   .command("init")
-  .description("Guided setup: shows what's configured and the exact next steps. Read-only — writes nothing.")
-  .action(() => {
+  .description("Guided setup: shows what's configured and the exact next steps. Read-only — writes nothing (except --from-history, which drafts a starter rules file you approve).")
+  .option("--from-history", "draft a starter rules file from what your agent did in recent sessions, written to .rulereceipt/draft-CLAUDE.md (never overwrites an existing rules file)")
+  .option("--days <n>", "how many days back to look, with --from-history", "30")
+  .action((opts: { fromHistory?: boolean; days?: string }) => {
     const cwd = process.cwd();
+    if (opts.fromHistory) {
+      const d = Number.parseInt(opts.days ?? "30", 10);
+      const obs = observeSessions(cwd, Number.isFinite(d) && d > 0 ? d : 30);
+      if (obs.sessions === 0) {
+        console.log("No sessions found for this project yet, so there's nothing to draft rules from. Run your agent here first.");
+        process.exitCode = 1;
+        return;
+      }
+      const draftPath = join(cwd, ".rulereceipt", "draft-CLAUDE.md");
+      if (existsSync(draftPath)) {
+        console.log(`A draft already exists at ${draftPath} — open it, or delete it and re-run. Not overwriting.`);
+        return;
+      }
+      mkdirSync(dirname(draftPath), { recursive: true });
+      writeFileSync(draftPath, draftRulesFromHistory(obs));
+      console.log(`Drafted a starter rules file from ${obs.sessions} session${obs.sessions === 1 ? "" : "s"} → ${draftPath}`);
+      console.log("Read it, keep the rules you want, then move it to CLAUDE.md (or AGENTS.md) in your project root.");
+      console.log("It's a draft only — nothing is enforced until you move it into place and run `rulereceipt`.");
+      return;
+    }
     console.log(
       buildInitGuidance({
         hasClaudeMd: existsSync(join(cwd, "CLAUDE.md")),
@@ -1295,17 +1318,25 @@ program
 
 async function runHistory(opts: { days?: string }): Promise<void> {
   const cwd = process.cwd();
+  const parsedDays = Number.parseInt(opts.days ?? "30", 10);
+  const days = Number.isFinite(parsedDays) && parsedDays > 0 ? parsedDays : 30;
   const rules = loadRules(cwd);
   if (rules.length === 0) {
-    console.log(
-      "No rules file found for this project (checked CLAUDE.md / AGENTS.md and every ~/.claude*/CLAUDE.md).\n" +
-        "Add a CLAUDE.md or AGENTS.md with the rules you want checked, then run `rulereceipt` again.\n" +
-        "To score a rules file you already have: rulereceipt audit"
-    );
+    // No rules to judge against — but we can still show what the agent DID, so a
+    // first-time user sees something true about their own work.
+    const obs = observeSessions(cwd, days);
+    if (obs.sessions === 0) {
+      console.log(
+        "No rules file and no coding-agent sessions found for this project yet.\n" +
+          "Run Claude Code (or Codex) here, then `rulereceipt` shows what it did — or `rulereceipt demo` for a sample.\n" +
+          "To score a rules file you already have: rulereceipt audit"
+      );
+    } else {
+      console.log(renderNoRules(obs, basename(cwd) || "this project"));
+    }
     return;
   }
-  const days = Number.parseInt(opts.days ?? "30", 10);
-  const summary = await scanHistory(cwd, rules, Number.isFinite(days) && days > 0 ? days : 30);
+  const summary = await scanHistory(cwd, rules, days);
   console.log(renderHistory(summary, basename(cwd) || "this project"));
 }
 
