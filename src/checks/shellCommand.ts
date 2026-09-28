@@ -105,3 +105,20 @@ export function leadingCommand(segment: string): string {
 export function withoutCommitMessage(command: string): string {
   return command.replace(/(-m|--message)(=|\s+)(['"])(?:\\.|(?!\3)[\s\S])*\3/g, "$1 <message>");
 }
+
+/**
+ * Blanks out quoted-string CONTENTS and drops #-comments, so a command MENTION
+ * inside a quote or a comment is not read as the command running.
+ *
+ * Found 2026-09-28: `echo "git push"` and `cat notes.md # git push` were both
+ * flagged as an unapproved push, because the matcher saw "git push" anywhere in
+ * the string. Blanking quote contents keeps the real verb visible (`git commit
+ * -m "msg"` still reads as a commit) while removing the mention. Use this only
+ * where a MENTION must not count as an action; checks that need the quoted text
+ * (attribution's commit-message trailer) must not use it.
+ */
+export function withoutQuotedMentions(command: string): string {
+  const noQuotes = command.replace(/'[^']*'/g, "''").replace(/"[^"]*"/g, '""');
+  // A `#` that begins a word (start or after whitespace) starts a comment.
+  return noQuotes.replace(/(^|\s)#[^\n]*/g, "$1");
+}

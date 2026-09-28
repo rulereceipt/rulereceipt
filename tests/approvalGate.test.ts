@@ -178,3 +178,19 @@ describe("guard asks before an unapproved gated action", async () => {
     expect(guardDecision(dir, "Bash", { command: "npm test" }, []).ask).toBeFalsy();
   });
 });
+
+describe("mentions are not actions (false-positive fix, 2026-09-28)", () => {
+  const PUSH = "Never push without explicit user instruction.";
+  it("a quoted mention of git push is NOT a push", () => {
+    const [r] = runApprovalGateChecks(cls(PUSH), [bashIn('echo "git push"', "bypassPermissions")]);
+    expect(r.status).not.toBe("FAIL");
+  });
+  it("git push in a shell comment is NOT a push", () => {
+    const [r] = runApprovalGateChecks(cls(PUSH), [bashIn("cat notes.md # git push", "bypassPermissions")]);
+    expect(r.status).not.toBe("FAIL");
+  });
+  it("a real git push is still caught", () => {
+    const [r] = runApprovalGateChecks(cls(PUSH), [bashIn("git push --force-with-lease", "bypassPermissions")]);
+    expect(r.status).toBe("FAIL");
+  });
+});
