@@ -49,6 +49,17 @@ showing you exactly what it will add and asking. `protect --undo` restores the
 file byte-for-byte. It's the only place RuleReceipt writes settings, and only
 with your yes.
 
+To share the result:
+
+```bash
+npx rulereceipt card
+```
+
+Writes a small SVG summary and prints ready-to-post links for X, LinkedIn,
+Bluesky and Reddit, plus copy-text for Slack or a PR. It carries **counts
+only** — no code, paths, or rule text (add rule names to the copy-text with
+`--show-rules`). Nothing is posted for you and nothing is uploaded.
+
 ## Status
 
 Published and live on npm, actively developed.

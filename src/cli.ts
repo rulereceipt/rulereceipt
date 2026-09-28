@@ -18,6 +18,7 @@ import { buildWrongReport, findTarget } from "./wrong.js";
 import { detectSelfEditedRuleFiles } from "./checks/selfEditedRules.js";
 import { scanHistory, renderHistory } from "./historyReport.js";
 import { planProtect, applyProtect, undoProtect } from "./protect.js";
+import { cardSvg, renderCardShare, type CardData } from "./card.js";
 import { createInterface } from "node:readline";
 import { loadOverrides, saveOverride, clearOverride, staleOverrides, ruleFingerprint, OVERRIDES_PATH } from "./overrides.js";
 import { runHook } from "./hook.js";
@@ -1243,6 +1244,43 @@ program
     console.log(`\nDone — added to ${plan.settingsPath}. Start a NEW Claude Code session so the hooks load.`);
     console.log("The hooks call `rulereceipt` on your PATH (install once with `npm i -g rulereceipt`); they fail open if it's missing.");
     console.log("Undo:  rulereceipt protect --undo");
+  });
+
+program
+  .command("card")
+  .description(
+    "Make a shareable image and pre-filled share links from your last 30 days of sessions — counts only, no code, paths or rule text (add rule names to the copy-text with --show-rules). Saves an SVG locally and prints X/LinkedIn/Bluesky/Reddit compose links. Nothing is posted and nothing is uploaded."
+  )
+  .option("--out <path>", "where to write the SVG card", "rulereceipt-card.svg")
+  .option("--show-rules", "include the broken rule names in the copy-text (never in the image)")
+  .option("--days <n>", "how many days back to summarize", "30")
+  .action(async (opts: { out?: string; showRules?: boolean; days?: string }) => {
+    const cwd = process.cwd();
+    const rules = loadRules(cwd);
+    if (rules.length === 0) {
+      console.log("No rules file found for this project, so there's nothing to summarize. Add a CLAUDE.md or AGENTS.md first.");
+      process.exitCode = 1;
+      return;
+    }
+    const days = Number.parseInt(opts.days ?? "30", 10);
+    const s = await scanHistory(cwd, rules, Number.isFinite(days) && days > 0 ? days : 30);
+    if (s.sessionsScanned === 0) {
+      console.log("No sessions found for this project in the window, so there's nothing to put on a card yet. Run your agent here, then try again.");
+      process.exitCode = 1;
+      return;
+    }
+    const data: CardData = {
+      broken: s.totalBrokenCount,
+      followed: s.followedRules,
+      judgment: s.judgmentRules,
+      sessions: s.sessionsScanned,
+      days: s.days,
+      who: s.tools.length === 1 && s.tools[0] === "claude-code" ? "Claude" : "the agent",
+      brokenTitles: s.breaks.map((b) => b.ruleTitle),
+    };
+    const outPath = resolve(cwd, opts.out ?? "rulereceipt-card.svg");
+    writeFileSync(outPath, cardSvg(data));
+    console.log(renderCardShare(data, outPath, Boolean(opts.showRules)));
   });
 
 program
