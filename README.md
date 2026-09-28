@@ -431,6 +431,12 @@ npx tsx src/cli.ts demo
 
 ## Trust, privacy and licensing
 
+**Verify it yourself.** `npx rulereceipt selftest` runs a set of bundled
+golden fixtures on your machine and reports how many verdicts are correct, with
+**zero network calls** — watch it with `lsof` or Little Snitch if you like. The
+same fixtures are the project's regression suite, so "all correct" is a promise
+the build enforces, not a claim.
+
 **What it can't see, it says so.** [KNOWN-GAPS.md](KNOWN-GAPS.md) lists
 exactly where the evidence runs out — commands in another terminal, clicks on
 the permission prompt, `rm`/delete not bound to a rule's subject, edited
