@@ -6,6 +6,8 @@ import { runGitBranchPolicyChecks } from "./checks/gitBranchPolicy.js";
 import { runAttributionChecks } from "./checks/attribution.js";
 import { loadOverrides, ruleFingerprint, ratifiedForbids } from "./overrides.js";
 import { commandRunsLiteral } from "./checks/proposedAction.js";
+import { approvalOccurrences } from "./checks/approvalGate.js";
+import { readTranscriptFromFile } from "./parsers/transcriptParser.js";
 import type { CheckResult, Rule, TranscriptEvent } from "./types.js";
 
 interface PreToolUseInput {
@@ -14,6 +16,7 @@ interface PreToolUseInput {
   tool_input?: Record<string, unknown>;
   hook_event_name?: string;
   permission_mode?: string;
+  transcript_path?: string;
 }
 
 function readStdin(): Promise<string> {
@@ -209,6 +212,33 @@ export interface GuardDecision {
   reason: string;
   /** The rules that would refuse it, empty when allowed. */
   blocks: Block[];
+  /**
+   * Set when a "never push/commit/open a PR without asking" rule covers this
+   * call and nothing in the session approved it: the hook answers "ask", so
+   * Claude Code shows the permission prompt even for an allow-listed command.
+   * Asking, not refusing: the rule says the user decides, so the user gets the
+   * button. Added 2026-09-28.
+   */
+  ask?: string;
+}
+
+/**
+ * The approval half of the guard. Uses the same per-action logic as the report
+ * (approvalOccurrences) so the two can never disagree: the proposed call is
+ * appended to the session as if no prompt were possible, and if the report
+ * would call it unapproved, the guard asks.
+ */
+function approvalAsk(cwd: string, command: string, events: TranscriptEvent[]): string {
+  const gates = classifyRules(loadRules(cwd)).filter((c) => c.kind === "approvalGate") as Array<{ rule: Rule; actions: string[] }>;
+  for (const { rule, actions } of gates) {
+    const proposed: TranscriptEvent = { role: "assistant", kind: "tool_use", toolName: "Bash", input: { command }, timestamp: "", permissionMode: "dontAsk" };
+    const occ = approvalOccurrences([...events, proposed], actions as never);
+    const last = occ[occ.length - 1];
+    if (last && last.command === command.replace(/\s+/g, " ").trim().slice(0, 80) && last.verdict !== "approved") {
+      return `RuleReceipt: your rule "${rule.title.slice(0, 120)}" needs your OK for this ${last.action}, and nothing in this session approved it yet.`;
+    }
+  }
+  return "";
 }
 
 /**
@@ -225,7 +255,8 @@ export interface GuardDecision {
 export function guardDecision(
   cwd: string,
   toolName: string,
-  toolInput: { command?: unknown } & Record<string, unknown>
+  toolInput: { command?: unknown } & Record<string, unknown>,
+  events: TranscriptEvent[] = []
 ): GuardDecision {
   const allow: GuardDecision = { deny: false, reason: "", blocks: [] };
   if (loadRules(cwd).length === 0) return allow;
@@ -247,8 +278,12 @@ export function guardDecision(
     return allow;
   }
 
-  if (blocks.length === 0) return allow;
-  return { deny: true, reason: reason(blocks), blocks };
+  if (blocks.length > 0) return { deny: true, reason: reason(blocks), blocks };
+  if (toolName === "Bash" && typeof toolInput.command === "string") {
+    const ask = approvalAsk(cwd, toolInput.command, events);
+    if (ask) return { deny: false, reason: "", blocks: [], ask };
+  }
+  return allow;
 }
 
 export async function runGuard(): Promise<void> {
@@ -263,7 +298,21 @@ export async function runGuard(): Promise<void> {
     const tool = input.tool_name ?? "";
     const toolInput = input.tool_input ?? {};
 
-    const decision = guardDecision(cwd, tool, toolInput);
+    let events: TranscriptEvent[] = [];
+    if (input.transcript_path) {
+      try {
+        events = readTranscriptFromFile(input.transcript_path);
+      } catch {
+        /* unreadable: judge the call on its own, which can only ask more, never less */
+      }
+    }
+    const decision = guardDecision(cwd, tool, toolInput, events);
+    if (!decision.deny && decision.ask) {
+      // "ask" is not a refusal: no exit 2. Claude Code shows its permission
+      // prompt with this reason; the user's click decides.
+      process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "ask", permissionDecisionReason: decision.ask } }));
+      return;
+    }
     if (!decision.deny) return allow();
 
     const why = decision.reason;

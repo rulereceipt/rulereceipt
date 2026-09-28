@@ -40,7 +40,7 @@ function run(args: string[]): { out: string; ok: boolean } {
 
 // Every command registered in cli.ts. Adding a command here is the point:
 // a new subcommand that isn't routable should fail this suite.
-const COMMANDS = ["check", "doctor", "lint", "digest", "config", "demo", "verify"];
+const COMMANDS = ["check", "audit", "rules", "init", "report", "doctor", "lint", "digest", "config", "demo", "verify"];
 
 describe("every subcommand is reachable, not swallowed by the default command", () => {
   for (const cmd of COMMANDS) {
@@ -158,5 +158,112 @@ describe("exit codes", () => {
     } finally {
       rmSync(u, { recursive: true, force: true });
     }
+  });
+});
+
+/**
+ * Cold-start smoke states — the first thing a stranger does after `npx`.
+ *
+ * The whole promise on the launch checklist is that a cold install never
+ * embarrasses us: no rules file, an empty rules file, no session — none of
+ * these may throw a stack trace, and each must tell the user the next
+ * command to run. A crash on the very first command is the worst possible
+ * first impression for a tool whose entire pitch is "trust me, I don't lie."
+ *
+ * HOME is redirected to an empty dir so the machine's real global
+ * ~/.claude/CLAUDE.md can't leak in and make an "empty" project look
+ * populated — the exact confusion that made a hand-run of these look fine
+ * while proving nothing. A stack trace is detected structurally (a Node
+ * "    at <frame>" line), not by matching any one message, so reworded copy
+ * doesn't silently disable the guard.
+ */
+describe("cold-start smoke states never crash and always name the next step", () => {
+  const home = mkdtempSync(join(tmpdir(), "rr-smoke-home-"));
+
+  afterAll(() => rmSync(home, { recursive: true, force: true }));
+
+  /** Runs the built CLI with an isolated HOME; returns output + exit code. */
+  function cold(args: string[], cwd: string): { out: string; code: number } {
+    try {
+      const out = execFileSync("node", [CLI, ...args], {
+        cwd,
+        encoding: "utf-8",
+        stdio: ["ignore", "pipe", "pipe"],
+        env: { ...process.env, HOME: home, USERPROFILE: home },
+      });
+      return { out, code: 0 };
+    } catch (err) {
+      const e = err as { stdout?: string; stderr?: string; status?: number };
+      return { out: `${e.stdout ?? ""}${e.stderr ?? ""}`, code: e.status ?? -1 };
+    }
+  }
+
+  const noStackTrace = (out: string) => expect(out).not.toMatch(/^\s+at\s+.+:\d+:\d+/m);
+
+  it("audit in an empty project: exit 0, says where rules go, no stack trace", () => {
+    const d = mkdtempSync(join(tmpdir(), "rr-smoke-empty-"));
+    const { out, code } = cold(["audit"], d);
+    rmSync(d, { recursive: true, force: true });
+    expect(code).toBe(0);
+    expect(out.toLowerCase()).toContain("no rules file found");
+    expect(out).toMatch(/CLAUDE\.md|AGENTS\.md/);
+    noStackTrace(out);
+  });
+
+  it("audit --json in an empty project: exit 0, valid zero JSON", () => {
+    const d = mkdtempSync(join(tmpdir(), "rr-smoke-json-"));
+    const { out, code } = cold(["audit", "--json"], d);
+    rmSync(d, { recursive: true, force: true });
+    expect(code).toBe(0);
+    const parsed = JSON.parse(out);
+    expect(parsed.total).toBe(0);
+    expect(parsed.checkable).toBe(0);
+  });
+
+  it("audit with an empty CLAUDE.md: exit 0, no stack trace", () => {
+    const d = mkdtempSync(join(tmpdir(), "rr-smoke-emptyfile-"));
+    writeFileSync(join(d, "CLAUDE.md"), "");
+    const { out, code } = cold(["audit"], d);
+    rmSync(d, { recursive: true, force: true });
+    expect(code).toBe(0);
+    expect(out.toLowerCase()).toMatch(/0 rules|no rules in it|none parsed/);
+    noStackTrace(out);
+  });
+
+  it("check with no rules and no session: exit 0, names the next step", () => {
+    const d = mkdtempSync(join(tmpdir(), "rr-smoke-nocheck-"));
+    const { out, code } = cold(["check"], d);
+    rmSync(d, { recursive: true, force: true });
+    expect(code).toBe(0);
+    expect(out.toLowerCase()).toMatch(/nothing to check|no claude\.md|add rules/);
+    noStackTrace(out);
+  });
+
+  it("check with rules present but no session: exit 0, tells them to run a session first", () => {
+    const d = mkdtempSync(join(tmpdir(), "rr-smoke-nosession-"));
+    writeFileSync(join(d, "CLAUDE.md"), "## 1. Never push to `main`\n- Always run `npm test`\n");
+    const { out, code } = cold(["check"], d);
+    rmSync(d, { recursive: true, force: true });
+    expect(code).toBe(0);
+    expect(out.toLowerCase()).toContain("no coding-agent session");
+    noStackTrace(out);
+  });
+
+  it("check --require-session with no session: exit 1 (documented), no stack trace", () => {
+    const d = mkdtempSync(join(tmpdir(), "rr-smoke-require-"));
+    writeFileSync(join(d, "CLAUDE.md"), "## 1. Never push to `main`\n");
+    const { out, code } = cold(["check", "--require-session"], d);
+    rmSync(d, { recursive: true, force: true });
+    expect(code).toBe(1);
+    noStackTrace(out);
+  });
+
+  it("demo needs no setup: exit 0, prints sample output, no stack trace", () => {
+    const d = mkdtempSync(join(tmpdir(), "rr-smoke-demo-"));
+    const { out, code } = cold(["demo"], d);
+    rmSync(d, { recursive: true, force: true });
+    expect(code).toBe(0);
+    expect(out.toLowerCase()).toContain("sample output");
+    noStackTrace(out);
   });
 });

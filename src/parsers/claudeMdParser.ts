@@ -64,6 +64,25 @@ const SETEXT_H2_UNDERLINE = /^-{2,}\s*$/;
  */
 const FENCE_LINE = /^\s*(`{3,}|~{3,})/;
 
+/**
+ * Removes HTML comments (`<!-- … -->`, possibly multi-line) from a rules file.
+ *
+ * whyrule / AgentLint, 2026-09-28: instructions inside an HTML comment are
+ * ignored by the agent, so a commented-out "rule" never loads. Parsing it as a
+ * rule would check the session against something Claude never saw — a false
+ * accusation. Fenced (``` / ~~~) and inline (`…`) code are masked first, so a
+ * comment shown as a sample survives; only real comments are dropped.
+ */
+function stripHtmlComments(raw: string): string {
+  const spans: string[] = [];
+  const masked = raw.replace(/```[\s\S]*?```|~~~[\s\S]*?~~~|`[^`\n]*`/g, (m) => {
+    spans.push(m);
+    return `\u0000CODE${spans.length - 1}\u0000`;
+  });
+  const stripped = masked.replace(/<!--[\s\S]*?-->/g, "");
+  return stripped.replace(/\u0000CODE(\d+)\u0000/g, (_, i) => spans[Number(i)]);
+}
+
 function normalizeSetextHeaders(lines: string[]): string[] {
   const out = [...lines];
   // Fence-aware for the same reason as the main pass: a row of dashes inside
@@ -115,7 +134,7 @@ function normalizeSetextHeaders(lines: string[]): string[] {
  * this function or in classify.ts touches Node APIs; keep it that way.
  */
 export function parseClaudeMdText(raw: string, source: "global" | "project"): Rule[] {
-  const lines = normalizeSetextHeaders(raw.split("\n"));
+  const lines = normalizeSetextHeaders(stripHtmlComments(raw).split("\n"));
   const rules: Rule[] = [];
 
   // `current` accumulates a numbered-header rule, a bold-rule-header rule,

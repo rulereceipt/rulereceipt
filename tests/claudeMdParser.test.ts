@@ -282,3 +282,29 @@ describe("parseClaudeMd against a file mixing numbered-header rules and plain-he
     }
   });
 });
+
+// whyrule/AgentLint finding (2026-09-28): instructions inside HTML comments are
+// ignored by the agent, so a commented-out "rule" must NOT be parsed as one —
+// otherwise we'd check a rule Claude never saw (a false-positive source).
+describe("HTML comments are not rules", () => {
+  it("drops a commented-out rule but keeps real rules and code samples", () => {
+    const md = [
+      "# Rules",
+      "",
+      "<!-- ## 1. Never push to `main`",
+      "disabled, Claude ignores this -->",
+      "",
+      "## 2. Always run tests",
+      "Run `npm test` before finishing.",
+      "",
+      "## 3. Example",
+      "```html",
+      "<!-- a real HTML comment in a sample stays -->",
+      "```",
+    ].join("\n");
+    const rules = parseClaudeMdText(md, "project");
+    expect(rules.some((r) => /never push to `?main/i.test(r.title + r.text))).toBe(false);
+    expect(rules.some((r) => /run `npm test`/i.test(r.text))).toBe(true);
+    expect(rules.some((r) => /a real HTML comment in a sample stays/.test(r.text))).toBe(true);
+  });
+});

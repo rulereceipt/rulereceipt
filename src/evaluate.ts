@@ -10,8 +10,31 @@ import { runAttributionChecks } from "./checks/attribution.js";
 import { runApprovalGateChecks } from "./checks/approvalGate.js";
 import { runJudgmentChecks } from "./checks/judgmentChecks.js";
 import { touchedPaths, ruleWasLoaded } from "./checks/pathScope.js";
+import { readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
+import { partitionByAge, futureResult } from "./ruleAge.js";
 import { loadOverrides, ruleFingerprint, staleOverrides } from "./overrides.js";
 import type { CheckResult, Rule, TranscriptEvent } from "./types.js";
+
+/**
+ * `permissions.allow` from the Claude Code settings that apply here. A command
+ * on this list runs without a prompt, so a push it covers had no chance of a
+ * human "yes" — the approval check needs that to tell "maybe you clicked yes"
+ * from "nobody was asked". Absent/unreadable files contribute nothing.
+ */
+function claudeAllowList(cwd: string): string[] {
+  const out: string[] = [];
+  for (const p of [join(cwd, ".claude", "settings.json"), join(cwd, ".claude", "settings.local.json"), join(homedir(), ".claude", "settings.json")]) {
+    try {
+      const allow = (JSON.parse(readFileSync(p, "utf-8")) as { permissions?: { allow?: unknown } }).permissions?.allow;
+      if (Array.isArray(allow)) out.push(...allow.filter((x): x is string => typeof x === "string"));
+    } catch {
+      /* absent or unreadable: no allow entries from this file */
+    }
+  }
+  return out;
+}
 
 export interface Evaluation {
   results: CheckResult[];
@@ -41,7 +64,13 @@ export async function evaluateSession(
 ): Promise<Evaluation> {
   const overrides = loadOverrides(cwd);
   const touched = touchedPaths(events);
-  const classified = classifyRules(rules).map((c) => {
+  // A rule cannot have been broken by a session that ran before it existed.
+  // Rules added after the session started (from git history) are reported as
+  // not applicable, never checked. Fails open: no git history means nothing is
+  // set aside. Moved here from `check` 2026-09-28 (the one-engine fix) so the
+  // hook and report apply it too.
+  const { present, future } = partitionByAge(cwd, rules, events);
+  const classified = classifyRules(present).map((c) => {
     const decision = overrides.get(ruleFingerprint(c.rule))?.decision;
     if (!decision) return c;
     if (decision === "notARule") return { kind: "notARule" as const, rule: c.rule };
@@ -79,7 +108,7 @@ export async function evaluateSession(
     ...runClaimEvidenceChecks(of("claimEvidence") as never, events),
     ...runEmojiChecks(of("emojiOutput") as never, events),
     ...runAttributionChecks(of("attribution") as never, events),
-    ...runApprovalGateChecks(of("approvalGate") as never, events),
+    ...runApprovalGateChecks(of("approvalGate") as never, events, { allow: claudeAllowList(cwd) }),
   ];
 
   const judgment = of("judgment");
@@ -88,7 +117,7 @@ export async function evaluateSession(
     : judgment.map(({ rule }) => needsLlmResult(rule));
 
   return {
-    results: [...deterministicResults, ...judgmentResults, ...scopeResults],
+    results: [...deterministicResults, ...judgmentResults, ...scopeResults, ...future.map(futureResult)],
     notARule: of("notARule"),
     stale: staleOverrides(overrides, rules),
   };

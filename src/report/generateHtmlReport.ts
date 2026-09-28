@@ -1,3 +1,4 @@
+import { minimalIssueUrl } from "../wrong.js";
 import { basename } from "node:path";
 import { homedir } from "node:os";
 import type { CheckResult } from "../types.js";
@@ -157,7 +158,7 @@ function countBy(results: CheckResult[], status: CheckResult["status"]): number 
   return results.filter((r) => r.status === status).length;
 }
 
-function renderResultRow(result: CheckResult, all: CheckResult[], hideEvidence: boolean): string {
+function renderResultRow(result: CheckResult, all: CheckResult[], hideEvidence: boolean, version = ""): string {
   const bucket = bucketOf(result);
   const cls = BUCKET_CLASS[bucket];
   const evidence = !hideEvidence && result.evidence
@@ -171,6 +172,9 @@ function renderResultRow(result: CheckResult, all: CheckResult[], hideEvidence: 
           </div>
           <h3 class="result__title">${clean(result.ruleTitle)}</h3>
           ${evidence}
+          ${version && (result.status === "FAIL" || result.status === "PASS")
+            ? `<p class="result__wrong"><a href="${clean(minimalIssueUrl(result, version))}" rel="noopener noreferrer">Verdict wrong? Report it</a> (for the full report, run <code>rulereceipt wrong</code> on the machine that ran the check)</p>`
+            : ""}
         </article>`;
 }
 
@@ -194,7 +198,7 @@ function sharedEvidence(rs: CheckResult[]): string | null {
   return rs.every((r) => r.evidence === first) ? first : null;
 }
 
-function renderSection(bucket: Bucket, results: CheckResult[], all: CheckResult[]): string {
+function renderSection(bucket: Bucket, results: CheckResult[], all: CheckResult[], version = ""): string {
   const inSection = results.filter((r) => bucketOf(r) === bucket);
   if (inSection.length === 0) return "";
   const note =
@@ -208,7 +212,7 @@ function renderSection(bucket: Bucket, results: CheckResult[], all: CheckResult[
         <h2 class="section__title">${clean(BUCKET_LABEL[bucket])} <span class="section__count">${inSection.length}</span></h2>
         ${note}
         ${sharedBlock}
-        ${inSection.map((r) => renderResultRow(r, all, shared !== null)).join("")}
+        ${inSection.map((r) => renderResultRow(r, all, shared !== null, version)).join("")}
       </section>`;
 }
 
@@ -301,6 +305,7 @@ export function generateHtmlReport(results: CheckResult[], meta: HtmlReportMeta)
   .section__shared { font-size: 13px; color: var(--muted); margin: 0 0 14px; padding: 10px 12px; border-left: 2px solid var(--line); background: var(--panel); border-radius: 0 6px 6px 0; white-space: pre-wrap; }
   .result__id { font-size: 12px; color: var(--muted); }
   .result__title { font-size: 15px; margin: 0 0 6px; font-weight: 600; }
+  .result__wrong { margin: 6px 0 0; font-size: 12px; color: var(--muted); }
   .result__evidence { margin: 0; font-size: 14px; color: var(--muted); white-space: pre-wrap; }
   .note { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px 18px; font-size: 13.5px; color: var(--muted); }
   .note h2 { font-size: 13px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--ink); margin: 0 0 10px; }
@@ -340,7 +345,7 @@ export function generateHtmlReport(results: CheckResult[], meta: HtmlReportMeta)
     <tr><th>Tool version</th><td><code>rulereceipt ${clean(meta.toolVersion)}</code></td></tr>
   </table>
 
-${BUCKET_ORDER.map((b) => renderSection(b, results, results)).join("")}
+${BUCKET_ORDER.map((b) => renderSection(b, results, results, meta.toolVersion)).join("")}
 
   <div class="note">
     <h2>How to read this report</h2>

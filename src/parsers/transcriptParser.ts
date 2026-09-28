@@ -141,6 +141,17 @@ export function parseLine(line: string): TranscriptEvent[] {
       for (const block of content) {
         if (typeof block !== "object" || block === null) continue;
         const b = block as Record<string, unknown>;
+        // User text sent as blocks (VS Code / IDE extension, or any message with
+        // an image) was dropped until 2026-09-28: in real sessions whole
+        // conversations had no user message at all, so every check that reads
+        // what the user said saw nothing. Harness-injected context wrapped in
+        // tags (<ide_opened_file>, <system-reminder>, …) is not the user
+        // speaking and is stripped; what remains is.
+        if (b.type === "text" && typeof b.text === "string") {
+          const said = b.text.replace(/<([a-z][\w-]*)>[\s\S]*?<\/\1>/gi, "").trim();
+          if (said.length > 0) events.push({ role: "user", kind: "text", text: said, timestamp });
+          continue;
+        }
         if (b.type === "tool_result") {
           events.push({
             role: "user",
@@ -167,10 +178,21 @@ export function parseLine(line: string): TranscriptEvent[] {
 export function readTranscriptFromFile(filePath: string): TranscriptEvent[] {
   const raw = readFileSync(filePath, "utf-8");
   const events: TranscriptEvent[] = [];
+  // Permission mode is recorded on user turns (and on `permission-mode` entries
+  // in newer versions); it applies to the tool calls that follow. The approval
+  // check needs it to tell "a prompt may have been approved" (default/
+  // acceptEdits/plan) from "no person was asked" (bypassPermissions/dontAsk/auto).
+  let mode: string | undefined;
   for (const line of raw.split("\n")) {
     if (!line.trim()) continue;
     try {
-      events.push(...parseLine(line));
+      const m =
+        line.match(/"(?:permissionMode|permission_mode)":"([A-Za-z]+)"/) ??
+        (line.includes('"permission-mode"') ? line.match(/"mode":"([A-Za-z]+)"/) : null);
+      if (m) mode = m[1];
+      const parsed = parseLine(line);
+      if (mode) for (const e of parsed) if (e.kind === "tool_use") e.permissionMode = mode;
+      events.push(...parsed);
     } catch {
       // One malformed/unexpected line must not crash the whole check —
       // skip it and keep going, same fail-closed principle as everywhere else.

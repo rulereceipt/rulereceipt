@@ -37,6 +37,14 @@ export interface TranscriptToolUseEvent {
    * the test run that a completion claim depended on.
    */
   toolUseId?: string;
+  /**
+   * The Claude Code permission mode in force when this call was made, when the
+   * transcript records one (`permissionMode` on user turns). Added 2026-09-28
+   * for the approval check: in `default`/`acceptEdits`/`plan` a shell command
+   * may have been approved in the permission prompt, which leaves no trace in
+   * the transcript; in `bypassPermissions`/`dontAsk`/`auto` no person was asked.
+   */
+  permissionMode?: string;
 }
 
 export interface TranscriptToolResultEvent {

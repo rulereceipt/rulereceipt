@@ -289,6 +289,23 @@ independently confirm it describes the session it claims to.
 Nothing is uploaded. The file is written to your working directory and
 goes wherever you choose to send it.
 
+## A verdict looks wrong?
+
+```bash
+npx rulereceipt wrong <rule-handle>
+```
+
+Builds a report of that rule, the verdict, how it was decided and the
+session lines around it, with obvious secrets, your home path and email
+addresses masked. It is saved to `.rulereceipt/wrong-<handle>.md` and
+printed so you can read and edit it, along with a link to a pre-filled
+GitHub issue that you open yourself. Nothing is sent. `check` prints the
+command after every report that has a decided verdict, and the HTML report
+has a "Verdict wrong?" link on each one that carries only the version and
+the verdict, never the rule or the evidence.
+
+Every accuracy fix in this project has come from a report like this.
+
 ## Exit codes
 
 `check` exits **1** when a rule was actually broken, and **0** otherwise,
@@ -378,6 +395,13 @@ npx tsx src/cli.ts demo
 ```
 
 ## Trust, privacy and licensing
+
+**What it can't see, it says so.** [KNOWN-GAPS.md](KNOWN-GAPS.md) lists
+exactly where the evidence runs out — commands in another terminal, clicks on
+the permission prompt, `rm`/delete not bound to a rule's subject, edited
+transcripts, IDE sessions without logs. When RuleReceipt hits one of those it
+reports "Can't tell", never a guess. Gaps we know about are safer than gaps we
+don't.
 
 **Nothing leaves your machine unless you ask.** Your code, rules, and
 session content never leave your computer, ever. Plain `rulereceipt check`
