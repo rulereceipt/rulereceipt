@@ -6,9 +6,40 @@ import { runGitBranchPolicyChecks } from "./checks/gitBranchPolicy.js";
 import { runAttributionChecks } from "./checks/attribution.js";
 import { loadOverrides, ruleFingerprint, ratifiedForbids } from "./overrides.js";
 import { commandRunsLiteral } from "./checks/proposedAction.js";
-import { approvalOccurrences } from "./checks/approvalGate.js";
+import { approvalOccurrences, allowListed } from "./checks/approvalGate.js";
 import { readTranscriptFromFile } from "./parsers/transcriptParser.js";
+import { readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import type { CheckResult, Rule, TranscriptEvent } from "./types.js";
+
+/**
+ * Modes where Claude Code shows NO permission prompt, so a hook's "ask" is
+ * ignored and the call just runs (Claude Code #89561; "ask" also drops bypass
+ * mode, #37420; headless silently denies, #95726). In these the only thing that
+ * actually stops an unapproved gated action is a real deny.
+ */
+const NO_PROMPT_MODES = new Set(["bypassPermissions", "auto", "dontAsk"]);
+
+/**
+ * `permissions.deny` from the Claude Code settings that apply here. If the user
+ * already denies a command, the guard must NOT answer "ask" for it — an "ask"
+ * can switch a deny off and let the command run with no prompt (Claude Code
+ * #39344). So a command the user denies is left entirely to Claude Code's own
+ * deny; the guard stands aside.
+ */
+function claudeDenyList(cwd: string): string[] {
+  const out: string[] = [];
+  for (const p of [join(cwd, ".claude", "settings.json"), join(cwd, ".claude", "settings.local.json"), join(homedir(), ".claude", "settings.json")]) {
+    try {
+      const deny = (JSON.parse(readFileSync(p, "utf-8")) as { permissions?: { deny?: unknown } }).permissions?.deny;
+      if (Array.isArray(deny)) out.push(...deny.filter((x): x is string => typeof x === "string"));
+    } catch {
+      /* absent or unreadable */
+    }
+  }
+  return out;
+}
 
 interface PreToolUseInput {
   cwd?: string;
@@ -226,19 +257,20 @@ export interface GuardDecision {
  * The approval half of the guard. Uses the same per-action logic as the report
  * (approvalOccurrences) so the two can never disagree: the proposed call is
  * appended to the session as if no prompt were possible, and if the report
- * would call it unapproved, the guard asks.
+ * would call it unapproved, this returns the rule and action so the caller can
+ * decide — by the current permission mode — whether to ask or to deny.
  */
-function approvalAsk(cwd: string, command: string, events: TranscriptEvent[]): string {
+function unapprovedGate(cwd: string, command: string, events: TranscriptEvent[]): { rule: Rule; action: string } | null {
   const gates = classifyRules(loadRules(cwd)).filter((c) => c.kind === "approvalGate") as Array<{ rule: Rule; actions: string[] }>;
   for (const { rule, actions } of gates) {
     const proposed: TranscriptEvent = { role: "assistant", kind: "tool_use", toolName: "Bash", input: { command }, timestamp: "", permissionMode: "dontAsk" };
     const occ = approvalOccurrences([...events, proposed], actions as never);
     const last = occ[occ.length - 1];
     if (last && last.command === command.replace(/\s+/g, " ").trim().slice(0, 80) && last.verdict !== "approved") {
-      return `RuleReceipt: your rule "${rule.title.slice(0, 120)}" needs your OK for this ${last.action}, and nothing in this session approved it yet.`;
+      return { rule, action: last.action };
     }
   }
-  return "";
+  return null;
 }
 
 /**
@@ -256,7 +288,8 @@ export function guardDecision(
   cwd: string,
   toolName: string,
   toolInput: { command?: unknown } & Record<string, unknown>,
-  events: TranscriptEvent[] = []
+  events: TranscriptEvent[] = [],
+  permissionMode?: string
 ): GuardDecision {
   const allow: GuardDecision = { deny: false, reason: "", blocks: [] };
   if (loadRules(cwd).length === 0) return allow;
@@ -279,9 +312,37 @@ export function guardDecision(
   }
 
   if (blocks.length > 0) return { deny: true, reason: reason(blocks), blocks };
+
+  // Approval gates ("never push/commit without asking"). What we answer depends
+  // on the permission mode, because a hook's "ask" is only honoured in the modes
+  // that actually show a prompt (Claude Code #89561/#37420/#95726):
+  //   - the user already DENIES this command   -> stand aside (never weaken a
+  //     deny with an "ask", #39344); Claude Code's own deny handles it.
+  //   - no-prompt mode (bypass/auto/dontAsk) or headless -> real DENY with a
+  //     reason, because "ask" is ignored there and would let the push run. The
+  //     per-action check clears it after the user says yes in chat and it retries.
+  //   - default/acceptEdits/plan (or unknown) -> "ask": the prompt appears and
+  //     the user decides. Unknown modes ask rather than deny so we never wrongly
+  //     block a legitimate action.
   if (toolName === "Bash" && typeof toolInput.command === "string") {
-    const ask = approvalAsk(cwd, toolInput.command, events);
-    if (ask) return { deny: false, reason: "", blocks: [], ask };
+    const gate = unapprovedGate(cwd, toolInput.command, events);
+    if (gate) {
+      if (allowListed(toolInput.command, claudeDenyList(cwd))) return allow;
+      const title = gate.rule.title.slice(0, 120);
+      if (permissionMode && NO_PROMPT_MODES.has(permissionMode)) {
+        return {
+          deny: true,
+          reason: `RuleReceipt: your rule "${title}" needs your OK for this ${gate.action}. Claude Code does not show a prompt in ${permissionMode} mode, so this call is stopped. Ask the user in the chat; after they say yes, run it again.`,
+          blocks: [{ rule: gate.rule, why: `${gate.action} with no approval, and no prompt would be shown in ${permissionMode} mode` }],
+        };
+      }
+      return {
+        deny: false,
+        reason: "",
+        blocks: [],
+        ask: `RuleReceipt: your rule "${title}" needs your OK for this ${gate.action}, and nothing in this session approved it yet.`,
+      };
+    }
   }
   return allow;
 }
@@ -306,7 +367,7 @@ export async function runGuard(): Promise<void> {
         /* unreadable: judge the call on its own, which can only ask more, never less */
       }
     }
-    const decision = guardDecision(cwd, tool, toolInput, events);
+    const decision = guardDecision(cwd, tool, toolInput, events, input.permission_mode);
     if (!decision.deny && decision.ask) {
       // "ask" is not a refusal: no exit 2. Claude Code shows its permission
       // prompt with this reason; the user's click decides.

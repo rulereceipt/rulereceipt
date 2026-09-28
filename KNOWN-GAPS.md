@@ -97,17 +97,17 @@ For agents without a readable session log, RuleReceipt can audit the rules file
   broken hook stops protecting you without blocking anything.
 - The guard blocks only rules it can check for certain (branches, files, commands you
   marked with `rules --forbid`). Everything else is reported afterwards, not blocked.
-- For "never push without asking", the guard answers **ask**, so Claude Code shows its
-  permission prompt. Important platform caveat (Claude Code's own issue tracker, checked
-  2026-09-28): a hook's **"ask" is ignored in `bypassPermissions`/`auto`/`dontAsk` modes** —
-  the call just runs (#89561) — and an "ask" is silently denied in headless `claude -p`
-  (#95726). So in exactly the modes where nobody is asked, the guard's "ask" does **not** stop
-  the action today. An "ask" can also interact badly with a user's own `permissions.deny`
-  (#39344). Until the guard is made permission-mode-aware (planned, next release: "ask" only in
-  default/acceptEdits/plan and never over a deny rule; a clear **deny**-with-reason in
-  no-prompt modes so the per-action check can let a retry through after the user says yes in
-  chat), treat live blocking of an unapproved push as reliable **only in default/acceptEdits/
-  plan mode**. The after-the-fact `check` verdict is unaffected.
+- For "never push without asking", the guard is **permission-mode aware** (Claude Code's hook
+  "ask" is only honoured in modes that show a prompt): in `default`/`acceptEdits`/`plan` it
+  answers **ask** so the prompt appears; in `bypassPermissions`/`auto`/`dontAsk` — where a
+  hook's "ask" is ignored and the call would just run (Claude Code #89561/#37420) — it answers
+  a real **deny** with a reason ("ask the user in chat, then retry"), and the per-action check
+  lets the retry through once the user says yes. It **never** answers over a command the user
+  already denies in `permissions.deny` (#39344) — it stands aside and lets Claude Code's own
+  deny hold. Remaining caveat: **headless** `claude -p` silently denies any hook decision
+  (#95726), and the hook input does not reliably signal headless, so live blocking there is not
+  guaranteed; and on Windows hooks run through bash (#79356). The after-the-fact `check` verdict
+  is unaffected by any of this.
 - An agent with shell access can edit your settings to remove the hooks. RuleReceipt does
   not yet detect this during the session.
 

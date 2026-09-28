@@ -221,3 +221,83 @@ describe("guard never claims a block that did not happen", () => {
     expect(allowed.reason).toBe("");
   });
 });
+
+/**
+ * The guard is permission-mode aware (0.1.62, from Claude Code's hook bugs).
+ *
+ * A hook's "ask" is only honoured in modes that show a prompt. In
+ * bypassPermissions/auto/dontAsk it is ignored and the call runs (#89561), so
+ * for an unapproved gated action the guard must DENY there instead. It must
+ * also never answer "ask" for a command the user already DENIES (#39344): an
+ * "ask" can switch the deny off. Default/acceptEdits/plan still ask.
+ */
+describe("guard approval is permission-mode aware", () => {
+  function repoWith(rule: string, denyList?: string[]): string {
+    const dir = mkdtempSync(join(tmpdir(), "rr-mode-"));
+    mkdirSync(join(dir, ".git"));
+    writeFileSync(join(dir, "CLAUDE.md"), rule);
+    if (denyList) {
+      mkdirSync(join(dir, ".claude"));
+      writeFileSync(join(dir, ".claude", "settings.json"), JSON.stringify({ permissions: { deny: denyList } }));
+    }
+    return dir;
+  }
+  function decide(dir: string, command: string, mode: string | undefined, events: never[] = []) {
+    const prev = process.env.HOME;
+    const h = mkdtempSync(join(tmpdir(), "rr-mode-h-"));
+    process.env.HOME = h;
+    try {
+      return guardDecision(dir, "Bash", { command }, events, mode);
+    } finally {
+      process.env.HOME = prev;
+      rmSync(h, { recursive: true, force: true });
+    }
+  }
+  const RULE = "- Never push without explicit user instruction.\n";
+
+  it("default mode: an unapproved push ASKS (a prompt appears)", () => {
+    const dir = repoWith(RULE);
+    const d = decide(dir, "git push origin main", "default");
+    rmSync(dir, { recursive: true, force: true });
+    expect(d.deny).toBe(false);
+    expect(d.ask).toContain("needs your OK");
+  });
+
+  it("bypassPermissions mode: an unapproved push is DENIED, because ask is ignored there", () => {
+    const dir = repoWith(RULE);
+    const d = decide(dir, "git push origin main", "bypassPermissions");
+    rmSync(dir, { recursive: true, force: true });
+    expect(d.deny).toBe(true);
+    expect(d.ask).toBeUndefined();
+    expect(d.reason).toContain("bypassPermissions");
+    expect(d.reason).toMatch(/ask the user in the chat/i);
+  });
+
+  for (const mode of ["auto", "dontAsk"]) {
+    it(`${mode} mode: an unapproved push is DENIED`, () => {
+      const dir = repoWith(RULE);
+      const d = decide(dir, "git push origin main", mode);
+      rmSync(dir, { recursive: true, force: true });
+      expect(d.deny).toBe(true);
+    });
+  }
+
+  it("never answers over the user's own deny rule: it stands aside (#39344)", () => {
+    const dir = repoWith(RULE, ["Bash(git push:*)"]);
+    const d = decide(dir, "git push origin main", "default"); // would normally ask
+    rmSync(dir, { recursive: true, force: true });
+    expect(d.deny).toBe(false);
+    expect(d.ask).toBeUndefined(); // let Claude Code's deny handle it, don't weaken it
+  });
+
+  it("an approved push (user said yes in chat) is allowed in every mode", () => {
+    const dir = repoWith(RULE);
+    const yes = [{ role: "user", kind: "text", text: "fix it and push", timestamp: "t" }] as never[];
+    for (const mode of ["default", "bypassPermissions", "auto"]) {
+      const d = decide(dir, "git push origin main", mode, yes);
+      expect(d.deny, mode).toBe(false);
+      expect(d.ask, mode).toBeUndefined();
+    }
+    rmSync(dir, { recursive: true, force: true });
+  });
+});
