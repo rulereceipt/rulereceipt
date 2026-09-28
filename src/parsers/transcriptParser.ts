@@ -1,6 +1,7 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, dirname, basename } from "node:path";
+import { parseTranscriptText } from "./transcriptLine.js";
 import type { TranscriptEvent } from "../types.js";
 
 /**
@@ -88,86 +89,9 @@ export function findLatestSessionFile(cwd: string): string | null {
   return all.length > 0 ? all[0] : null;
 }
 
-function extractToolResultText(content: unknown): string {
-  if (typeof content === "string") return content;
-  if (Array.isArray(content)) {
-    return content
-      .map((part) => (typeof part === "object" && part && "text" in part ? String((part as { text: unknown }).text) : ""))
-      .filter(Boolean)
-      .join("\n");
-  }
-  return "";
-}
-
-export function parseLine(line: string): TranscriptEvent[] {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(line);
-  } catch {
-    return [];
-  }
-
-  // JSON.parse accepts any valid JSON value, not just objects — "null",
-  // "42", "\"a string\"" all parse without throwing. A transcript line is
-  // only ever meaningful as an object; anything else is skipped, not a crash.
-  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-    return [];
-  }
-  const obj = parsed as Record<string, unknown>;
-
-  const timestamp = typeof obj.timestamp === "string" ? obj.timestamp : "";
-  const events: TranscriptEvent[] = [];
-
-  if (obj.type === "assistant" && !obj.isApiErrorMessage) {
-    const message = obj.message as Record<string, unknown> | undefined;
-    const content = message?.content;
-    if (Array.isArray(content)) {
-      for (const block of content) {
-        if (typeof block !== "object" || block === null) continue;
-        const b = block as Record<string, unknown>;
-        if (b.type === "text" && typeof b.text === "string") {
-          events.push({ role: "assistant", kind: "text", text: b.text, timestamp });
-        } else if (b.type === "tool_use" && typeof b.name === "string") {
-          events.push({ role: "assistant", kind: "tool_use", toolName: b.name, input: b.input, timestamp, toolUseId: typeof b.id === "string" ? b.id : undefined });
-        }
-      }
-    }
-  } else if (obj.type === "user") {
-    const message = obj.message as Record<string, unknown> | undefined;
-    const content = message?.content;
-    if (typeof content === "string") {
-      events.push({ role: "user", kind: "text", text: content, timestamp });
-    } else if (Array.isArray(content)) {
-      for (const block of content) {
-        if (typeof block !== "object" || block === null) continue;
-        const b = block as Record<string, unknown>;
-        // User text sent as blocks (VS Code / IDE extension, or any message with
-        // an image) was dropped until 2026-09-28: in real sessions whole
-        // conversations had no user message at all, so every check that reads
-        // what the user said saw nothing. Harness-injected context wrapped in
-        // tags (<ide_opened_file>, <system-reminder>, …) is not the user
-        // speaking and is stripped; what remains is.
-        if (b.type === "text" && typeof b.text === "string") {
-          const said = b.text.replace(/<([a-z][\w-]*)>[\s\S]*?<\/\1>/gi, "").trim();
-          if (said.length > 0) events.push({ role: "user", kind: "text", text: said, timestamp });
-          continue;
-        }
-        if (b.type === "tool_result") {
-          events.push({
-            role: "user",
-            kind: "tool_result",
-            content: extractToolResultText(b.content),
-            isError: b.is_error === true,
-            timestamp,
-            toolUseId: typeof b.tool_use_id === "string" ? b.tool_use_id : undefined,
-          });
-        }
-      }
-    }
-  }
-
-  return events;
-}
+// parseLine (and its permission-mode-tracking wrapper parseTranscriptText) live
+// in transcriptLine.ts — a pure, Node-free module the browser demo also imports.
+export { parseLine } from "./transcriptLine.js";
 
 /**
  * Read the most recently modified session transcript for a project
@@ -176,30 +100,9 @@ export function parseLine(line: string): TranscriptEvent[] {
  * not a failure.
  */
 export function readTranscriptFromFile(filePath: string): TranscriptEvent[] {
-  const raw = readFileSync(filePath, "utf-8");
-  const events: TranscriptEvent[] = [];
-  // Permission mode is recorded on user turns (and on `permission-mode` entries
-  // in newer versions); it applies to the tool calls that follow. The approval
-  // check needs it to tell "a prompt may have been approved" (default/
-  // acceptEdits/plan) from "no person was asked" (bypassPermissions/dontAsk/auto).
-  let mode: string | undefined;
-  for (const line of raw.split("\n")) {
-    if (!line.trim()) continue;
-    try {
-      const m =
-        line.match(/"(?:permissionMode|permission_mode)":"([A-Za-z]+)"/) ??
-        (line.includes('"permission-mode"') ? line.match(/"mode":"([A-Za-z]+)"/) : null);
-      if (m) mode = m[1];
-      const parsed = parseLine(line);
-      if (mode) for (const e of parsed) if (e.kind === "tool_use") e.permissionMode = mode;
-      events.push(...parsed);
-    } catch {
-      // One malformed/unexpected line must not crash the whole check —
-      // skip it and keep going, same fail-closed principle as everywhere else.
-      continue;
-    }
-  }
-  return events;
+  // Pure parsing (including permission-mode tracking) lives in transcriptLine.ts
+  // so the browser demo can run the exact same logic on a dropped file.
+  return parseTranscriptText(readFileSync(filePath, "utf-8"));
 }
 
 /**

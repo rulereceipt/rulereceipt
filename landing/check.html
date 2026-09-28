@@ -137,13 +137,45 @@
     </div>
   </div>
 
+  <style>
+    .sdemo{margin-top:44px;padding-top:36px;border-top:1px solid var(--line-strong);}
+    .dropzone{margin-top:14px;border:1.5px dashed var(--line-strong);border-radius:12px;padding:34px 18px;text-align:center;color:var(--muted,#888);background:var(--panel);cursor:pointer;transition:border-color .15s,background .15s;}
+    .dropzone.over{border-color:#AD4A17;background:rgba(173,74,23,.06);}
+    .dropzone .pick{color:#AD4A17;text-decoration:underline;cursor:pointer;}
+    .dropzone .hint{margin-top:10px;font-size:.8rem;}
+    .srow{margin-top:20px;display:flex;gap:22px;align-items:baseline;flex-wrap:wrap;font-size:1.05rem;}
+    .srow b{font-size:1.6rem;font-weight:700;}
+    .srule{margin-top:10px;padding:11px 13px;border:1px solid var(--line-strong);border-radius:10px;background:var(--panel);}
+    .srule .badge{display:inline-block;min-width:64px;font-family:var(--mono);font-size:.72rem;font-weight:700;letter-spacing:.04em;padding:2px 7px;border-radius:6px;margin-right:10px;}
+    .srule.fail .badge{background:#5a1c18;color:#ffb3ae;}
+    .srule.pass .badge{background:#153a1f;color:#8fe0a5;}
+    .srule.unclear .badge{background:#2a2f36;color:#a9b4c0;}
+    .srule .ev{margin-top:7px;font-size:.82rem;color:var(--muted,#8b949e);font-family:var(--mono);white-space:pre-wrap;word-break:break-word;}
+  </style>
+  <div class="sdemo">
+    <h2 style="font-size:1.35rem;margin:0;">Now drop a real session and see what your agent actually did</h2>
+    <p class="privacy">&#9679; Also entirely in your browser &mdash; the session file is never uploaded. Same checkers as the CLI.</p>
+    <div class="dropzone" id="drop">
+      Drop a Claude Code session <code>.jsonl</code> here, or <label class="pick">choose a file<input type="file" id="sfile" accept=".jsonl,.json" hidden></label>
+      <div class="hint">They live in <code>~/.claude/projects/&lt;project&gt;/*.jsonl</code>. Or <a href="#" id="sexample">try the example session</a>.</div>
+    </div>
+    <div class="out" id="sout" style="display:none;">
+      <div class="srow"><span><b id="s-fail">0</b> broken</span><span><b id="s-pass">0</b> followed</span><span><b id="s-unclear">0</b> can&rsquo;t tell</span></div>
+      <p class="hint" id="s-meta" style="margin-top:8px;"></p>
+      <div id="s-list"></div>
+      <div class="after" style="margin-top:22px;">
+        This is the same check <code>npx rulereceipt check</code> runs locally &mdash; here it ran on your dropped file, in the page, with nothing uploaded.
+      </div>
+    </div>
+  </div>
+
   <div class="foot">
     Context is not waste &mdash; a CLAUDE.md is meant to carry stack, commands and layout, and Claude Code loads all of it. The split matters for a different reason: only instructions can be checked after the fact, and a long file spends attention on both. Same classifier the CLI uses, compiled to run in the page &mdash; so this and the tool agree by construction. It looks for whether a line contains a directive, not for a particular file format. Method and known gaps: <a href="/postmortem">what we got wrong</a>.
   </div>
 </div>
 
 <script type="module">
-  import { analyze, CORPUS } from "/checker.js";
+  import { analyze, CORPUS, checkSessionInBrowser } from "/checker.js";
 
   const $ = (id) => document.getElementById(id);
   const src = $("src"), out = $("out"), status = $("status");
@@ -225,6 +257,65 @@ Lead every status update with what is broken, then what worked.
   $("demo").addEventListener("click", () => { src.value = EXAMPLE; run(); });
   src.addEventListener("keydown", (e) => {
     if ((e.metaKey || e.ctrlKey) && e.key === "Enter") run();
+  });
+
+  // ---- Session-drop demo: run the real per-rule check in the browser ----
+  const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const drop = $("drop"), sfile = $("sfile"), sout = $("sout"), slist = $("s-list");
+  const ORDER = { FAIL: 0, PASS: 1, UNCLEAR: 2 };
+
+  function renderSession(sessionText) {
+    const rulesText = src.value.trim() || EXAMPLE;
+    if (!src.value.trim()) src.value = EXAMPLE; // so the rules they were checked against are visible
+    let s;
+    try {
+      s = checkSessionInBrowser(rulesText, sessionText);
+    } catch (e) {
+      status.textContent = "Couldn't read that file as a session.";
+      return;
+    }
+    $("s-fail").textContent = s.fail;
+    $("s-pass").textContent = s.pass;
+    $("s-unclear").textContent = s.unclear;
+    $("s-meta").textContent = s.events + " session events read · checked against " + s.results.length + " rules · nothing uploaded";
+    slist.innerHTML = "";
+    s.results
+      .slice()
+      .sort((a, b) => (ORDER[a.status] ?? 3) - (ORDER[b.status] ?? 3))
+      .forEach((r) => {
+        const div = document.createElement("div");
+        div.className = "srule " + r.status.toLowerCase();
+        div.innerHTML = '<span class="badge">' + r.status + "</span>" + esc(r.ruleTitle) +
+          (r.evidence ? '<div class="ev">' + esc(r.evidence) + "</div>" : "");
+        slist.appendChild(div);
+      });
+    sout.style.display = "block";
+    try { window.posthog && window.posthog.capture("session_checked", { fail: s.fail, pass: s.pass, unclear: s.unclear }); } catch (e) {}
+  }
+
+  function readFile(f) {
+    const reader = new FileReader();
+    reader.onload = () => renderSession(String(reader.result));
+    reader.onerror = () => { status.textContent = "Couldn't read that file."; };
+    reader.readAsText(f);
+  }
+
+  drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("over"); });
+  drop.addEventListener("dragleave", () => drop.classList.remove("over"));
+  drop.addEventListener("drop", (e) => {
+    e.preventDefault();
+    drop.classList.remove("over");
+    const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) readFile(f);
+  });
+  sfile.addEventListener("change", () => { if (sfile.files[0]) readFile(sfile.files[0]); });
+  $("sexample").addEventListener("click", (e) => {
+    e.preventDefault();
+    // Loads OUR bundled example session (not the user's file) so people with no
+    // local session can still see the check run.
+    fetch("/example-session.jsonl").then((r) => r.text()).then(renderSession).catch(() => {
+      status.textContent = "Couldn't load the example session.";
+    });
   });
 </script>
 </body>

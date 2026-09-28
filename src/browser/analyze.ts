@@ -92,3 +92,7 @@ export function analyze(text: string): AnalysisResult {
     judgmentSamples,
   };
 }
+
+// Client-side SESSION check for the browser demo: drop a session .jsonl +
+// paste rules, get per-rule verdicts, nothing uploaded. Same checkers as the CLI.
+export { evaluateBrowserSession, checkSessionInBrowser, type BrowserSessionSummary } from "./evaluateBrowser.js";
