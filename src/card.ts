@@ -28,13 +28,16 @@ const SITE = "rulereceipt.dev";
 export function shareText(d: CardData, showRules = false): string {
   // A single dropped session (the browser demo) has no "over N days" span, so
   // it gets a "this session" caption rather than the history-mode one.
+  // Never claim "now it can't" — that is only true if `protect` is installed,
+  // and even then a determined command can slip a guard (found by a real test,
+  // 2026-09-29). The card states the FACT it can prove: what the session did.
   const single = d.sessions === 1;
   const base = single
     ? d.broken > 0
-      ? `${d.who} broke my written rules ${d.broken} time${d.broken === 1 ? "" : "s"} in this session — now it can't.`
+      ? `${d.who} broke my written rules ${d.broken} time${d.broken === 1 ? "" : "s"} in this session — with the receipt to prove it.`
       : `RuleReceipt checked one of my agent's sessions against my written rules: ${d.broken} broken.`
     : d.broken > 0
-      ? `${d.who} broke my written rules ${d.broken} time${d.broken === 1 ? "" : "s"} in ${d.days} days (${d.sessions} sessions) — now it can't.`
+      ? `${d.who} broke my written rules ${d.broken} time${d.broken === 1 ? "" : "s"} in ${d.days} days (${d.sessions} sessions) — with the receipt to prove it.`
       : `RuleReceipt checked ${d.sessions} of my agent sessions over ${d.days} days against my written rules: ${d.broken} broken.`;
   const tail = `Checked with RuleReceipt — runs locally, nothing uploaded. ${SITE}`;
   if (showRules && d.broken > 0 && d.brokenTitles && d.brokenTitles.length > 0) {

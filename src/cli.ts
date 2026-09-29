@@ -20,7 +20,7 @@ import { scanHistory, renderHistory } from "./historyReport.js";
 import { observeSessions, renderNoRules, draftRulesFromHistory } from "./sessionObserve.js";
 import { listSessionRows, renderSessionList } from "./listSessions.js";
 import { runSelfTestChecks, renderSelfTest } from "./selftest.js";
-import { planProtect, applyProtect, undoProtect } from "./protect.js";
+import { planProtect, applyProtect, undoProtect, PROTECT_HOOK_SNIPPET } from "./protect.js";
 import { cardSvg, renderCardShare, type CardData } from "./card.js";
 import { createInterface } from "node:readline";
 import { loadOverrides, saveOverride, clearOverride, staleOverrides, ruleFingerprint, OVERRIDES_PATH } from "./overrides.js";
@@ -78,10 +78,20 @@ async function shareResults(results: CheckResult[]): Promise<void> {
   }
 }
 
+// Sample output. A FAIL is only ever shown here for a STRUCTURED rule with a
+// quoted command — never a judgment rule — because that is the tool's actual
+// promise, and the demo is the first thing people run. (A judgment rule shown
+// Broken here was found by a real test 2026-09-29 and was exactly the kind of
+// over-claim this product exists to catch.)
 const DEMO_RESULTS: CheckResult[] = [
-  { ruleId: "7", ruleTitle: "Tests must be able to fail", ruleSource: "global", status: "PASS", evidence: "sabotage-and-revert shown before the green run" },
-  { ruleId: "4", ruleTitle: "Surface bad news first", ruleSource: "global", status: "FAIL", evidence: "reply led with passing tests, the one broken test was mentioned last" },
-  { ruleId: "11", ruleTitle: "Fails closed on error", ruleSource: "global", status: "UNCLEAR", evidence: "no error occurred this session, nothing to verify against" },
+  { ruleId: "1", ruleTitle: "Never push to `main`", ruleSource: "project", status: "FAIL", outcome: "fail", method: "git_events",
+    evidence: 'a git command actually targeted the "main" branch: git push origin main' },
+  { ruleId: "2", ruleTitle: "Evidence or it didn't happen", ruleSource: "global", status: "FAIL", outcome: "fail", method: "claim_vs_evidence",
+    evidence: 'the session stated "All tests pass ✅" but the last test run before it, `npm test`, reported "1 failed"' },
+  { ruleId: "3", ruleTitle: "Never edit `.env`", ruleSource: "project", status: "PASS", outcome: "pass", method: "file_events",
+    evidence: "no write, edit, or delete of `.env` this session" },
+  { ruleId: "4", ruleTitle: "Surface bad news first", ruleSource: "global", status: "UNCLEAR", needsHuman: true,
+    evidence: "" },
 ];
 
 async function emailResults(reportText: string): Promise<void> {
@@ -1276,6 +1286,14 @@ program
       return;
     }
     const plan = planProtect(cwd);
+    if (plan.parseError) {
+      console.log(`Your ${plan.settingsPath} is not valid JSON (a comment, a trailing comma, or a syntax error).`);
+      console.log("protect will NOT touch it — rewriting it could delete your own settings (deny rules, model, other hooks).");
+      console.log("\nFix the JSON, then re-run  rulereceipt protect  — or add these two hooks by hand:\n");
+      console.log(PROTECT_HOOK_SNIPPET.split("\n").map((l) => `    ${l}`).join("\n"));
+      process.exitCode = 1;
+      return;
+    }
     if (plan.alreadyProtected) {
       console.log(`Already protected — the RuleReceipt hooks are in ${plan.settingsPath}. Nothing to add.`);
       return;

@@ -39,6 +39,15 @@ describe("mentions and look-alikes are never Broken", () => {
   it("a disguised push with config flags is still caught", () => {
     expect(statusFor(BRANCH, "git -c protocol.version=2 push origin main", /never push/i)).toBe("FAIL");
   });
+  it("a push wrapped in `sh -c '...'` is still caught (no bypass)", () => {
+    expect(statusFor(BRANCH, "sh -c 'git push origin main'", /never push/i)).toBe("FAIL");
+  });
+  it("a push wrapped in `bash -lc \"...\"` is still caught", () => {
+    expect(statusFor(BRANCH, 'bash -lc "git push --force origin main"', /never push/i)).toBe("FAIL");
+  });
+  it("a feature-branch push wrapped in sh -c is NOT caught (scoped to main)", () => {
+    expect(statusFor(BRANCH, "sh -c 'git push origin feature/login'", /never push/i)).not.toBe("FAIL");
+  });
 
   it("mentioning console.log in a shell echo is not writing it into a file", () => {
     expect(statusFor(LOG, 'echo "console.log(1)"', /debug logging/i)).not.toBe("FAIL");

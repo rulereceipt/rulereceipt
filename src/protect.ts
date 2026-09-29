@@ -64,7 +64,21 @@ export interface ProtectPlan {
   toAdd: string[];
   /** True when both hooks are already present — nothing to do. */
   alreadyProtected: boolean;
+  /**
+   * True when the settings file exists but is not parseable JSON (a comment, a
+   * trailing comma, or genuinely broken). protect MUST NOT rewrite it — doing so
+   * would delete the user's own settings (deny rules, model, other hooks). The
+   * caller shows the hooks to add by hand and changes nothing. Found by a real
+   * test, 2026-09-29: a JSONC file lost its `permissions.deny` rule.
+   */
+  parseError: boolean;
 }
+
+/** The two hook lines to add by hand, for the parse-error path. */
+export const PROTECT_HOOK_SNIPPET = `"hooks": {
+  "PreToolUse": [{ "hooks": [{ "type": "command", "command": "${GUARD_CMD}" }] }],
+  "Stop": [{ "hooks": [{ "type": "command", "command": "${HOOK_CMD}" }] }]
+}`;
 
 export function planProtect(cwd: string): ProtectPlan {
   const settingsPath = settingsPathFor(cwd);
@@ -72,14 +86,16 @@ export function planProtect(cwd: string): ProtectPlan {
   let original: string | null = null;
   let settings: Settings = {};
   if (existed) {
+    original = readFileSync(settingsPath, "utf-8");
     try {
-      original = readFileSync(settingsPath, "utf-8");
       const parsed = JSON.parse(original) as unknown;
       if (parsed && typeof parsed === "object") settings = parsed as Settings;
     } catch {
-      // Malformed JSON: we keep the ORIGINAL bytes (for a faithful undo) but
-      // build the new file from an empty object rather than guessing at a merge.
-      settings = {};
+      // Malformed/JSONC (comment, trailing comma, or broken): REFUSE. Rewriting
+      // it would silently delete the user's own settings — deny rules, model,
+      // other hooks. Return a plan that changes NOTHING and flags the parse
+      // error so the caller can tell the user and show the lines to add by hand.
+      return { settingsPath, existed, original, next: original, toAdd: [], alreadyProtected: false, parseError: true };
     }
   }
 
@@ -100,10 +116,14 @@ export function planProtect(cwd: string): ProtectPlan {
     next: `${JSON.stringify(settings, null, 2)}\n`,
     toAdd,
     alreadyProtected: toAdd.length === 0,
+    parseError: false,
   };
 }
 
 export function applyProtect(cwd: string, plan: ProtectPlan): void {
+  // Never write over a file we could not parse — that is the data-loss bug this
+  // guards against. The CLI stops before here, but this makes it impossible.
+  if (plan.parseError) throw new Error("refusing to write: the settings file is not valid JSON");
   // Record exactly what to restore (the original bytes, or that there was no
   // file) BEFORE touching anything, so --undo is byte-for-byte.
   atomicWrite(backupPathFor(cwd), `${JSON.stringify({ settingsPath: plan.settingsPath, existed: plan.existed, original: plan.original }, null, 2)}\n`);

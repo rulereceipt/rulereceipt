@@ -83,3 +83,27 @@ describe("protect (CLI)", () => {
     expect(s.match(/rulereceipt guard/g)).toHaveLength(1); // exactly one
   });
 });
+
+describe("protect refuses to touch an unparseable settings file (data-loss fix, 2026-09-29)", () => {
+  it("flags parseError and does NOT rebuild from empty (JSONC with a deny rule)", () => {
+    const dir = repo();
+    mkdirSync(join(dir, ".claude"), { recursive: true });
+    const jsonc = '{\n  // my model\n  "model": "opus",\n  "permissions": { "deny": ["Bash(git push:*)"] },\n}';
+    writeFileSync(settings(dir), jsonc);
+    const plan = planProtect(dir);
+    expect(plan.parseError).toBe(true);
+    expect(plan.next).toBe(jsonc); // unchanged
+    expect(plan.toAdd).toEqual([]);
+  });
+
+  it("applyProtect leaves the file byte-identical on a parse error", () => {
+    const dir = repo();
+    mkdirSync(join(dir, ".claude"), { recursive: true });
+    const jsonc = '{\n  "model": "opus", // keep\n  "permissions": { "deny": ["Bash(git push:*)"] },\n}';
+    writeFileSync(settings(dir), jsonc);
+    const before = readFileSync(settings(dir), "utf-8");
+    const plan = planProtect(dir);
+    expect(() => applyProtect(dir, plan)).toThrow(); // refuses
+    expect(readFileSync(settings(dir), "utf-8")).toBe(before); // byte-identical
+  });
+});

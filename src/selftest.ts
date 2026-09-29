@@ -110,7 +110,7 @@ export function renderSelfTest(r: SelfTestResult): string {
       `rulereceipt selftest\n\n` +
       `  ${r.total} checks, all correct.\n` +
       `  0 network calls — this ran entirely on your machine (watch it with lsof / Little Snitch if you like).\n\n` +
-      `The same checkers ran here as on your real sessions. If any of these were ever wrong, this would say so.`
+      `The same checkers ran here as on your real sessions. These are a sample of hand-checked cases across the checkers — a regression in any of them shows up here (it is not exhaustive proof).`
     );
   }
   const lines = r.failures.map((f) => `  ✗ ${f.name} — ${f.detail}`);

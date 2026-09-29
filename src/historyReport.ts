@@ -162,7 +162,7 @@ export function renderHistory(s: HistorySummary, projectName: string, now = Date
   }
 
   if (s.breaks.length === 0) {
-    out.push("No rules were broken in these sessions. Nothing to flag.");
+    out.push("No proven breaks found in these sessions (a structured check with quoted evidence). Rules needing judgment are shown per-session, not counted here.");
   } else {
     const who = s.tools.length === 1 && s.tools[0] === "claude-code" ? "Claude" : "the agent";
     out.push(`${who} broke your rules ${s.totalBrokenCount} time${s.totalBrokenCount === 1 ? "" : "s"}.`);

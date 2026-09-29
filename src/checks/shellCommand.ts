@@ -78,10 +78,34 @@ function isHeredocOpener(before: string, afterDelim: string): boolean {
  * runs (proposedAction, attribution).
  */
 export function segments(command: string): string[] {
-  return withoutHeredocs(command)
+  return unwrapShellWrappers(withoutHeredocs(command))
     .split(/\n|&&|\|\||[;|]/)
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
+}
+
+/**
+ * Hoists the script out of a shell wrapper — `sh -c '<script>'`, `bash -lc
+ * "<script>"`, `zsh -c ...`, `dash -c ...`, `eval '<script>'` — so the command
+ * it actually runs is seen by every checker instead of hiding in a quoted arg.
+ *
+ * Found by a real test 2026-09-29: `sh -c 'git push origin main'` slipped past
+ * the guard AND the report, because the push sat inside a quote that
+ * withoutQuotedMentions blanks. Unwrapping first exposes the inner command as
+ * its own segment. Only a shell/eval wrapper is unwrapped — `echo "git push"`
+ * is not a wrapper and stays a mention. Bounded loop handles one nested level;
+ * deeper nesting is rare and fails toward not-unwrapped (a miss, not a false
+ * accusation).
+ */
+const SHELL_WRAPPER = /\b(?:sh|bash|zsh|dash|eval)\b(?:\s+-[A-Za-z]+)*\s+(['"])([\s\S]*?)\1/;
+export function unwrapShellWrappers(command: string): string {
+  let out = command;
+  for (let i = 0; i < 4; i++) {
+    const m = out.match(SHELL_WRAPPER);
+    if (!m || m.index === undefined) break;
+    out = out.slice(0, m.index) + ` ; ${m[2]} ; ` + out.slice(m.index + m[0].length);
+  }
+  return out;
 }
 
 /** The executable a segment invokes, with env assignments and `sudo` skipped. */

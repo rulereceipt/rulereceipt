@@ -21,7 +21,7 @@ describe("the enforcement offer", () => {
 
   it("appears when a rule was broken", () => {
     const o = gateOffer({ failures: 2, hookInstalled: false });
-    expect(o).toContain("rulereceipt hook");
+    expect(o).toContain("rulereceipt protect");
   });
 
   it("says nothing when the hook is already installed", () => {

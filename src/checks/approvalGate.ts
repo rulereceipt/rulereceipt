@@ -1,7 +1,7 @@
 import type { ApprovalGateClassification } from "./classify.js";
 import type { CheckResult, TranscriptEvent } from "../types.js";
 import { violation } from "../types.js";
-import { withoutHeredocs, withoutQuotedMentions } from "./shellCommand.js";
+import { withoutHeredocs, withoutQuotedMentions, unwrapShellWrappers } from "./shellCommand.js";
 
 /**
  * "Never push / commit / open a PR / delete without asking me" — checked per
@@ -68,7 +68,9 @@ function commandOf(e: TranscriptEvent): string {
   // Strip heredoc bodies (a heredoc that WRITES "git push" is not a push) and
   // blank quoted/commented mentions (`echo "git push"`, `# git push`), so only
   // a command actually being run is matched.
-  return typeof c === "string" ? withoutQuotedMentions(withoutHeredocs(c)) : "";
+  // Unwrap `sh -c '…'` BEFORE blanking quotes, so a push hidden in a wrapper is
+  // exposed as a real command rather than blanked as a quoted mention (#2).
+  return typeof c === "string" ? withoutQuotedMentions(unwrapShellWrappers(withoutHeredocs(c))) : "";
 }
 
 /** The result for the call at `i`: matched by id when present, else the next result. */

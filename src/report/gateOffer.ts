@@ -49,9 +49,8 @@ export function hookIsInstalled(cwd: string): boolean {
 export function gateOffer(state: { failures: number; hookInstalled: boolean }): string | null {
   if (state.failures === 0) return null;
   if (state.hookInstalled) return null;
-  const n = state.failures;
   return (
-    `This report is after the fact. \`rulereceipt hook\` runs as a Claude Code Stop hook and\n` +
-    `refuses to let a session end on ${n === 1 ? "a broken rule" : "a broken rule"} — see the README for the four lines to add.`
+    `This report is after the fact. To refuse a session that ends on a broken rule, run\n` +
+    `\`rulereceipt protect\` — it adds the Stop hook and the guard for you (with a preview and undo).`
   );
 }
