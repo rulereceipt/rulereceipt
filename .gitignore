@@ -40,3 +40,6 @@ tests/fixtures/real-sessions/
 # machine-local Claude Code settings (guard hook, absolute paths)
 .claude/settings.local.json
 .claude/rules/guardtest.md
+
+# local probe scratch files
+z_*

@@ -803,7 +803,12 @@ const GATE_ACTIONS: { key: string; verb: string }[] = [
 ];
 const GATE_NEG = String.raw`\b(?:never|don'?t|do\s+not|must\s+not|mustn'?t|should\s+not|shouldn'?t|no)\b`;
 const GATE_CONSENT = String.raw`\b(?:without\s+(?:(?:the\s+)?(?:user'?s?|my|your|an?)\s+)?(?:explicit(?:ly)?\s+|express\s+|prior\s+)?(?:(?:the\s+)?user'?s?\s+|my\s+)?(?:permission|approval|consent|confirmation|instruction|request|sign[- ]?off|go[- ]?ahead|asking|being\s+(?:asked|told|instructed))|unless\s+(?:(?:the\s+)?user|i|you\s+are|explicitly)\s*(?:explicitly\s+)?(?:asks?|asked|requests?|requested|says?|tells?|told|instructs?|instructed|approves?|approved|confirms?)|until\s+(?:the\s+)?user\s+(?:confirms|approves|says|asks))\b`;
-const GATE_ASK_BEFORE = String.raw`\b(?:ask|check\s+with\s+(?:me|the\s+user)|confirm|get\s+(?:approval|permission|sign[- ]?off)|wait\s+for\s+(?:(?:the\s+)?(?:user|me)|approval|confirmation|explicit|sign[- ]?off))\b(?:\s+\w+){0,4}?\s+(?:before|prior\s+to)\b`;
+// "confirm" alone means VERIFY, not "ask the user" — found on unseen data
+// 2026-09-29: a file note "`extension-report.py` … confirm before committing"
+// became a blanket commit-approval gate. So a bare "confirm"/"check" no longer
+// counts; it must be "confirm/check WITH me/the user". "ask", "get approval" and
+// "wait for approval" before the action still count.
+const GATE_ASK_BEFORE = String.raw`\b(?:ask|(?:check|confirm)\s+with\s+(?:me|the\s+user|us)|get\s+(?:approval|permission|sign[- ]?off)|wait\s+for\s+(?:(?:the\s+)?(?:user|me)|approval|confirmation|explicit|sign[- ]?off))\b(?:\s+\w+){0,4}?\s+(?:before|prior\s+to)\b`;
 
 /**
  * Which gated actions a rule makes conditional on the user's say-so.

@@ -45,7 +45,22 @@ function editedContentFromEvent(event: TranscriptEvent): string | null {
  * open paren or a call — so requiring a boundary after it would reject the
  * arguments.
  */
+/**
+ * The token sits inside a natural-language sentence (a lowercase word + space
+ * right before it, and a space + lowercase word right after) — a MENTION, not
+ * code. Found on unseen data 2026-09-29: "Avoid `try-catch` in hot paths" FAILed
+ * (and the guard blocked a Write) because "try-catch" appears in the prose
+ * "...use a try-catch block...". A real import (`from "lucide-react"`) is not
+ * sandwiched in prose (it is bounded by quotes), so it still matches.
+ */
+function isProseSandwich(content: string, at: number, pattern: string): boolean {
+  const before = content.slice(Math.max(0, at - 12), at);
+  const after = content.slice(at + pattern.length, at + pattern.length + 12);
+  return /[a-z]\s$/.test(before) && /^\s[a-z]/.test(after);
+}
+
 function containsCall(content: string, pattern: string): boolean {
+  const isCall = pattern.endsWith("(");
   const leadsWithIdentifier = /^[A-Za-z0-9_$]/.test(pattern);
   if (!leadsWithIdentifier) {
     // A CALL like `.forEach(` legitimately follows an object (`arr.forEach()`),
@@ -75,7 +90,11 @@ function containsCall(content: string, pattern: string): boolean {
     // continuation — `analytics.track(` is a real call to `track(`. So `.` is
     // NOT in the disqualifying class (fixed 2026-09-26); `_` still is, so
     // `_metar_fetch(` does not match `fetch(`.
-    if (!/[A-Za-z0-9_$]/.test(before)) return true;
+    if (!/[A-Za-z0-9_$]/.test(before)) {
+      // A non-call token embedded in a prose sentence is a mention, not code.
+      if (!isCall && isProseSandwich(content, at, pattern)) { from = at + 1; continue; }
+      return true;
+    }
     from = at + 1;
   }
 }
