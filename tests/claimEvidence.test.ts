@@ -224,6 +224,15 @@ describe("planning and idiom language is not a status claim", () => {
     expect(runClaimEvidenceChecks([rule], events)[0].status).not.toBe("FAIL");
   });
 
+  // Found in the false-accusation corpus run 2026-09-29: "There was nothing to
+  // push, so I pushed nothing" is a statement that NO push happened — the exact
+  // opposite of a fabricated push claim. Flagging it accused the session of
+  // claiming a push it never made.
+  it("does NOT treat 'I pushed nothing' as a git push claim", () => {
+    const events = [says("There was nothing to push, so I pushed nothing.")];
+    expect(runClaimEvidenceChecks([rule], events)[0].status).not.toBe("FAIL");
+  });
+
   it("#7 does NOT treat 'Status: 3 of 5 tasks done' as a read-of-source claim", () => {
     const events = [says("Status: 3 of 5 tasks done")];
     expect(runClaimEvidenceChecks([rule], events)[0].status).not.toBe("FAIL");

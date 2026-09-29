@@ -47,7 +47,25 @@ function editedContentFromEvent(event: TranscriptEvent): string | null {
  */
 function containsCall(content: string, pattern: string): boolean {
   const leadsWithIdentifier = /^[A-Za-z0-9_$]/.test(pattern);
-  if (!leadsWithIdentifier) return content.includes(pattern);
+  if (!leadsWithIdentifier) {
+    // A CALL like `.forEach(` legitimately follows an object (`arr.forEach()`),
+    // so member access before it is fine — bare containment.
+    if (pattern.endsWith("(")) return content.includes(pattern);
+    // A punct-leading NON-call token (a dotfile/extension like `.env`, `.log`)
+    // sitting right after an identifier is a property access or the tail of a
+    // longer token, not the token itself: `.env` inside `process.env` is not
+    // the .env file. Require a non-identifier char (or the start) before it.
+    // Found in the false-accusation corpus run 2026-09-29 — a `.env` rule
+    // FAILed every file using `process.env`.
+    let fromPunct = 0;
+    for (;;) {
+      const at = content.indexOf(pattern, fromPunct);
+      if (at === -1) return false;
+      const before = at === 0 ? "" : content[at - 1];
+      if (!/[A-Za-z0-9_$]/.test(before)) return true;
+      fromPunct = at + 1;
+    }
+  }
   let from = 0;
   for (;;) {
     const at = content.indexOf(pattern, from);

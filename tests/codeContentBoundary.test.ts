@@ -62,4 +62,25 @@ describe("content matching respects identifier boundaries", () => {
   it("still does not match a method name fused into a longer identifier", () => {
     expect(runCodeContentChecks(cls("track("), wrote("  backtrack(state)"))[0].status).not.toBe("FAIL");
   });
+
+  // A punct-leading, non-call token (a dotfile/extension like `.env`) embedded
+  // after an identifier is a property access or a longer token, not the token
+  // itself. `.env` inside `process.env` is not the .env file. Found in the
+  // false-accusation corpus run 2026-09-29: a rule "never commit secrets to
+  // .env" FAILed every file using process.env.
+  it("does not match .env inside process.env", () => {
+    expect(runCodeContentChecks(cls(".env"), wrote("const k = process.env.API_KEY"))[0].status).not.toBe("FAIL");
+  });
+
+  it("does not match .env inside import.meta.env", () => {
+    expect(runCodeContentChecks(cls(".env"), wrote("const base = import.meta.env.BASE_URL"))[0].status).not.toBe("FAIL");
+  });
+
+  it("still matches a real quoted .env file reference", () => {
+    expect(runCodeContentChecks(cls(".env"), wrote('fs.writeFileSync(".env", secret)'))[0].status).toBe("FAIL");
+  });
+
+  it("still matches a .env path reference", () => {
+    expect(runCodeContentChecks(cls(".env"), wrote("const p = './.env'"))[0].status).toBe("FAIL");
+  });
 });

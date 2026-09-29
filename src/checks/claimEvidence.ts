@@ -91,7 +91,9 @@ const ACTION_CLAIMS: Array<{ label: string; claim: RegExp; exclude: RegExp; comm
     // Idioms that borrow "pushed" but aren't a git push. "pushed the fix/code/
     // changes/branch to <remote>" stays a claim; effort/figurative senses do
     // not (finding #6, 2026-09-26).
-    exclude: /\bpushed\s+(?:back|for|through|forward|ahead|past|hard|on|myself|ourselves|yourself|themselves|the\s+(?:boundar|button|envelope|limit|deadline|pace)|to\s+(?:get|finish|complete|ship|meet|hit|make|wrap|move))/i,
+    // "pushed nothing/none" is a statement that NO push happened — the opposite
+    // of a push claim (finding 2026-09-29, false-accusation corpus run).
+    exclude: /\bpushed\s+(?:back|for|through|forward|ahead|past|hard|on|nothing|none|myself|ourselves|yourself|themselves|the\s+(?:boundar|button|envelope|limit|deadline|pace)|to\s+(?:get|finish|complete|ship|meet|hit|make|wrap|move))/i,
     command: /\bgit\s+push\b/i,
   },
   {
