@@ -511,8 +511,26 @@ so you can verify the published package was built from this repository at
 a specific commit. No publishing token exists to be stolen. Check it
 yourself with `npm audit signatures` after installing.
 
-**Licence.** Source-available software — see [LICENSE](./LICENSE) and
-[NOTICE.md](./NOTICE.md) before reusing this code.
+**Licence.** Source-available, not OSI open source: the code is public and
+you can read, run and modify it for yourself, but reuse is limited — see
+[LICENSE](./LICENSE) and [NOTICE.md](./NOTICE.md) before reusing it.
+
+**Windows.** Not tested yet. RuleReceipt is developed and tested on macOS
+and Linux. It may work on Windows, but nothing there is verified — treat it
+as unsupported until this note changes.
+
+## Uninstalling
+
+Easy to remove, no leftovers:
+
+```bash
+rulereceipt protect --undo     # restores .claude/settings.json byte-for-byte
+npm uninstall -g rulereceipt   # or: npm rm rulereceipt in a project
+rm -rf .rulereceipt/           # the local reports/receipts folder, if you want it gone
+```
+
+`protect --undo` is only needed if you ran `protect`. Nothing else is
+installed anywhere on your system.
 
 ## Contact
 
