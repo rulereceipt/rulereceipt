@@ -41,6 +41,12 @@ jobs:
       - run: bash scripts/smoke.sh
       - run: node dist/cli.js selftest
 
+      # Open-core guard: fail if the publishable tarball would contain anything
+      # beyond the built CLI + metadata (no corpus/, data/, local/, tests/,
+      # team/cloud code, or secrets). A silent leak in a future release is a
+      # hard CI failure here instead.
+      - run: node scripts/check-package.mjs
+
       # Blocking gate on what actually ships. Dev-only advisories (a test
       # runner, a types package) cannot affect a published CLI or a
       # deployed function, so gating on them means a permanently red CI

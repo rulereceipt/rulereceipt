@@ -10,6 +10,7 @@ import { runAttributionChecks } from "./checks/attribution.js";
 import { runApprovalGateChecks } from "./checks/approvalGate.js";
 import { runJudgmentChecks } from "./checks/judgmentChecks.js";
 import { touchedPaths, ruleWasLoaded } from "./checks/pathScope.js";
+import { downgradeUserAsked } from "./checks/userAsked.js";
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -116,7 +117,8 @@ export async function evaluateSession(
     ? await runJudgmentChecks(judgment as never, events)
     : judgment.map(({ rule }) => needsLlmResult(rule));
 
-  const results = [...deterministicResults, ...judgmentResults, ...scopeResults, ...future.map(futureResult)];
+  const structuralResults = downgradeUserAsked(deterministicResults, classifications, events);
+  const results = [...structuralResults, ...judgmentResults, ...scopeResults, ...future.map(futureResult)];
 
   return {
     results: attachSourceLocation(results, rules),

@@ -11,6 +11,7 @@ import { runEmojiChecks } from "../checks/emojiOutput.js";
 import { runAttributionChecks } from "../checks/attribution.js";
 import { runApprovalGateChecks } from "../checks/approvalGate.js";
 import { touchedPaths, ruleWasLoaded } from "../checks/pathScope.js";
+import { downgradeUserAsked } from "../checks/userAsked.js";
 import type { CheckResult } from "../types.js";
 
 /**
@@ -69,7 +70,8 @@ export function evaluateBrowserSession(rulesText: string, sessionText: string): 
     evidence: "",
   }));
 
-  return [...deterministicResults, ...judgmentResults, ...scopeResults];
+  const structural = downgradeUserAsked(deterministicResults, classifications, events);
+  return [...structural, ...judgmentResults, ...scopeResults];
 }
 
 export interface BrowserSessionSummary {
