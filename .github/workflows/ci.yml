@@ -12,11 +12,10 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
-    # package.json declares engines ">=18", but CI only ever ran one
-    # version, so that claim was never actually tested. This runs the
-    # oldest version still supported by that range alongside current LTS,
-    # so a Node-version-specific break is caught here rather than by a
-    # user on a version we claimed to support.
+    # engines is ">=20", and the matrix tests exactly that: the declared
+    # floor (20) and current LTS (22). Node 18 was dropped 2026-09-29 — it
+    # was advertised in engines but never in CI, and it is EOL, so the claim
+    # was untested. The rule is: we test every version we claim to support.
     strategy:
       fail-fast: false
       matrix:
@@ -34,6 +33,13 @@ jobs:
       - run: npm run typecheck
       - run: npm run build
       - run: npm test
+
+      # Cold-install guard: the exact commands a stranger runs after `npx`
+      # must exit clean (no stack trace) on the freshly-built dist, and the
+      # self-test's golden fixtures must all still be correct. A green unit
+      # suite does not prove the built CLI actually starts — this does.
+      - run: bash scripts/smoke.sh
+      - run: node dist/cli.js selftest
 
       # Blocking gate on what actually ships. Dev-only advisories (a test
       # runner, a types package) cannot affect a published CLI or a

@@ -48,7 +48,7 @@
     "verify": "npm run lint && npm run typecheck && npm test"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
   "license": "SEE LICENSE IN LICENSE",
   "dependencies": {
