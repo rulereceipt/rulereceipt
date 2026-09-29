@@ -83,13 +83,29 @@ async function shareResults(results: CheckResult[]): Promise<void> {
 // promise, and the demo is the first thing people run. (A judgment rule shown
 // Broken here was found by a real test 2026-09-29 and was exactly the kind of
 // over-claim this product exists to catch.)
+/** Add an entry to .gitignore (best-effort, git repos only) so a written file can't be committed by accident. */
+function ensureGitignored(cwd: string, entry: string): void {
+  try {
+    if (!existsSync(join(cwd, ".git"))) return;
+    const gi = join(cwd, ".gitignore");
+    const current = existsSync(gi) ? readFileSync(gi, "utf-8") : "";
+    const want = entry.replace(/\/$/, "");
+    if (current.split(/\r?\n/).some((l) => l.trim() === want || l.trim() === entry)) return;
+    const prefix = current.length > 0 && !current.endsWith("\n") ? "\n" : "";
+    writeFileSync(gi, `${current}${prefix}${entry}\n`);
+    console.log(`(added ${entry} to .gitignore so it isn't committed)`);
+  } catch {
+    /* best-effort — a card that isn't gitignored is a minor issue, not a failure */
+  }
+}
+
 const DEMO_RESULTS: CheckResult[] = [
   { ruleId: "1", ruleTitle: "Never push to `main`", ruleSource: "project", status: "FAIL", outcome: "fail", method: "git_events",
     evidence: 'a git command actually targeted the "main" branch: git push origin main' },
   { ruleId: "2", ruleTitle: "Evidence or it didn't happen", ruleSource: "global", status: "FAIL", outcome: "fail", method: "claim_vs_evidence",
     evidence: 'the session stated "All tests pass ✅" but the last test run before it, `npm test`, reported "1 failed"' },
-  { ruleId: "3", ruleTitle: "Never edit `.env`", ruleSource: "project", status: "PASS", outcome: "pass", method: "file_events",
-    evidence: "no write, edit, or delete of `.env` this session" },
+  { ruleId: "3", ruleTitle: "Never edit `.env`", ruleSource: "project", status: "UNCLEAR", outcome: "not_applicable", method: "file_events",
+    evidence: "the `.env` file was never written to, deleted, or moved this session — a forbid rule that never came up, not a pass" },
   { ruleId: "4", ruleTitle: "Surface bad news first", ruleSource: "global", status: "UNCLEAR", needsHuman: true,
     evidence: "" },
 ];
@@ -1321,7 +1337,7 @@ program
   .description(
     "Make a shareable image and pre-filled share links from your last 30 days of sessions — counts only, no code, paths or rule text (add rule names to the copy-text with --show-rules). Saves an SVG locally and prints X/LinkedIn/Bluesky/Reddit compose links. Nothing is posted and nothing is uploaded."
   )
-  .option("--out <path>", "where to write the SVG card", "rulereceipt-card.svg")
+  .option("--out <path>", "where to write the SVG card", join(".rulereceipt", "card.svg"))
   .option("--show-rules", "include the broken rule names in the copy-text (never in the image)")
   .option("--days <n>", "how many days back to summarize", "30")
   .action(async (opts: { out?: string; showRules?: boolean; days?: string }) => {
@@ -1348,7 +1364,11 @@ program
       who: s.tools.length === 1 && s.tools[0] === "claude-code" ? "Claude" : "the agent",
       brokenTitles: s.breaks.map((b) => b.ruleTitle),
     };
-    const outPath = resolve(cwd, opts.out ?? "rulereceipt-card.svg");
+    const outPath = resolve(cwd, opts.out ?? join(".rulereceipt", "card.svg"));
+    mkdirSync(dirname(outPath), { recursive: true });
+    // Keep the card out of the repo: it lives under .rulereceipt/, which we add
+    // to .gitignore on first write so it can't be committed by accident.
+    ensureGitignored(cwd, ".rulereceipt/");
     writeFileSync(outPath, cardSvg(data));
     console.log(renderCardShare(data, outPath, Boolean(opts.showRules)));
   });

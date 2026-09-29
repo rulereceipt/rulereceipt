@@ -6,7 +6,7 @@ import { runGitBranchPolicyChecks } from "./checks/gitBranchPolicy.js";
 import { runAttributionChecks } from "./checks/attribution.js";
 import { loadOverrides, ruleFingerprint, ratifiedForbids } from "./overrides.js";
 import { commandRunsLiteral } from "./checks/proposedAction.js";
-import { approvalOccurrences, allowListed } from "./checks/approvalGate.js";
+import { approvalOccurrences, allowListed, approvalCommandShort, approvalScopedBranch } from "./checks/approvalGate.js";
 import { readTranscriptFromFile } from "./parsers/transcriptParser.js";
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
@@ -279,9 +279,12 @@ function unapprovedGate(cwd: string, command: string, events: TranscriptEvent[])
   const gates = classifyRules(loadRules(cwd)).filter((c) => c.kind === "approvalGate") as Array<{ rule: Rule; actions: string[] }>;
   for (const { rule, actions } of gates) {
     const proposed: TranscriptEvent = { role: "assistant", kind: "tool_use", toolName: "Bash", input: { command }, timestamp: "", permissionMode: "dontAsk" };
-    const occ = approvalOccurrences([...events, proposed], actions as never);
+    const occ = approvalOccurrences([...events, proposed], actions as never, { scopedBranch: approvalScopedBranch(rule) });
     const last = occ[occ.length - 1];
-    if (last && last.command === command.replace(/\s+/g, " ").trim().slice(0, 80) && last.verdict !== "approved") {
+    // Compare against the SAME canonical short the occurrence uses (mention
+    // segments dropped, `sh -c` unwrapped) — a raw-string compare missed a
+    // wrapped push and mis-fired on a mention (found by a real test).
+    if (last && last.command === approvalCommandShort(command) && approvalCommandShort(command) !== "" && last.verdict !== "approved") {
       return { rule, action: last.action };
     }
   }

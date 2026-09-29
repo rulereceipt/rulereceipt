@@ -79,6 +79,16 @@ export async function scanHistory(
   const tools = new Set<string>();
   let sessionsScanned = 0;
 
+  /** The latest event timestamp in a session, or null if none parse. */
+  const lastEventMs = (events: { timestamp: string }[]): number | null => {
+    let max = 0;
+    for (const e of events) {
+      const t = Date.parse(e.timestamp);
+      if (!Number.isNaN(t) && t > max) max = t;
+    }
+    return max > 0 ? max : null;
+  };
+
   for (const { adapter, file } of sessions) {
     let ms: number;
     try {
@@ -96,6 +106,11 @@ export async function scanHistory(
     if (events.length === 0) continue;
     sessionsScanned++;
     tools.add(adapter.tool);
+    // The DATE shown is the session's own last timestamp, not the file's mtime —
+    // a file touched today can hold a session from last week, and showing "last:
+    // today" for it is wrong (found by a real test, 2026-09-29). Falls back to
+    // the mtime only when the transcript carries no usable timestamp.
+    const sessionMs = lastEventMs(events) ?? ms;
     const { results } = await evaluateSession(cwd, rules, events, false, needsLlmResult);
     for (const r of results) {
       const k = key(r);
@@ -104,7 +119,7 @@ export async function scanHistory(
         a = { title: r.ruleTitle, source: r.ruleSource, id: r.ruleId, breaks: [], passed: false, judgment: false };
         rules_.set(k, a);
       }
-      if (r.status === "FAIL") a.breaks.push({ ms, quote: r.evidence });
+      if (r.status === "FAIL") a.breaks.push({ ms: sessionMs, quote: r.evidence });
       else if (r.status === "PASS") a.passed = true;
       else if (r.status === "UNCLEAR" && r.needsHuman) a.judgment = true;
     }

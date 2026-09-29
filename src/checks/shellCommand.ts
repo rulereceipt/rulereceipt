@@ -103,7 +103,10 @@ export function unwrapShellWrappers(command: string): string {
   for (let i = 0; i < 4; i++) {
     const m = out.match(SHELL_WRAPPER);
     if (!m || m.index === undefined) break;
-    out = out.slice(0, m.index) + ` ; ${m[2]} ; ` + out.slice(m.index + m[0].length);
+    // Hoist with NEWLINES, not `; … ;`: segments() splits on both, but a newline
+    // collapses away in evidence display (\s+ -> " ") whereas literal `;` leaked
+    // into a quoted-back command as `"; git push ;"` (found by a real test).
+    out = out.slice(0, m.index) + `\n${m[2]}\n` + out.slice(m.index + m[0].length);
   }
   return out;
 }

@@ -1,7 +1,17 @@
 import type { ApprovalGateClassification } from "./classify.js";
 import type { CheckResult, TranscriptEvent } from "../types.js";
 import { violation } from "../types.js";
-import { withoutHeredocs, withoutQuotedMentions, unwrapShellWrappers } from "./shellCommand.js";
+import { withoutHeredocs, withoutQuotedMentions, unwrapShellWrappers, leadingCommand } from "./shellCommand.js";
+
+/**
+ * Commands that only READ/print/search their arguments — a push/commit named as
+ * an ARGUMENT to one of these is a mention, not the action. Same list the
+ * deterministic checker uses; kept local to avoid a circular import.
+ */
+const MENTION_ONLY = new Set([
+  "echo", "printf", "grep", "rg", "ag", "ack", "egrep", "fgrep", "cat", "bat",
+  "head", "tail", "less", "more", "ls", "find", "fd", "sed", "awk", "cut", "tr",
+]);
 
 /**
  * "Never push / commit / open a PR / delete without asking me" — checked per
@@ -68,9 +78,54 @@ function commandOf(e: TranscriptEvent): string {
   // Strip heredoc bodies (a heredoc that WRITES "git push" is not a push) and
   // blank quoted/commented mentions (`echo "git push"`, `# git push`), so only
   // a command actually being run is matched.
-  // Unwrap `sh -c '…'` BEFORE blanking quotes, so a push hidden in a wrapper is
-  // exposed as a real command rather than blanked as a quoted mention (#2).
-  return typeof c === "string" ? withoutQuotedMentions(unwrapShellWrappers(withoutHeredocs(c))) : "";
+  if (typeof c !== "string") return "";
+  // Same parser as the check path (one parser, not two): unwrap `sh -c '…'`
+  // BEFORE blanking quotes (so a push hidden in a wrapper is exposed), then keep
+  // ONLY segments that actually RUN a command — a push/commit that is only an
+  // argument to echo/grep/printf/sed is a mention, never the action. This is
+  // what makes `echo git push is bad` not read as a push in the guard.
+  const exposed = withoutQuotedMentions(unwrapShellWrappers(withoutHeredocs(c)));
+  return exposed
+    .split(/\n|&&|\|\||[;|]/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0 && !MENTION_ONLY.has(leadingCommand(s)))
+    .join("\n");
+}
+
+/** The canonical short form of a command, for matching a proposed call to its occurrence. */
+export function approvalCommandShort(command: string): string {
+  return commandOf({ role: "assistant", kind: "tool_use", toolName: "Bash", input: { command }, timestamp: "" }).replace(/\s+/g, " ").trim().slice(0, 80);
+}
+
+/**
+ * The branch a "push/commit … to <branch>" approval rule is scoped to, if any.
+ * "Never push to main without asking" is about MAIN — it must not gate a push to
+ * a feature branch. Found by a real test 2026-09-29: the guard asked on every
+ * push. Returns undefined for a generic "never push without asking" (all pushes).
+ */
+export function approvalScopedBranch(rule: { title: string; text: string }): string | undefined {
+  const m = `${rule.title} ${rule.text}`.match(/\b(?:push(?:ing)?|commit(?:ting)?|merg(?:e|ing))\b[^.\n]*?\b(main|master|develop|trunk|release)\b/i);
+  return m ? m[1].toLowerCase() : undefined;
+}
+
+/**
+ * Whether a `git push` command targets `branch` (or its target is unknown — a
+ * bare `git push`, which could be main, so it is gated to be safe). An explicit
+ * push to a DIFFERENT branch returns false, so a feature-branch push is not
+ * gated by a rule that names main.
+ */
+function pushTargetsBranch(command: string, branch: string): boolean {
+  const m = command.match(/\bgit\s+(?:\S+\s+){0,4}?push\b(.*)/i);
+  if (!m) return true;
+  const args = m[1];
+  const refspec = args.match(/[\w./-]+:([\w./-]+)/); // src:dst -> dst is the target
+  if (refspec) return refspec[1] === branch || refspec[1].endsWith(`/${branch}`);
+  const tokens = args.split(/\s+/).filter((t) => t && !t.startsWith("-"));
+  if (tokens.length >= 2) {
+    const b = tokens[tokens.length - 1];
+    return b === branch || b.endsWith(`/${branch}`);
+  }
+  return true; // bare `git push` / `git push origin` — unknown target, gate to be safe
 }
 
 /** The result for the call at `i`: matched by id when present, else the next result. */
@@ -100,6 +155,8 @@ export function allowListed(command: string, allow: string[]): boolean {
 export interface ApprovalOptions {
   /** `permissions.allow` entries from the project's and user's Claude Code settings. */
   allow?: string[];
+  /** When set, a `push` action is only gated if it targets this branch (or its target is unknown). */
+  scopedBranch?: string;
 }
 
 interface Occurrence {
@@ -117,6 +174,9 @@ export function approvalOccurrences(events: TranscriptEvent[], actions: Action[]
     if (!command) continue;
     for (const action of actions) {
       if (!IN_COMMAND[action].test(command)) continue;
+      // A branch-scoped push rule ("push to main") does not gate a push to a
+      // different branch — only main (or a bare push whose target is unknown).
+      if (action === "push" && opts.scopedBranch && !pushTargetsBranch(command, opts.scopedBranch)) continue;
       const res = resultOf(events, i);
       if (res && res.kind === "tool_result" && res.isError) continue; // rejected in the prompt, or it never went through
       const from = (lastIndex[action] ?? -1) + 1;
@@ -168,7 +228,7 @@ export function runApprovalGateChecks(
   opts: ApprovalOptions = {}
 ): CheckResult[] {
   return classifications.map(({ rule, actions, polarity }) => {
-    const occ = approvalOccurrences(events, actions as Action[], opts);
+    const occ = approvalOccurrences(events, actions as Action[], { ...opts, scopedBranch: approvalScopedBranch(rule) });
     const base = { ruleId: rule.id, ruleTitle: rule.title, ruleSource: rule.source, method: "approval_gate" as const };
     if (occ.length === 0) {
       return { ...base, status: "UNCLEAR" as const, outcome: "not_applicable" as const, evidence: `no ${actions.join("/")} went through this session, so the rule never applied` };
