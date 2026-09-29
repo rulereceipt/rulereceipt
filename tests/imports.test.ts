@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { loadRules, describeRuleSources } from "../src/rules.js";
 import { shadowedAgentsMd } from "../src/shadowedAgents.js";
 import { importTargets, stripCodeForImports } from "../src/parsers/imports.js";
+import { parseClaudeMdText } from "../src/parsers/claudeMdParser.js";
 
 /**
  * @imports: a CLAUDE.md that says `@AGENTS.md` makes AGENTS.md LOADED, not
@@ -65,6 +66,22 @@ describe("loadRules follows @imports", () => {
     w("AGENTS.md", "## Imported\n- FENCEDMARKER never do this.\n");
     expect(hasRule("OWNMARKER")).toBe(true);
     expect(hasRule("FENCEDMARKER")).toBe(false);
+  });
+});
+
+describe("an @import directive is not itself a rule", () => {
+  it("a CLAUDE.md whose only body is '@AGENTS.md' contributes zero rules", () => {
+    expect(parseClaudeMdText("@AGENTS.md\n", "project")).toHaveLength(0);
+  });
+  it("real rules alongside an @import still parse; the import line is dropped", () => {
+    const rules = parseClaudeMdText("## Own\n- OWNMARKER run tests.\n\n@AGENTS.md\n", "project");
+    expect(rules).toHaveLength(1);
+    expect(`${rules[0].title} ${rules[0].text}`).toContain("OWNMARKER");
+  });
+  it("an @import shown inside a code fence is left as content, not dropped", () => {
+    // Inside a fence it is an example; the section still yields its rule.
+    const rules = parseClaudeMdText("## How\nDo this.\n\n```\n@AGENTS.md\n```\n", "project");
+    expect(rules.length).toBeGreaterThanOrEqual(1);
   });
 });
 

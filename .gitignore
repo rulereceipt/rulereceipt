@@ -43,3 +43,6 @@ tests/fixtures/real-sessions/
 
 # local probe scratch files
 z_*
+
+# npm pack artifacts
+*.tgz

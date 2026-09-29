@@ -88,6 +88,26 @@ function stripHtmlComments(raw: string): string {
   return stripped.replace(/\u0000CODE(\d+)\u0000/g, (_, i) => spans[Number(i)]);
 }
 
+/**
+ * A whole-line `@import` directive (`@AGENTS.md`, `@docs/rules.md`) is how Claude
+ * Code pulls in another file — it is NOT itself a rule. Blank those lines (keeping
+ * the line, so source lines below stay right) so a CLAUDE.md whose body is just
+ * `@AGENTS.md` does not report the import as a phantom one-line rule. Imports
+ * inside code spans/fences are left untouched (they are examples, not directives).
+ */
+function stripImportDirectiveLines(raw: string): string {
+  const spans: string[] = [];
+  const masked = raw.replace(/```[\s\S]*?```|~~~[\s\S]*?~~~|`[^`\n]*`/g, (m) => {
+    spans.push(m);
+    return `\u0000CODE${spans.length - 1}\u0000`;
+  });
+  const blanked = masked
+    .split("\n")
+    .map((line) => (/^\s*@[^\s]+\s*$/.test(line) ? "" : line))
+    .join("\n");
+  return blanked.replace(/\u0000CODE(\d+)\u0000/g, (_, i) => spans[Number(i)]);
+}
+
 function normalizeSetextHeaders(lines: string[]): string[] {
   const out = [...lines];
   // Fence-aware for the same reason as the main pass: a row of dashes inside
@@ -138,7 +158,10 @@ function normalizeSetextHeaders(lines: string[]): string[] {
  * ("your file never leaves the page") is only true because nothing in
  * this function or in classify.ts touches Node APIs; keep it that way.
  */
-export function parseClaudeMdText(raw: string, source: "global" | "project"): Rule[] {
+export function parseClaudeMdText(rawInput: string, source: "global" | "project"): Rule[] {
+  // Whole-line @import directives are file references, not rules — drop them
+  // before anything counts or classifies them.
+  const raw = stripImportDirectiveLines(rawInput);
   const lines = normalizeSetextHeaders(stripHtmlComments(raw).split("\n"));
   const rules: Rule[] = [];
 
