@@ -1,6 +1,6 @@
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { readFileSync, readdirSync, statSync, realpathSync, existsSync } from "node:fs";
 import { homedir } from "node:os";
-import { join, dirname, basename } from "node:path";
+import { join, dirname, basename, sep } from "node:path";
 import { parseTranscriptText } from "./transcriptLine.js";
 import type { TranscriptEvent } from "../types.js";
 
@@ -35,8 +35,78 @@ import type { TranscriptEvent } from "../types.js";
  * extra readdir() of the home directory per check — negligible.
  */
 
-function encodeProjectPath(cwd: string): string {
-  return cwd.replace(/\//g, "-");
+/**
+ * Claude Code names the per-project directory by mangling the cwd, but the exact
+ * rule is not stable or documented across versions: at minimum "/" becomes "-",
+ * and observed builds also turn "." "_" and space (every non-alphanumeric) into
+ * "-". Guessing the encoding is therefore fragile — a project at
+ * /Users/john.doe/my.app, my_project or "My Work" would silently find zero
+ * sessions (found by independent test on 0.1.74, 2026-09-29; the whole first
+ * screen — check, history, list-sessions, card — showed "No sessions found").
+ *
+ * So encoding is only a FAST-PATH hint. The source of truth is the `cwd` field
+ * every Claude session line carries: this reads the real cwd out of each folder
+ * and matches on it (realpath-compared, so symlinks and dotted paths just work),
+ * which also survives any future encoding change Claude Code makes.
+ */
+function encodeCandidates(cwd: string): string[] {
+  const slashOnly = cwd.replace(/\//g, "-");
+  const allNonAlnum = cwd.replace(/[^A-Za-z0-9]/g, "-");
+  return [...new Set([slashOnly, allNonAlnum])];
+}
+
+function realpathOr(p: string): string {
+  try {
+    return realpathSync(p);
+  } catch {
+    return p;
+  }
+}
+
+/** The cwd a session folder belongs to, read from the first line that carries it. */
+function sessionCwdOf(sessionFile: string): string | null {
+  let text: string;
+  try {
+    text = readFileSync(sessionFile, "utf-8");
+  } catch {
+    return null;
+  }
+  // The cwd is on every line; scan only until the first hit (usually line 1).
+  let from = 0;
+  for (let i = 0; i < 200; i++) {
+    const nl = text.indexOf("\n", from);
+    const line = text.slice(from, nl === -1 ? undefined : nl);
+    if (line.includes('"cwd"')) {
+      try {
+        const cwd = (JSON.parse(line) as { cwd?: unknown }).cwd;
+        if (typeof cwd === "string" && cwd.length > 0) return cwd;
+      } catch {
+        /* partial/garbled line: keep scanning */
+      }
+    }
+    if (nl === -1) break;
+    from = nl + 1;
+  }
+  return null;
+}
+
+/** A cwd looks like a real project root, so descendant (monorepo) sessions are safe to pull in. */
+function looksLikeProjectRoot(cwd: string): boolean {
+  return [".git", "CLAUDE.md", "AGENTS.md", "GEMINI.md", ".claude", ".cursor", ".github/copilot-instructions.md"].some(
+    (marker) => existsSync(join(cwd, marker))
+  );
+}
+
+/** Absolute paths of every Claude-Code-style home to search, including CLAUDE_CONFIG_DIR. */
+function claudeHomeDirs(): string[] {
+  const dirs = new Set<string>();
+  for (const name of findClaudeHomeDirNames()) dirs.add(join(homedir(), name));
+  const cfg = process.env.CLAUDE_CONFIG_DIR;
+  if (cfg) for (const part of cfg.split(",")) {
+    const p = part.trim();
+    if (p) dirs.add(p);
+  }
+  return [...dirs];
 }
 
 function listSessionFiles(projectDir: string): string[] {
@@ -74,14 +144,58 @@ export function findClaudeHomeDirNames(): string[] {
   }
 }
 
-/** Every session file for this project, newest first. */
+/**
+ * Every session file that belongs to this project, newest first.
+ *
+ * A folder matches when the real cwd stored in its sessions is THIS directory
+ * (encoding-independent — handles dots, underscores, spaces, symlinks), or when
+ * this directory is a project root and the session's cwd is inside it (a
+ * monorepo subfolder like packages/api, so the root check sees that work too).
+ * Encoding candidates are only a fallback for folders whose stored cwd can't be
+ * read.
+ */
 export function listAllSessionFiles(cwd: string): string[] {
-  const encoded = encodeProjectPath(cwd);
-  const sessionFiles = findClaudeHomeDirNames().flatMap((dirName) =>
-    listSessionFiles(join(homedir(), dirName, "projects", encoded))
-  );
-  sessionFiles.sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs);
-  return sessionFiles;
+  const target = realpathOr(cwd);
+  const candidates = new Set(encodeCandidates(cwd));
+  const allowDescendants = looksLikeProjectRoot(cwd);
+  const files: string[] = [];
+  const seen = new Set<string>();
+
+  for (const home of claudeHomeDirs()) {
+    const projectsDir = join(home, "projects");
+    let folders: string[];
+    try {
+      folders = readdirSync(projectsDir);
+    } catch {
+      continue;
+    }
+    for (const folder of folders) {
+      const dir = join(projectsDir, folder);
+      const folderFiles = listSessionFiles(dir);
+      if (folderFiles.length === 0) continue;
+
+      const storedCwd = sessionCwdOf(folderFiles[0]);
+      let matches = false;
+      if (storedCwd) {
+        const real = realpathOr(storedCwd);
+        if (real === target) matches = true;
+        else if (allowDescendants && real.startsWith(target + sep)) matches = true;
+      } else {
+        // No readable cwd (older/garbled file): fall back to the name encoding.
+        matches = candidates.has(folder);
+      }
+      if (!matches) continue;
+      for (const f of folderFiles) {
+        if (!seen.has(f)) {
+          seen.add(f);
+          files.push(f);
+        }
+      }
+    }
+  }
+
+  files.sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs);
+  return files;
 }
 
 export function findLatestSessionFile(cwd: string): string | null {
