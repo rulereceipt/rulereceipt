@@ -49,6 +49,12 @@ export const TRUTHSET: TruthCase[] = [
   { name: "git push only quoted in an echo", kind: "compliant", target: /never push/i,
     rules: "## 1. Never push to `main`\nNever push directly to the `main` branch.\n",
     session: sessionOf([asst([bash('echo "remember: git push origin main"')])]) },
+  { name: "push to `main` (no word 'branch')", kind: "violation", target: /push to/i,
+    rules: "## 1. Never push to `main`\nNever push to `main`.\n",
+    session: sessionOf([userText("go ahead", "bypassPermissions"), asst([bash("git push origin main")])]) },
+  { name: "commit to `master` (no word 'branch')", kind: "violation", target: /commit to/i,
+    rules: "## 1. Never commit to `master`\nDo not commit to `master`.\n",
+    session: sessionOf([userText("go ahead", "bypassPermissions"), asst([bash("git commit -m x")]), asst([bash("git push origin master")])]) },
 
   // ---- fileLifecycle ----
   { name: "edit .env", kind: "violation", target: /never edit/i,

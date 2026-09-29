@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>RuleReceipt — Accuracy</title>
+<meta name="description" content="How often RuleReceipt accuses wrongly, and how often it catches a real violation — measured on 559 real rules files and a hand-labelled detection set, with the method open so you can rerun it." />
+<link rel="canonical" href="https://rulereceipt.dev/accuracy" />
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23FAFAF7'/%3E%3Cpath d='M9 8h14v17l-3-2-3 2-3-2-3 2-2-2z' fill='none' stroke='%2317191C' stroke-width='1.6'/%3E%3Cpath d='M12 14h8M12 18h6' stroke='%2317805F' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E" />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="https://rulereceipt.dev/accuracy" />
+<meta property="og:title" content="RuleReceipt — Accuracy" />
+<meta property="og:description" content="How often RuleReceipt accuses wrongly (1.1%) and how often it catches a real violation — measured, with the method open." />
+<meta property="og:image" content="https://rulereceipt.dev/og-image.png" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:image" content="https://rulereceipt.dev/og-image.png" />
+<meta name="twitter:title" content="RuleReceipt — Accuracy" />
+<meta name="twitter:description" content="1.1% false-accusation ceiling, measured on 559 real rules files. Method open." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<style>
+  :root {
+    --bg: #FAF9F5; --panel: #FFFFFF; --panel-line: #E8E6DC; --panel-line-strong: #DEDCD1;
+    --paper: #141413; --paper-dim: #7A756E; --amber: #C4551F; --cyan: #17805F;
+    --font-display: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--paper); font-family: var(--font-display); font-size: 17px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 660px; margin: 0 auto; padding: 0 24px 100px; }
+  a { color: #AD4A17; }
+  header.top { display: flex; align-items: center; justify-content: space-between; padding: 26px 0 0; }
+  .wordmark { font-weight: 800; font-size: 1.05rem; letter-spacing: 0.02em; text-transform: uppercase; color: var(--paper); text-decoration: none; }
+  .back { display: inline-block; font-size: 0.88rem; }
+  h1 { font-size: 2rem; line-height: 1.15; margin: 44px 0 8px; letter-spacing: -0.02em; }
+  h2 { font-size: 1.2rem; margin: 44px 0 10px; }
+  .lede { color: var(--paper-dim); font-size: 1.05rem; margin: 0 0 8px; }
+  .cards { display: flex; gap: 16px; flex-wrap: wrap; margin: 28px 0 8px; }
+  .card { flex: 1 1 200px; background: var(--panel); border: 1px solid var(--panel-line-strong); border-radius: 14px; padding: 22px; }
+  .num { font-size: 2.4rem; font-weight: 800; letter-spacing: -0.03em; line-height: 1; }
+  .num.good { color: var(--cyan); }
+  .card .label { font-weight: 600; margin-top: 8px; }
+  .card .sub { color: var(--paper-dim); font-size: 0.9rem; margin-top: 4px; }
+  code, pre { font-family: var(--font-mono); font-size: 0.9em; }
+  pre { background: var(--panel); border: 1px solid var(--panel-line-strong); border-radius: 10px; padding: 14px 16px; overflow-x: auto; font-size: 0.85rem; }
+  .note { background: var(--panel); border: 1px solid var(--panel-line); border-left: 3px solid var(--cyan); border-radius: 8px; padding: 14px 16px; margin: 16px 0; font-size: 0.95rem; }
+  .limits { border-left-color: var(--amber); }
+  ul { padding-left: 20px; } li { margin: 6px 0; }
+  .foot { color: var(--paper-dim); font-size: 0.85rem; margin-top: 50px; border-top: 1px solid var(--panel-line); padding-top: 18px; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg:#141413; --panel:#1E1E1C; --panel-line:#2C2C29; --panel-line-strong:#38382F; --paper:#F5F4EE; --paper-dim:#A6A197; }
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="top">
+      <a class="wordmark" href="/">RuleReceipt</a>
+      <a class="back" href="/">&larr; back</a>
+    </header>
+
+    <h1>Accuracy, measured</h1>
+    <p class="lede">The one thing this tool cannot afford to do is accuse you wrongly. So we measure it — on real files, with a method you can rerun — instead of asserting it.</p>
+
+    <div class="cards">
+      <div class="card">
+        <div class="num good">1.1%</div>
+        <div class="label">False-accusation ceiling</div>
+        <div class="sub">Share of reports carrying any FAIL across 559 real rules files run over 10 real sessions (5,590 reports). An upper bound — see the note below.</div>
+      </div>
+      <div class="card">
+        <div class="num good">12 / 12</div>
+        <div class="label">Known violations caught</div>
+        <div class="sub">A hand-labelled detection set spanning every structured check — each a real violation plus a near-miss that must stay quiet. 9 / 9 near-misses stayed quiet.</div>
+      </div>
+    </div>
+
+    <h2>What the false-accusation number means</h2>
+    <p>Take 559 rules files people actually published, and 10 real coding sessions. Run every file against every session — 5,590 reports — and count how many carry even one FAIL. That is <strong>1.1%</strong>.</p>
+    <p>It is a <strong>ceiling</strong>, not an error rate, and deliberately so: those rules belong to other people's projects and the sessions don't, so almost every FAIL there is spurious <em>by construction</em>. The real false-accusation rate on your own rules and your own sessions is lower. We report the ceiling because it is the number we can measure honestly and that only moves when the tool's readiness to accuse changes — it went from about one report in six, early on, to 1.1% today.</p>
+
+    <h2>What the detection number means</h2>
+    <p>Precision alone can be gamed by never accusing anything. So there is a second set: hand-labelled sessions that genuinely break a rule (a push to <code>main</code>, an edit to <code>.env</code>, a <code>console.log</code> written into a file, a "tests pass" claim after a failing run, a forbidden import, a missing test) — each paired with a near-miss that must <em>not</em> fire. Every violation is caught; every near-miss stays quiet.</p>
+
+    <h2>Run it yourself</h2>
+    <p>The strongest version of this claim is the one you check. The self-test ships in the CLI and makes zero network calls — watch it with <code>lsof</code> or Little Snitch:</p>
+    <pre>npx rulereceipt@latest selftest</pre>
+    <p>The full precision and detection measurements are ordinary scripts in the <a href="https://github.com/rulereceipt/rulereceipt">open repository</a> — clone it and run them against your own corpus and sessions.</p>
+
+    <div class="note">A "FAIL" can only be produced from a rule that actually <em>forbids</em> something — that's a compile-time invariant, enforced by the build, not a convention. When the evidence doesn't settle a rule, the answer is "couldn't tell," never a guess.</div>
+
+    <div class="note limits">
+      <strong>The honest limits.</strong>
+      <ul>
+        <li>1.1% is an <em>upper bound</em> from other people's rules on our sessions — not a measured rate on your own setup.</li>
+        <li>The detection set is v1 and hand-built: it proves the checks catch the violations we tested and stay quiet on the near-misses, not that they catch every possible real-world violation.</li>
+        <li>It reads one session's recorded transcript. It is solid for the honest case — it is not, today, tamper-evident against someone deliberately covering their tracks.</li>
+      </ul>
+    </div>
+
+    <div class="foot">
+      Numbers on this page were measured on 2026-09-29 against rulereceipt 0.1.70. They change when the tool does; this page is updated with them, not ahead of them.
+    </div>
+  </div>
+</body>
+</html>

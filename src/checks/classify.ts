@@ -408,6 +408,12 @@ function isClaimEvidenceRule(rule: Rule): boolean {
 
 const BRANCH_WORD = /\bbranch\b/i;
 
+// A git ref-action verb. "Never push to `main`" / "don't commit to `master`"
+// are branch rules even without the literal word "branch" — found missed in the
+// 2026-09-29 full-tool validation. Paired with a backticked, branch-shaped
+// literal (and NOT a file token), so a bare English "main" is not swept in.
+const GIT_REF_ACTION = /\b(?:push(?:ing|es|ed)?|commit(?:ting|s|ted)?|merg(?:e|ing|es|ed)|rebas(?:e|ing|es|ed)|checkout)\b/i;
+
 /**
  * A literal that could actually be a git branch name.
  *
@@ -916,8 +922,10 @@ export function classifyRule(rule: Rule): Classification {
   // Real rules here name exactly one branch ("the `demo` branch", "never
   // push to the `main` branch"), and a rule that mentions branches while
   // naming a command belongs to whichever checker handles that command.
-  const branchName = [...patterns].find(isBranchName);
-  if (BRANCH_WORD.test(text) && branchName !== undefined) {
+  // A branch name is a backticked, branch-shaped literal that is NOT a file
+  // token (`.env`, `dist/`) — those belong to fileLifecycle, not a ref check.
+  const branchName = [...patterns].find((p) => isBranchName(p) && !looksLikeFilePathToken(p));
+  if ((BRANCH_WORD.test(text) || GIT_REF_ACTION.test(text)) && branchName !== undefined) {
     return { kind: "gitBranchPolicy", rule, branchName, polarity , polarityInferred };
   }
 
