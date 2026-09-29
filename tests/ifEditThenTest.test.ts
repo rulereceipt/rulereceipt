@@ -20,7 +20,7 @@ describe("runIfEditThenTestChecks", () => {
   it("FAILs (skipped) when a prod file is edited with no matching test file", () => {
     const events = [edit("src/foo.ts")];
     const [result] = runIfEditThenTestChecks([rule], events);
-    expect(result.status).toBe("FAIL");
+    expect(result.status).toBe("UNCLEAR");
   });
 
   it("PASSes (followed) when both a prod file and a test file are edited", () => {
@@ -37,7 +37,7 @@ describe("runIfEditThenTestChecks", () => {
   it("does NOT count assistant chat text claiming 'I added tests' as evidence — only real tool_use edits count", () => {
     const events = [edit("src/foo.ts"), textEvent("I added tests for this in src/foo.test.ts, all passing now.")];
     const [result] = runIfEditThenTestChecks([rule], events);
-    expect(result.status).toBe("FAIL");
+    expect(result.status).toBe("UNCLEAR");
   });
 
   // #3 (2026-09-26): pytest and RSpec test files were unrecognised, so adding
@@ -54,7 +54,7 @@ describe("runIfEditThenTestChecks", () => {
 
   it("does not mistake a prod file with 'test' mid-name for a test file", () => {
     const events = [edit("src/latest_data.py")];
-    expect(runIfEditThenTestChecks([rule], events)[0].status).toBe("FAIL");
+    expect(runIfEditThenTestChecks([rule], events)[0].status).toBe("UNCLEAR");
   });
 
   it("recognizes __tests__/ directory style test files, not just .test. suffix", () => {
@@ -94,7 +94,7 @@ describe("runIfEditThenTestChecks", () => {
     it("still correctly FAILs on a real code file even when a doc file was ALSO edited without a test", () => {
       const events = [edit("src/foo.ts"), edit("README.md")];
       const [result] = runIfEditThenTestChecks([rule], events);
-      expect(result.status).toBe("FAIL");
+      expect(result.status).toBe("UNCLEAR");
       expect(result.evidence).toContain("src/foo.ts");
       expect(result.evidence).not.toContain("README.md");
     });
@@ -153,12 +153,12 @@ describe("a test RUN satisfies an edit-implies-test rule", () => {
   it("still FAILS when code changed and nothing tested it at all", () => {
     // The case the rule actually exists for must keep failing.
     const [r] = runIfEditThenTestChecks([rule], [edit("src/app.ts"), bash("git commit -m wip")]);
-    expect(r.status).toBe("FAIL");
+    expect(r.status).toBe("UNCLEAR");
   });
 
   it("does not count an unrelated command as a test run", () => {
     const [r] = runIfEditThenTestChecks([rule], [edit("src/app.ts"), bash("npm run build")]);
-    expect(r.status).toBe("FAIL");
+    expect(r.status).toBe("UNCLEAR");
   });
 });
 
@@ -205,13 +205,13 @@ describe("scratch, temp and generated paths are not production code", () => {
 
   it("still demands a test for real source under a src directory", () => {
     const [r] = runIfEditThenTestChecks([rule], [edit("src/app.ts")]);
-    expect(r.status).toBe("FAIL");
+    expect(r.status).toBe("UNCLEAR");
   });
 
   it("does not let a temp edit mask a real one in the same session", () => {
     // The real file still has to be answered for.
     const [r] = runIfEditThenTestChecks([rule], [edit("/tmp/probe.mjs"), edit("src/app.ts")]);
-    expect(r.status).toBe("FAIL");
+    expect(r.status).toBe("UNCLEAR");
     expect(r.evidence).toMatch(/src\/app\.ts/);
     expect(r.evidence).not.toMatch(/probe\.mjs/);
   });

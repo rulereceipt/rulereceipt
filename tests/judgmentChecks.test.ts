@@ -72,7 +72,10 @@ describe("runJudgmentChecks — API interaction (mocked, no live API key availab
     }));
     const { runJudgmentChecks } = await import("../src/checks/judgmentChecks.js");
     const results = await runJudgmentChecks([rule], []);
-    expect(results[0]).toMatchObject({ ruleId: "4", status: "FAIL" });
+    // A model "FAIL" is never a verdict — it is surfaced as a labelled AI
+    // opinion needing a human (UNCLEAR), never a counted Broken (A1, 2026-09-29).
+    expect(results[0]).toMatchObject({ ruleId: "4", status: "UNCLEAR", needsHuman: true });
+    expect(results[0].evidence).toMatch(/AI opinion/i);
   });
 
   it("fails closed to UNCLEAR if the API call throws", async () => {
@@ -161,7 +164,8 @@ describe("runJudgmentChecks — API interaction (mocked, no live API key availab
     const global = results.find((r) => r.ruleSource === "global");
     const project = results.find((r) => r.ruleSource === "project");
     expect(global?.status).toBe("PASS");
-    expect(project?.status).toBe("FAIL");
+    // A model "FAIL" becomes a labelled opinion (UNCLEAR), never a counted Broken.
+    expect(project?.status).toBe("UNCLEAR");
   });
 
   // proves this test can fail: an invalid status value must not be trusted as-is

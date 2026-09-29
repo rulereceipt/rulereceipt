@@ -296,7 +296,24 @@ export async function runJudgmentChecks(
           : "the situation this rule governs never arose in this session",
       };
     }
-    if (status === "PASS" || status === "FAIL" || status === "UNCLEAR") {
+    if (status === "FAIL") {
+      // An AI opinion is NEVER a verdict — the product's guarantee is that
+      // "Broken" comes only from a forbidden action that happened or a claim
+      // contradicted by the session, never a model's guess. A model "FAIL" is
+      // surfaced as a clearly-labelled opinion needing a human, so it can never
+      // be counted as Broken in the report, history, card, digest or badge.
+      const evidence = (parsed.evidence ?? "").trim();
+      return {
+        ruleId: rule.id,
+        ruleTitle: rule.title,
+        ruleSource: rule.source,
+        status: "UNCLEAR" as const,
+        needsHuman: true,
+        method: "model_judgment" as const,
+        evidence: `AI opinion (not a verdict — a human should decide): this looks broken. ${evidence}${transcript.truncated ? ` ${TRUNCATION_NOTE}` : ""}`.trim(),
+      };
+    }
+    if (status === "PASS" || status === "UNCLEAR") {
       const evidence = parsed.evidence ?? "";
       return {
         ruleId: rule.id,

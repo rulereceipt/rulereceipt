@@ -113,12 +113,20 @@ export function runIfEditThenTestChecks(
     }
 
     if (testPaths.length === 0) {
+      // Shadow, 2026-09-29: "every change needs a test" is a REQUIRE rule, and
+      // an edit with no test touched or run is not PROOF the rule was broken —
+      // the test may not have been needed, or may have run in another terminal.
+      // The product's guarantee is that "Broken" means a forbidden action
+      // actually happened, or a claim was contradicted by the session; this is
+      // neither, so it reports "can't tell", never a fabricated FAIL. Promote to
+      // Broken only after 30+ real cases are hand-checked at 0 wrong.
       return {
         ruleId: rule.id,
         ruleTitle: rule.title,
         ruleSource: rule.source,
-        status: "FAIL",
-        evidence: `edited ${prodPaths.slice(0, 3).join(", ")}${prodPaths.length > 3 ? ", ..." : ""} but no matching test file was touched`,
+        status: "UNCLEAR" as const,
+        method: "edit_test_pairing" as const,
+        evidence: `edited ${prodPaths.slice(0, 3).join(", ")}${prodPaths.length > 3 ? ", ..." : ""}, and no test file was touched or run this session — can't tell whether this change needed a test`,
       };
     }
 

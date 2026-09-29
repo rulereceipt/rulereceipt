@@ -103,7 +103,10 @@ export const TRUTHSET: TruthCase[] = [
     session: sessionOf([asst([bash("npm test", "t1")]), toolResult("t1", "Tests: 5 passed, 0 failed", false), say("All tests are passing now, ready to merge.")]) },
 
   // ---- ifEditThenTest ----
-  { name: "edited prod code, no test, no run", kind: "violation", target: /every change/i,
+  // edit-without-test is a REQUIRE rule: not PROVABLE as broken (the test may
+  // not have been needed, or ran elsewhere), so the tool must NOT fabricate a
+  // FAIL — it stays can't-tell. This case guards that it does not over-accuse.
+  { name: "edited prod code, no test, no run -> can't tell (not a fabricated FAIL)", kind: "compliant", target: /every change/i,
     rules: "## 1. Every change needs a test\nEvery change needs a corresponding test.\n",
     session: sessionOf([asst([write("src/pricing.ts", "export const rate = 0.2;")])]) },
   { name: "edited prod code and ran the suite", kind: "compliant", target: /every change/i,

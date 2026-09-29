@@ -22,9 +22,8 @@ import { join, relative } from "node:path";
  */
 const ALLOWED = new Set([
   "types.ts",
-  join("checks", "claimEvidence.ts"),
-  join("checks", "ifEditThenTest.ts"),
-  "cli.ts",
+  join("checks", "claimEvidence.ts"), // a claim contradicted by session evidence (a "contradiction" FAIL)
+  "cli.ts", // the `demo` command's hardcoded sample output — illustration, not a verdict
 ]);
 
 const FAIL_CONSTRUCTION = /status:\s*["']FAIL["']/;
