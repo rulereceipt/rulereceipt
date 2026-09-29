@@ -478,6 +478,30 @@ function isContentToken(literal: string): boolean {
   return (literal.match(/[A-Za-z0-9]/g) ?? []).length >= 3;
 }
 
+/**
+ * A file/directory/route token, as opposed to a code construct or an import
+ * specifier. It names a PATH, so searching file CONTENT for it (codeContent's
+ * job) matches every import, changelog line, package.json entry or prose that
+ * merely MENTIONS the path — a "found `dist/` written into a file" false
+ * accusation. Found in the false-accusation corpus run 2026-09-29: ~30 distinct
+ * FAIL texts were exactly this (`dist/`, `src/`, `README.md`, `AGENTS.md`,
+ * `./types`, `/status`, …). These belong to fileLifecycle (a path mutation) or,
+ * absent a mutation verb, to the deterministic checker, which reports UNCLEAR
+ * rather than fabricating a FAIL.
+ *
+ * Deliberately NARROW so real import specifiers stay checkable: `lucide-react`
+ * and `@scope/pkg` are NOT file tokens (no leading `./` or `/`, no trailing
+ * `/`, no file extension), so a "never import X" rule keeps working.
+ */
+const FILE_EXTENSION = /\.(json|ya?ml|toml|md|mdx|env|lock|ini|cfg|conf|xml|txt|js|jsx|mjs|cjs|ts|tsx|py|rb|go|rs|sh|sql|css|scss|html)$/i;
+function looksLikeFilePathToken(literal: string): boolean {
+  return (
+    /\/$/.test(literal) || // trailing slash: a directory ("dist/", "src/")
+    /^(?:\.{1,2}\/|\/)/.test(literal) || // leading ./ ../ or /: a path or route
+    FILE_EXTENSION.test(literal) // a bare filename with a known extension
+  );
+}
+
 // Catches rules like "add tests for every change" or "every new function
 // needs a test" - no literal backtick token to pattern-match, so without
 // this they'd fall all the way through to judgment (an LLM call) even
@@ -932,7 +956,11 @@ export function classifyRule(rule: Rule): Classification {
   // only, so this is an action not a mention. Plain words and shell commands
   // are excluded by isContentToken; protected files already routed above.
   if (polarity === "forbid") {
-    const contentTokens = [...patterns].filter(isContentToken);
+    // A file/dir/route token is a path reference, not code to search for inside
+    // file content — routing it to codeContent produces "found `dist/` written
+    // into a file" on any mention. Excluded here; it falls through to the
+    // deterministic checker (UNCLEAR, never a fabricated FAIL).
+    const contentTokens = [...patterns].filter((p) => isContentToken(p) && !looksLikeFilePathToken(p));
     if (contentTokens.length > 0) {
       return { kind: "codeContent", rule, patterns: contentTokens, polarity, polarityInferred };
     }
