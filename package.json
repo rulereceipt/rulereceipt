@@ -1,6 +1,6 @@
 {
   "name": "rulereceipt",
-  "version": "0.1.66",
+  "version": "0.1.67",
   "description": "Checks whether your AI coding agent followed your rules, with evidence. Works with Claude Code (Codex in testing); reads CLAUDE.md, AGENTS.md, Cursor, Copilot and Windsurf rules.",
   "repository": {
     "type": "git",
