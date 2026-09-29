@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
-import { join, dirname, parse } from "node:path";
+import { join, dirname, parse, resolve } from "node:path";
+import { resolveImports } from "./parsers/imports.js";
 
 /**
  * An AGENTS.md that Claude Code never loads because a CLAUDE.md sits beside it.
@@ -55,7 +56,10 @@ export function shadowedAgentsMd(cwd: string): ShadowedAgents[] {
       const claudePath = join(dir, claude);
       const agentsPath = join(dir, agents);
       if (existsSync(claudePath) && existsSync(agentsPath)) {
-        found.push({ agents: agentsPath, shadowedBy: claudePath });
+        // If the CLAUDE.md @imports the AGENTS.md, the agent DOES read it — it
+        // is not shadowed, and warning that it is would itself be untrue.
+        const importedByClaude = resolveImports(claudePath).some((p) => resolve(p) === resolve(agentsPath));
+        if (!importedByClaude) found.push({ agents: agentsPath, shadowedBy: claudePath });
       }
     }
     if (existsSync(join(dir, ".git"))) break;

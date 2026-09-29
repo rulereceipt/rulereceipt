@@ -4,6 +4,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { parseClaudeMd } from "./parsers/readClaudeMd.js";
 import { findClaudeHomeDirNames } from "./parsers/transcriptParser.js";
 import { loadMemoryRules } from "./parsers/readMemory.js";
+import { resolveImports } from "./parsers/imports.js";
 import type { Rule } from "./types.js";
 
 /**
@@ -158,6 +159,40 @@ function ruleSourcesAtLevel(dir: string): RuleSource[] {
   // Gemini CLI: single rules file (its AGENTS.md equivalent).
   loaded("GEMINI.md", "Gemini");
 
+  return applyImports(out);
+}
+
+/**
+ * Claude Code follows @imports: a loaded rules file that says `@AGENTS.md` (or
+ * `@docs/rules.md`) makes that file part of what the agent reads. So an imported
+ * file is NOT shadowed, and its rules ARE checked. This reconciles `out` with
+ * that: any file imported by a loaded file is promoted to loaded (a shadowed
+ * AGENTS.md a CLAUDE.md imports flips to loaded), and any imported file not
+ * already listed is added as a loaded source. Without imports, `out` is
+ * unchanged, so existing projects keep their exact rule order and ids.
+ */
+function applyImports(out: RuleSource[]): RuleSource[] {
+  const imported = new Set<string>();
+  for (const src of out) {
+    if (src.status !== "loaded") continue;
+    for (const target of resolveImports(src.path)) imported.add(resolve(target));
+  }
+  if (imported.size === 0) return out;
+
+  const present = new Set(out.map((s) => resolve(s.path)));
+  for (const src of out) {
+    if (src.status === "shadowed" && imported.has(resolve(src.path))) {
+      src.status = "loaded";
+      src.note = "imported by a loaded CLAUDE.md (@import), so the agent does read it";
+    }
+  }
+  // Imported files that were not otherwise candidates at this level (e.g. a
+  // @docs/rules.md), in a stable order so rule ids stay deterministic.
+  for (const path of [...imported].sort()) {
+    if (present.has(path)) continue;
+    present.add(path);
+    out.push({ path, status: "loaded", format: "imported (@import)" });
+  }
   return out;
 }
 
