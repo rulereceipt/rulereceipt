@@ -1042,7 +1042,7 @@
           </details>
           <details class="faq-item">
             <summary>How do I know it won't just cry wolf?</summary>
-            <p>Because that's the thing it's built against. An early version did cry wolf — across 559 real rules files, about one report in six carried a false accusation. Most of the work since has gone into fixing that, not into catching more: measured over those same 559 rules files run against 10 real sessions, it's down to <strong>1.2%</strong>, and a "FAIL" can only be produced from a rule that actually forbids something — enforced at build time, not left to hope. When the evidence doesn't settle it, the answer is "couldn't tell," never a guess. A checker that accuses you wrongly is worse than no checker, so it's optimised to stay quiet unless it's sure. You don't have to take our word for it — <code>rulereceipt selftest</code> runs the checkers on bundled examples with known answers, on your machine, with zero network calls. Full numbers and method: <a href="/accuracy">the accuracy page</a>.</p>
+            <p>Because that's the thing it's built against. An early version did cry wolf — across 559 real rules files, about one report in six carried a false accusation. Most of the work since has gone into fixing that, not into catching more: measured over those same 559 rules files run against 10 real sessions, it's down to <strong>1.1%</strong>, and a "FAIL" can only be produced from a rule that actually forbids something — enforced at build time, not left to hope. When the evidence doesn't settle it, the answer is "couldn't tell," never a guess. A checker that accuses you wrongly is worse than no checker, so it's optimised to stay quiet unless it's sure. You don't have to take our word for it — <code>rulereceipt selftest</code> runs the checkers on bundled examples with known answers, on your machine, with zero network calls. Full numbers and method: <a href="/accuracy">the accuracy page</a>.</p>
           </details>
           <details class="faq-item">
             <summary>Can it check every session, not just one?</summary>
@@ -1082,7 +1082,14 @@
     <div class="wrap">
       <div class="cmd-repeat" id="copy-footer" data-copy="npx rulereceipt check" data-loc="footer" role="button" tabindex="0" title="Click to copy">npx rulereceipt check</div>
       <div class="fine">Your machine. Your rules. Your receipt.</div>
-      <div class="fine" style="margin-top:14px">
+      <div style="margin-top:18px;">
+        <a href="https://www.producthunt.com/products/rulereceipt?launch=rulereceipt" target="_blank" rel="noopener"
+           style="display:inline-flex;align-items:center;gap:9px;border:1px solid var(--panel-line-strong);border-radius:11px;padding:9px 15px;background:var(--panel);color:var(--paper);text-decoration:none;font-weight:600;font-size:0.9rem;">
+          <span aria-hidden="true" style="display:inline-flex;width:22px;height:22px;align-items:center;justify-content:center;border-radius:6px;background:#DA552F;color:#fff;font-weight:800;font-family:var(--font-display);">P</span>
+          Featured on Product Hunt
+        </a>
+      </div>
+      <div class="fine" style="margin-top:16px">
         <a href="/about">About</a> · <a href="/stats">Usage stats</a> · <a href="/postmortem">What we got wrong</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a> · <a href="/unsubscribe">Unsubscribe</a>
       </div>
       <div class="social-row">
