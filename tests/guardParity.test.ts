@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { guardDecision } from "../src/guard.js";
@@ -62,5 +63,24 @@ describe("guard and check agree (parity)", () => {
   it("cleans up", () => {
     rmSync(dir, { recursive: true, force: true });
     expect(true).toBe(true);
+  });
+});
+describe("guard: a bare `git push` is scoped by the current branch", () => {
+  function repoOn(branch: string): string {
+    const dir = mkdtempSync(join(tmpdir(), "rr-branch-"));
+    execFileSync("git", ["init", "-q"], { cwd: dir });
+    execFileSync("git", ["symbolic-ref", "HEAD", `refs/heads/${branch}`], { cwd: dir });
+    writeFileSync(join(dir, "CLAUDE.md"), "## 1. r\nNever push to main without asking me first.\n");
+    return dir;
+  }
+  it("bare `git push` from a feature branch is NOT gated (rule is push to main)", () => {
+    const dir = repoOn("feature/login");
+    expect(guardDecision(dir, "Bash", { command: "git push" }, [], "bypassPermissions").deny).toBe(false);
+    rmSync(dir, { recursive: true, force: true });
+  });
+  it("bare `git push` from main IS gated", () => {
+    const dir = repoOn("main");
+    expect(guardDecision(dir, "Bash", { command: "git push" }, [], "bypassPermissions").deny).toBe(true);
+    rmSync(dir, { recursive: true, force: true });
   });
 });

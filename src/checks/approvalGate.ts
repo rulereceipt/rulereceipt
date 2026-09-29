@@ -114,7 +114,7 @@ export function approvalScopedBranch(rule: { title: string; text: string }): str
  * push to a DIFFERENT branch returns false, so a feature-branch push is not
  * gated by a rule that names main.
  */
-function pushTargetsBranch(command: string, branch: string): boolean {
+function pushTargetsBranch(command: string, branch: string, currentBranch?: string): boolean {
   const m = command.match(/\bgit\s+(?:\S+\s+){0,4}?push\b(.*)/i);
   if (!m) return true;
   const args = m[1];
@@ -125,7 +125,12 @@ function pushTargetsBranch(command: string, branch: string): boolean {
     const b = tokens[tokens.length - 1];
     return b === branch || b.endsWith(`/${branch}`);
   }
-  return true; // bare `git push` / `git push origin` — unknown target, gate to be safe
+  // Bare `git push` / `git push origin` — the target is the CURRENT branch. When
+  // the guard can tell us that branch, gate only if it is the scoped branch (a
+  // bare push from a feature branch is not a push to main). When it is unknown
+  // (the check path, or git unavailable), gate to be safe.
+  if (currentBranch) return currentBranch === branch || currentBranch.endsWith(`/${branch}`);
+  return true;
 }
 
 /** The result for the call at `i`: matched by id when present, else the next result. */
@@ -157,6 +162,8 @@ export interface ApprovalOptions {
   allow?: string[];
   /** When set, a `push` action is only gated if it targets this branch (or its target is unknown). */
   scopedBranch?: string;
+  /** The current git branch (guard only), so a bare `git push` from a feature branch is not gated by a "push to main" rule. */
+  currentBranch?: string;
 }
 
 interface Occurrence {
@@ -176,7 +183,7 @@ export function approvalOccurrences(events: TranscriptEvent[], actions: Action[]
       if (!IN_COMMAND[action].test(command)) continue;
       // A branch-scoped push rule ("push to main") does not gate a push to a
       // different branch — only main (or a bare push whose target is unknown).
-      if (action === "push" && opts.scopedBranch && !pushTargetsBranch(command, opts.scopedBranch)) continue;
+      if (action === "push" && opts.scopedBranch && !pushTargetsBranch(command, opts.scopedBranch, opts.currentBranch)) continue;
       const res = resultOf(events, i);
       if (res && res.kind === "tool_result" && res.isError) continue; // rejected in the prompt, or it never went through
       const from = (lastIndex[action] ?? -1) + 1;

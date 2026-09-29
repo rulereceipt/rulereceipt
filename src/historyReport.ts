@@ -4,6 +4,18 @@ import { evaluateSession } from "./evaluate.js";
 import type { CheckResult, Rule } from "./types.js";
 
 /**
+ * One-line clip that ends on a whole word with an ellipsis, never mid-sentence.
+ * Found by a real test 2026-09-29: a break quote was cut as "...so no prompt was".
+ */
+function clip(s: string, n: number): string {
+  const one = s.replace(/\s+/g, " ").trim();
+  if (one.length <= n) return one;
+  const cut = one.slice(0, n);
+  const lastSpace = cut.lastIndexOf(" ");
+  return `${(lastSpace > n * 0.6 ? cut.slice(0, lastSpace) : cut).replace(/[\s,;:.—-]+$/, "")}…`;
+}
+
+/**
  * History mode — the first-run "wait, what?" screen.
  *
  * `npx rulereceipt` with no arguments checks EVERY session for this project in
@@ -183,10 +195,10 @@ export function renderHistory(s: HistorySummary, projectName: string, now = Date
     out.push(`${who} broke your rules ${s.totalBrokenCount} time${s.totalBrokenCount === 1 ? "" : "s"}.`);
     out.push("");
     for (const b of s.breaks.slice(0, 10)) {
-      const title = b.ruleTitle.replace(/\s+/g, " ").trim().slice(0, 60);
+      const title = clip(b.ruleTitle, 60);
       const when = relDate(b.lastMs, now);
       out.push(`  x  ${title}    ${b.count} time${b.count === 1 ? "" : "s"}   last: ${when}`);
-      if (b.quote) out.push(`       ${b.quote.replace(/\s+/g, " ").trim().slice(0, 100)}`);
+      if (b.quote) out.push(`       ${clip(b.quote, 100)}`);
     }
   }
   out.push("");

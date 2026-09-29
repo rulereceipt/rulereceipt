@@ -8,6 +8,23 @@ import { loadOverrides, ruleFingerprint, ratifiedForbids } from "./overrides.js"
 import { commandRunsLiteral } from "./checks/proposedAction.js";
 import { approvalOccurrences, allowListed, approvalCommandShort, approvalScopedBranch } from "./checks/approvalGate.js";
 import { readTranscriptFromFile } from "./parsers/transcriptParser.js";
+import { execFileSync } from "node:child_process";
+
+/**
+ * The current git branch in `cwd`, or undefined if it can't be determined —
+ * so a bare `git push` from a feature branch is not gated by a "push to main"
+ * rule. Fails open (never throws, never blocks) if git is unavailable.
+ */
+function gitCurrentBranch(cwd: string): string | undefined {
+  try {
+    // `symbolic-ref --short HEAD` gives the branch name even on an unborn branch
+    // (no commits yet); `rev-parse --abbrev-ref` returns "HEAD" there.
+    const b = execFileSync("git", ["symbolic-ref", "--short", "HEAD"], { cwd, encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"], timeout: 1000 }).trim();
+    return b && b !== "HEAD" ? b : undefined;
+  } catch {
+    return undefined;
+  }
+}
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -279,7 +296,7 @@ function unapprovedGate(cwd: string, command: string, events: TranscriptEvent[])
   const gates = classifyRules(loadRules(cwd)).filter((c) => c.kind === "approvalGate") as Array<{ rule: Rule; actions: string[] }>;
   for (const { rule, actions } of gates) {
     const proposed: TranscriptEvent = { role: "assistant", kind: "tool_use", toolName: "Bash", input: { command }, timestamp: "", permissionMode: "dontAsk" };
-    const occ = approvalOccurrences([...events, proposed], actions as never, { scopedBranch: approvalScopedBranch(rule) });
+    const occ = approvalOccurrences([...events, proposed], actions as never, { scopedBranch: approvalScopedBranch(rule), currentBranch: gitCurrentBranch(cwd) });
     const last = occ[occ.length - 1];
     // Compare against the SAME canonical short the occurrence uses (mention
     // segments dropped, `sh -c` unwrapped) — a raw-string compare missed a
