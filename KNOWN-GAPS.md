@@ -63,6 +63,9 @@ Specific limits:
   left to you, not checked, because the tool cannot evaluate the condition reliably.
 - **Rules that forbid one thing and require another** in the same sentence are left to you,
   so a literal is never checked against the wrong half.
+- **A branch rule follows your exact words.** "Never push to `main`" checks pushes to
+  `main` only — it does **not** also cover `master` (or any other branch). If your default
+  branch is `master`, name it in the rule, or write "`main` or `master`".
 - **Order rules** ("run tests **before** commit") are not checked as an order yet.
 - **Scope rules** ("only change what I asked"), **test-weakening**, and **rules about MCP
   tools** are not checked yet.
