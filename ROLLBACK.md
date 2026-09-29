@@ -4,6 +4,43 @@ What to do if a published release is bad. The npm registry read-side lags a few
 minutes behind a publish, so give any command below time to propagate before
 judging it.
 
+## How publishing works here (read this first)
+
+Publishing is **GitHub Actions only** — there is no npm token on any laptop
+(`npm whoami` returns E401 by design). A new version is published by pushing a
+`v<x.y.z>` git tag: `.github/workflows/publish.yml` triggers on `v*.*.*`, runs
+`npm ci && npm run build`, and publishes with `npm publish --provenance --access
+public` via npm **trusted publishing (OIDC)**. The tag's version must equal
+`package.json`'s version or the publish is wrong/failing. Publishing always goes
+to the **`latest`** dist-tag (there is no staged `next` tag in this workflow).
+
+**Rollback commands below are the exception:** `npm dist-tag` and `npm deprecate`
+are NOT run by the workflow, so they need a local login first:
+
+```bash
+npm login          # authenticate as the rulereceipt npm account (personal, NOT office)
+npm whoami         # confirm it says the rulereceipt account before touching dist-tags
+```
+
+## If 0.1.75 is bad — exact steps
+
+Published 2026-09-30. Last known-good before it: **0.1.74** (but 0.1.74 has the
+session-discovery bug for dotted paths and the false-accusation classes 0.1.75
+fixed — rolling back to it trades bugs, so prefer roll-forward to a 0.1.76 patch).
+
+If you must roll `latest` back right now while a fix is prepared:
+
+```bash
+npm login                                        # as the rulereceipt account
+npm dist-tag add rulereceipt@0.1.74 latest       # point latest back at 0.1.74
+npm deprecate rulereceipt@0.1.75 "Regression in 0.1.75: <one line>. Use 0.1.74, fix incoming."
+npm dist-tag ls rulereceipt                       # confirm latest -> 0.1.74
+```
+
+Then roll forward: fix on main (red-first test), bump to 0.1.76, push a `v0.1.76`
+tag (Actions publishes it to `latest`), and undeprecate is not needed — 0.1.76
+supersedes. Do NOT `npm unpublish` (see below).
+
 ## First: decide roll forward vs roll back
 
 **Prefer rolling forward.** Ship a fixed patch rather than repointing `latest` at
