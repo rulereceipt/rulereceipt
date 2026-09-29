@@ -16,11 +16,26 @@ export interface HookEntry {
   matcher?: string;
 }
 
+/**
+ * A hook command registered more than once on the same event within a single
+ * settings file — so it fires that many times per event. Cross-file repetition
+ * (a global and a project settings file both registering it) is legitimate
+ * layering and is NOT reported: only a genuinely redundant in-file duplicate is,
+ * to avoid a false "you have a problem" on a normal setup.
+ */
+export interface DuplicateHook {
+  sourceFile: string;
+  event: string;
+  command: string;
+  count: number;
+}
+
 export interface DoctorResult {
   filesScanned: string[];
   filesFound: string[];
   hooks: HookEntry[];
   newSinceLastRun: HookEntry[];
+  duplicates: DuplicateHook[];
 }
 
 // Deliberately narrow and literal — false positives waste trust, false
@@ -164,5 +179,21 @@ export function runDoctor(cwd: string): DoctorResult {
 
   saveSnapshot(cwd, hooks);
 
-  return { filesScanned, filesFound, hooks, newSinceLastRun };
+  return { filesScanned, filesFound, hooks, newSinceLastRun, duplicates: findDuplicates(hooks) };
+}
+
+/**
+ * Same command on the same event within ONE file, counted. Keyed by
+ * file+event+command so the global-plus-project case never registers as a
+ * duplicate — that is intended layering, not a misconfiguration.
+ */
+function findDuplicates(hooks: HookEntry[]): DuplicateHook[] {
+  const counts = new Map<string, DuplicateHook>();
+  for (const h of hooks) {
+    const key = `${h.sourceFile}|${h.event}|${h.command}`;
+    const existing = counts.get(key);
+    if (existing) existing.count += 1;
+    else counts.set(key, { sourceFile: h.sourceFile, event: h.event, command: h.command, count: 1 });
+  }
+  return [...counts.values()].filter((d) => d.count > 1);
 }

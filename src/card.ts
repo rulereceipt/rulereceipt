@@ -26,10 +26,16 @@ const SITE = "rulereceipt.dev";
 
 /** The share caption. Counts only, unless showRules adds the broken rule names. */
 export function shareText(d: CardData, showRules = false): string {
-  const base =
-    d.broken > 0
-      ? `${d.who} broke my written rules ${d.broken} time${d.broken === 1 ? "" : "s"} in ${d.days} days (${d.sessions} session${d.sessions === 1 ? "" : "s"}) — now it can't.`
-      : `RuleReceipt checked ${d.sessions} of my agent session${d.sessions === 1 ? "" : "s"} over ${d.days} days against my written rules: ${d.broken} broken.`;
+  // A single dropped session (the browser demo) has no "over N days" span, so
+  // it gets a "this session" caption rather than the history-mode one.
+  const single = d.sessions === 1;
+  const base = single
+    ? d.broken > 0
+      ? `${d.who} broke my written rules ${d.broken} time${d.broken === 1 ? "" : "s"} in this session — now it can't.`
+      : `RuleReceipt checked one of my agent's sessions against my written rules: ${d.broken} broken.`
+    : d.broken > 0
+      ? `${d.who} broke my written rules ${d.broken} time${d.broken === 1 ? "" : "s"} in ${d.days} days (${d.sessions} sessions) — now it can't.`
+      : `RuleReceipt checked ${d.sessions} of my agent sessions over ${d.days} days against my written rules: ${d.broken} broken.`;
   const tail = `Checked with RuleReceipt — runs locally, nothing uploaded. ${SITE}`;
   if (showRules && d.broken > 0 && d.brokenTitles && d.brokenTitles.length > 0) {
     const list = d.brokenTitles.slice(0, 3).map((t) => `“${t.replace(/\s+/g, " ").trim().slice(0, 50)}”`).join(", ");
@@ -66,7 +72,9 @@ function esc(s: string): string {
 /** A self-contained SVG card. Counts only — never rule text, paths or code. */
 export function cardSvg(d: CardData): string {
   const headline = d.broken > 0 ? `${d.who} broke your rules ${d.broken}×` : `0 rules broken`;
-  const sub = `${d.sessions} session${d.sessions === 1 ? "" : "s"} · last ${d.days} days`;
+  const sub = d.days > 0
+    ? `${d.sessions} session${d.sessions === 1 ? "" : "s"} · last ${d.days} days`
+    : `${d.sessions} session${d.sessions === 1 ? "" : "s"}`;
   const stats = `${d.followed} followed · ${d.judgment} need judgment`;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="418" viewBox="0 0 800 418" role="img" aria-label="RuleReceipt summary">
   <rect width="800" height="418" fill="#0b0d10"/>

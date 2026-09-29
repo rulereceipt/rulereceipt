@@ -96,3 +96,9 @@ export function analyze(text: string): AnalysisResult {
 // Client-side SESSION check for the browser demo: drop a session .jsonl +
 // paste rules, get per-rule verdicts, nothing uploaded. Same checkers as the CLI.
 export { evaluateBrowserSession, checkSessionInBrowser, type BrowserSessionSummary } from "./evaluateBrowser.js";
+
+// Share the browser result: caption (counts only), compose links, and a
+// self-contained SVG card. card.ts is pure string work — no Node, no network —
+// so it can run in the page without breaking the "nothing leaves this page"
+// promise. Counts only, never rule text or the session.
+export { shareText, shareLinks, cardSvg, type CardData } from "../card.js";

@@ -11,6 +11,15 @@ export interface Rule {
    * against a rule it was never shown. Absent = always loaded.
    */
   paths?: string[];
+  /**
+   * Absolute path of the rules file this rule was read from, and the 1-based
+   * line where its heading/marker sits. Added 2026-09-29 so a report can say
+   * exactly where a rule lives ("CLAUDE.md:42 — Never push to main"): a verdict
+   * you can walk to the source of is a verdict you can trust. Optional — memory
+   * rules and the freeform-paragraph fallback carry a path but may omit a line.
+   */
+  sourcePath?: string;
+  sourceLine?: number;
 }
 
 export interface TranscriptTextEvent {
@@ -178,6 +187,15 @@ export interface CheckResult {
    * anthropics/claude-code#90542.
    */
   polarityInferred?: boolean;
+
+  /**
+   * Where the checked rule lives — the rules file's absolute path and the
+   * 1-based line of its heading. Copied from the rule in `evaluateSession`,
+   * and ONLY when the (source, id, title) triple maps to exactly one loaded
+   * rule, so a report never points at the wrong line. Absent otherwise.
+   */
+  sourcePath?: string;
+  sourceLine?: number;
 }
 
 /**

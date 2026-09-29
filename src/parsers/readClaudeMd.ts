@@ -77,6 +77,22 @@ export function readPathScope(raw: string): string[] | undefined {
   return undefined;
 }
 
+/**
+ * How many leading lines `stripFrontmatter` removes, so a source line computed
+ * on the stripped text can be mapped back to the real file line. Zero when
+ * there is no frontmatter block.
+ */
+function frontmatterLineOffset(raw: string): number {
+  if (!/^---\r?\n/.test(raw)) return 0;
+  const end = raw.indexOf("\n---", 3);
+  if (end === -1) return 0;
+  const after = raw.indexOf("\n", end + 1);
+  if (after === -1) return 0;
+  // stripFrontmatter returns raw.slice(after + 1): everything up to and
+  // including that newline is gone. Count the newlines removed.
+  return (raw.slice(0, after + 1).match(/\n/g) ?? []).length;
+}
+
 export function parseClaudeMd(filePath: string, source: "global" | "project"): Rule[] {
   let raw: string;
   try {
@@ -84,8 +100,14 @@ export function parseClaudeMd(filePath: string, source: "global" | "project"): R
   } catch {
     return [];
   }
+  const offset = frontmatterLineOffset(raw);
   const rules = parseClaudeMdText(stripFrontmatter(raw), source);
   const paths = readPathScope(raw);
-  return paths ? rules.map((r) => ({ ...r, paths })) : rules;
+  return rules.map((r) => ({
+    ...r,
+    sourcePath: filePath,
+    sourceLine: r.sourceLine === undefined ? undefined : r.sourceLine + offset,
+    ...(paths ? { paths } : {}),
+  }));
 }
 

@@ -874,6 +874,15 @@ function runDoctorCommand() {
   if (result.newSinceLastRun.length > 0) {
     console.log(`${result.newSinceLastRun.length} of these are new since the last time doctor ran here.`);
   }
+
+  if (result.duplicates.length > 0) {
+    console.log("");
+    console.log(`⚠ ${result.duplicates.length} duplicate hook${result.duplicates.length === 1 ? "" : "s"} — the same command is registered more than once on one event, so it runs that many times:`);
+    for (const d of result.duplicates) {
+      console.log(`  ${d.event} — ${d.command}  (×${d.count})`);
+      console.log(`     in ${d.sourceFile} — remove the extra copy so it fires once.`);
+    }
+  }
 }
 
 program

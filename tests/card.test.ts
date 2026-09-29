@@ -22,6 +22,24 @@ describe("card share text", () => {
   });
 });
 
+describe("single-session framing (browser drop of one session)", () => {
+  const one: CardData = { broken: 2, followed: 5, judgment: 3, sessions: 1, days: 0, who: "the agent" };
+  it("shareText says 'this session', not 'in 0 days (1 sessions)'", () => {
+    const t = shareText(one);
+    expect(t).toContain("this session");
+    expect(t).not.toContain("0 days");
+    expect(t).not.toContain("1 sessions");
+  });
+  it("cardSvg omits the 'last N days' clause when days is 0", () => {
+    const svg = cardSvg(one);
+    expect(svg).not.toContain("0 days");
+    expect(svg).toContain("1 session");
+  });
+  it("still shows 'last N days' for a multi-day history card", () => {
+    expect(cardSvg(d)).toContain("last 30 days");
+  });
+});
+
 describe("card share links", () => {
   it("are well-formed compose links (no auth, user sends it)", () => {
     const l = shareLinks("hello world");

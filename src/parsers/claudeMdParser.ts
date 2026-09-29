@@ -79,7 +79,12 @@ function stripHtmlComments(raw: string): string {
     spans.push(m);
     return `\u0000CODE${spans.length - 1}\u0000`;
   });
-  const stripped = masked.replace(/<!--[\s\S]*?-->/g, "");
+  // A removed comment is replaced by the SAME number of newlines it spanned,
+  // not by nothing. Rule source lines are tracked by line index (2026-09-29),
+  // so a multi-line comment that collapsed to nothing would shift every rule
+  // below it and make the reported "CLAUDE.md:42" wrong. Blank lines left in a
+  // rule body are trimmed at its edges and harmless within it.
+  const stripped = masked.replace(/<!--[\s\S]*?-->/g, (m) => "\n".repeat((m.match(/\n/g) ?? []).length));
   return stripped.replace(/\u0000CODE(\d+)\u0000/g, (_, i) => spans[Number(i)]);
 }
 
@@ -157,6 +162,8 @@ export function parseClaudeMdText(raw: string, source: "global" | "project"): Ru
   let currentIsMarkedRule = false; // true for numbered/bold rules: bullets in their body stay as body text
   let bodyLines: string[] = [];
   let pendingSectionTitle: string | null = null;
+  let pendingSectionLine = 0; // 1-based line of the plain header awaiting its prose rule
+  let lineNo = 0; // 1-based index of the line currently being read
   let sectionCount = 0;
   let sectionId: string | null = "S0"; // "S0" before any header is seen; null while a header is pending its first rule
   let bulletIndex = 0;
@@ -185,7 +192,7 @@ export function parseClaudeMdText(raw: string, source: "global" | "project"): Ru
     if (currentIsMarkedRule) {
       bodyLines.push(line);
     } else if (pendingSectionTitle !== null && line.trim() !== "") {
-      current = { id: `${assignSectionId()}.0`, title: pendingSectionTitle, text: "", source };
+      current = { id: `${assignSectionId()}.0`, title: pendingSectionTitle, text: "", source, sourceLine: pendingSectionLine };
       bodyLines = [line];
       pendingSectionTitle = null;
     } else if (current) {
@@ -194,6 +201,7 @@ export function parseClaudeMdText(raw: string, source: "global" | "project"): Ru
   };
 
   for (const line of lines) {
+    lineNo += 1;
     // Fence state is tracked before any structural match, so nothing inside a
     // code block is ever read as a heading, a bullet, or a rule marker.
     const fence = line.match(FENCE_LINE);
@@ -217,7 +225,7 @@ export function parseClaudeMdText(raw: string, source: "global" | "project"): Ru
     if (numbered) {
       flush();
       pendingSectionTitle = null;
-      current = { id: numbered[1], title: numbered[2].trim(), text: "", source };
+      current = { id: numbered[1], title: numbered[2].trim(), text: "", source, sourceLine: lineNo };
       currentIsMarkedRule = true;
       continue;
     }
@@ -226,7 +234,7 @@ export function parseClaudeMdText(raw: string, source: "global" | "project"): Ru
     if (bold) {
       flush();
       pendingSectionTitle = null;
-      current = { id: bold[1], title: bold[2].trim(), text: "", source };
+      current = { id: bold[1], title: bold[2].trim(), text: "", source, sourceLine: lineNo };
       currentIsMarkedRule = true;
       continue;
     }
@@ -237,6 +245,7 @@ export function parseClaudeMdText(raw: string, source: "global" | "project"): Ru
       sectionId = null;
       bulletIndex = 0;
       pendingSectionTitle = plain[1].trim();
+      pendingSectionLine = lineNo;
       currentIsMarkedRule = false;
       continue;
     }
@@ -248,7 +257,7 @@ export function parseClaudeMdText(raw: string, source: "global" | "project"): Ru
       } else {
         bulletIndex += 1;
         const text = bullet[1].trim();
-        rules.push({ id: `${assignSectionId()}.${bulletIndex}`, title: text, text, source });
+        rules.push({ id: `${assignSectionId()}.${bulletIndex}`, title: text, text, source, sourceLine: lineNo });
       }
       continue;
     }
@@ -265,14 +274,26 @@ export function parseClaudeMdText(raw: string, source: "global" | "project"): Ru
   // headers, no bullets, no bold-rule markers) is split one rule per
   // blank-line-separated paragraph, so a genuinely unstructured file
   // still yields checkable rules instead of silently returning nothing.
-  const paragraphs = raw
-    .split(/\n\s*\n/)
-    .map((p) => p.trim())
-    .filter((p) => p.length > 0);
-
-  return paragraphs.map((p, i) => {
+  // Track the line each paragraph starts on so the fallback rules carry a
+  // source line too. Split on the raw text and walk cumulative line counts.
+  const chunks = raw.split(/\n\s*\n/);
+  const out: Rule[] = [];
+  let lineCursor = 1;
+  let n = 0;
+  for (const chunk of chunks) {
+    const startLine = lineCursor;
+    lineCursor += (chunk.match(/\n/g) ?? []).length; // lines consumed by this chunk
+    // account for the blank separator the split removed (one newline minimum)
+    lineCursor += 1;
+    const p = chunk.trim();
+    if (p.length === 0) continue;
+    n += 1;
     const firstLine = p.split("\n")[0].trim();
     const title = firstLine.length > 100 ? `${firstLine.slice(0, 100).trim()}…` : firstLine;
-    return { id: String(i + 1), title, text: p, source };
-  });
+    // Best-effort line for the freeform fallback: any leading blank lines in the
+    // chunk push the real first line down.
+    const leadBlank = (chunk.match(/^(?:[ \t]*\n)*/)?.[0].match(/\n/g) ?? []).length;
+    out.push({ id: String(n), title, text: p, source, sourceLine: startLine + leadBlank });
+  }
+  return out;
 }

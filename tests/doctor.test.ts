@@ -108,4 +108,38 @@ describe("runDoctor", () => {
     const isNew = result.newSinceLastRun.some((h) => h.command === "/bin/newly-added");
     expect(isNew).toBe(true);
   });
+
+  it("flags a hook registered twice on the same event in one file as a duplicate", () => {
+    mkdirSync(join(testCwd, ".claude"), { recursive: true });
+    writeFileSync(
+      join(testCwd, ".claude", "settings.json"),
+      JSON.stringify({
+        hooks: {
+          PreToolUse: [
+            { matcher: "", hooks: [{ type: "command", command: "rulereceipt guard" }] },
+            { matcher: "", hooks: [{ type: "command", command: "rulereceipt guard" }] },
+          ],
+        },
+      })
+    );
+    const result = runDoctor(testCwd);
+    const dup = result.duplicates.find((d) => d.command === "rulereceipt guard");
+    expect(dup).toBeDefined();
+    expect(dup?.count).toBe(2);
+    expect(dup?.event).toBe("PreToolUse");
+  });
+
+  it("does NOT flag the same command on two DIFFERENT files as a duplicate (global + project layering is legitimate)", () => {
+    mkdirSync(join(testCwd, ".claude"), { recursive: true });
+    writeFileSync(
+      join(testCwd, ".claude", "settings.json"),
+      JSON.stringify({ hooks: { PreToolUse: [{ matcher: "", hooks: [{ type: "command", command: "rulereceipt guard" }] }] } })
+    );
+    writeFileSync(
+      join(testCwd, ".claude", "settings.local.json"),
+      JSON.stringify({ hooks: { PreToolUse: [{ matcher: "", hooks: [{ type: "command", command: "rulereceipt guard" }] }] } })
+    );
+    const result = runDoctor(testCwd);
+    expect(result.duplicates.filter((d) => d.sourceFile.startsWith(testCwd))).toEqual([]);
+  });
 });

@@ -116,9 +116,36 @@ export async function evaluateSession(
     ? await runJudgmentChecks(judgment as never, events)
     : judgment.map(({ rule }) => needsLlmResult(rule));
 
+  const results = [...deterministicResults, ...judgmentResults, ...scopeResults, ...future.map(futureResult)];
+
   return {
-    results: [...deterministicResults, ...judgmentResults, ...scopeResults, ...future.map(futureResult)],
+    results: attachSourceLocation(results, rules),
     notARule: of("notARule"),
     stale: staleOverrides(overrides, rules),
   };
+}
+
+/**
+ * Copies each rule's source file/line onto its verdict — but ONLY when the
+ * (source, id, title) triple maps to exactly one loaded rule. Rule ids are
+ * positional and two files can legitimately reuse "1" or "S1.1", so a blind
+ * id-match could point a report at the wrong line. A wrong "CLAUDE.md:42" is
+ * worse than none, so an ambiguous or unlocated rule simply carries no line.
+ */
+function locationKey(source: string, id: string, title: string): string {
+  return `${source}\u0000${id}\u0000${title}`;
+}
+
+export function attachSourceLocation(results: CheckResult[], rules: Rule[]): CheckResult[] {
+  const byKey = new Map<string, Rule | null>();
+  for (const rule of rules) {
+    if (rule.sourcePath === undefined) continue;
+    const key = locationKey(rule.source, rule.id, rule.title);
+    byKey.set(key, byKey.has(key) ? null : rule); // second hit => ambiguous => null
+  }
+  return results.map((r) => {
+    const rule = byKey.get(locationKey(r.ruleSource, r.ruleId, r.ruleTitle));
+    if (!rule) return r;
+    return { ...r, sourcePath: rule.sourcePath, sourceLine: rule.sourceLine };
+  });
 }

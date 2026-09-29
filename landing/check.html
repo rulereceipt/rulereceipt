@@ -163,6 +163,15 @@
       <div class="srow"><span><b id="s-fail">0</b> broken</span><span><b id="s-pass">0</b> followed</span><span><b id="s-unclear">0</b> can&rsquo;t tell</span></div>
       <p class="hint" id="s-meta" style="margin-top:8px;"></p>
       <div id="s-list"></div>
+      <div id="s-share" style="margin-top:22px;display:none;">
+        <div style="font-weight:600;margin-bottom:8px;">Share this result</div>
+        <p class="hint" style="margin:0 0 10px;">Counts only &mdash; never your code, file paths or the session. Nothing is posted for you; each link opens a compose window you choose to send.</p>
+        <div id="s-share-links" style="display:flex;gap:14px;flex-wrap:wrap;font-size:.9rem;"></div>
+        <div style="margin-top:12px;display:flex;gap:14px;flex-wrap:wrap;font-size:.9rem;">
+          <a href="#" id="s-copy">Copy caption</a>
+          <a href="#" id="s-card">Download card (SVG)</a>
+        </div>
+      </div>
       <div class="after" style="margin-top:22px;">
         This is the same check <code>npx rulereceipt check</code> runs locally &mdash; here it ran on your dropped file, in the page, with nothing uploaded.
       </div>
@@ -175,10 +184,14 @@
 </div>
 
 <script type="module">
-  import { analyze, CORPUS, checkSessionInBrowser } from "/checker.js";
+  import { analyze, CORPUS, checkSessionInBrowser, shareText, shareLinks, cardSvg } from "/checker.js";
 
   const $ = (id) => document.getElementById(id);
   const src = $("src"), out = $("out"), status = $("status");
+  // Single HTML-escaper for the whole module. There were two (a `function esc`
+  // and a `const esc`), which is a SyntaxError in a module and silently broke
+  // every interactive part of this page — fixed 2026-09-29.
+  const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
   const EXAMPLE = `# Engineering rules
 
@@ -231,10 +244,6 @@ Lead every status update with what is broken, then what worked.
     out.classList.add("on");
   }
 
-  function esc(s) {
-    return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").slice(0, 140);
-  }
-
   function run() {
     const text = src.value;
     if (!text.trim()) { status.textContent = "Paste a file first."; return; }
@@ -260,7 +269,6 @@ Lead every status update with what is broken, then what worked.
   });
 
   // ---- Session-drop demo: run the real per-rule check in the browser ----
-  const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   const drop = $("drop"), sfile = $("sfile"), sout = $("sout"), slist = $("s-list");
   const ORDER = { FAIL: 0, PASS: 1, UNCLEAR: 2 };
 
@@ -290,7 +298,42 @@ Lead every status update with what is broken, then what worked.
         slist.appendChild(div);
       });
     sout.style.display = "block";
+    renderShare(s);
     try { window.posthog && window.posthog.capture("session_checked", { fail: s.fail, pass: s.pass, unclear: s.unclear }); } catch (e) {}
+  }
+
+  // Build the share caption/links/card from COUNTS only. A single dropped
+  // session, so sessions:1, days:0 — card.ts renders the "this session" wording.
+  function cardDataFrom(s) {
+    return { broken: s.fail, followed: s.pass, judgment: s.unclear, sessions: 1, days: 0, who: "My agent" };
+  }
+  function renderShare(s) {
+    const share = $("s-share");
+    const d = cardDataFrom(s);
+    const caption = shareText(d);
+    const links = shareLinks(caption);
+    $("s-share-links").innerHTML =
+      '<a href="' + esc(links.x) + '" target="_blank" rel="noopener">X / Twitter</a>' +
+      '<a href="' + esc(links.linkedin) + '" target="_blank" rel="noopener">LinkedIn</a>' +
+      '<a href="' + esc(links.bluesky) + '" target="_blank" rel="noopener">Bluesky</a>' +
+      '<a href="' + esc(links.reddit) + '" target="_blank" rel="noopener">Reddit</a>';
+    $("s-copy").onclick = (e) => {
+      e.preventDefault();
+      navigator.clipboard.writeText(caption).then(
+        () => { $("s-copy").textContent = "Copied"; setTimeout(() => { $("s-copy").textContent = "Copy caption"; }, 1500); },
+        () => { $("s-copy").textContent = "Copy failed"; }
+      );
+    };
+    $("s-card").onclick = (e) => {
+      e.preventDefault();
+      const blob = new Blob([cardSvg(d)], { type: "image/svg+xml" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = "rulereceipt-card.svg";
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    };
+    share.style.display = "block";
   }
 
   function readFile(f) {

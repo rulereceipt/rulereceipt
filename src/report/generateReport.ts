@@ -1,6 +1,21 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
+import { homedir } from "node:os";
 import type { CheckResult } from "../types.js";
+
+/**
+ * Where a rule lives, for the report — "~/proj/CLAUDE.md:42", or just the path
+ * when the parser could not place a line, or "" when the rule's location was
+ * ambiguous and deliberately omitted (see attachSourceLocation). The home dir
+ * is compressed to ~ so the line stays readable; the JSON report keeps the full
+ * absolute path.
+ */
+function locationOf(r: CheckResult): string {
+  if (!r.sourcePath) return "";
+  const home = homedir();
+  const path = r.sourcePath.startsWith(home) ? `~${r.sourcePath.slice(home.length)}` : r.sourcePath;
+  return r.sourceLine ? `${path}:${r.sourceLine}` : path;
+}
 
 export interface ReportMeta {
   sessionFilePath: string | null;
@@ -204,6 +219,8 @@ export function generateReport(results: CheckResult[], meta: ReportMeta): string
       lines.push("");
       for (const r of inBucket) {
         lines.push(`  ${ruleLabel(r, clean)}`);
+        const loc = locationOf(r);
+        if (loc) lines.push(`    ↳ ${loc}`);
         // An entry that does not share the hoisted text still says its own
         // piece — that difference is the only per-rule information there is.
         if (r.evidence && r.evidence !== shared) lines.push(`    ${r.evidence}`);
@@ -214,6 +231,8 @@ export function generateReport(results: CheckResult[], meta: ReportMeta): string
 
     for (const r of inBucket) {
       lines.push(`${MARK[r.status]} ${r.status.padEnd(7)} ${ruleLabel(r, clean)}`);
+      const loc = locationOf(r);
+      if (loc) lines.push(`  ↳ ${loc}`);
       if (r.evidence) lines.push(`  evidence: ${r.evidence}`);
       // What this method was ALLOWED to conclude, travelling with the
       // verdict. A text scan may say it saw no occurrence of a spelling; it
@@ -269,7 +288,9 @@ export function generateMarkdownReport(results: CheckResult[], meta: ReportMeta)
   lines.push("|---|---|---|");
   for (const r of clean) {
     const evidence = escapeMarkdownCell(r.evidence || "");
-    lines.push(`| ${MARK[r.status]} ${r.status} | ${escapeMarkdownCell(ruleLabel(r, clean))} | ${evidence} |`);
+    const loc = locationOf(r);
+    const label = loc ? `${ruleLabel(r, clean)}<br>\`${loc}\`` : ruleLabel(r, clean);
+    lines.push(`| ${MARK[r.status]} ${r.status} | ${escapeMarkdownCell(label)} | ${evidence} |`);
   }
   lines.push("");
   const hash = computeTranscriptHash(meta.sessionFilePath);
@@ -314,6 +335,10 @@ export function generateJsonReport(results: CheckResult[], meta: ReportMeta, too
       ruleId: r.ruleId,
       ruleTitle: r.ruleTitle,
       ruleSource: r.ruleSource,
+      // Absolute path + 1-based line of the rule's heading, when unambiguous
+      // (see attachSourceLocation). A consumer can jump straight to the rule.
+      sourcePath: r.sourcePath ?? null,
+      sourceLine: r.sourceLine ?? null,
       status: r.status,
       outcome: r.outcome ?? null,
       method: r.method ?? null,
