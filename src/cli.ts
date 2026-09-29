@@ -17,6 +17,7 @@ import { evaluateSession } from "./evaluate.js";
 import { buildWrongReport, findTarget } from "./wrong.js";
 import { detectSelfEditedRuleFiles } from "./checks/selfEditedRules.js";
 import { scanHistory, renderHistory } from "./historyReport.js";
+import { explainRule, renderWhy } from "./why.js";
 import { observeSessions, renderNoRules, draftRulesFromHistory } from "./sessionObserve.js";
 import { listSessionRows, renderSessionList } from "./listSessions.js";
 import { runSelfTestChecks, renderSelfTest } from "./selftest.js";
@@ -1089,6 +1090,30 @@ program
       return;
     }
     console.log(renderProjectAudit(a, Boolean(opts.markdown)));
+  });
+
+program
+  .command("why <rule...>")
+  .description(
+    "Everything the tool knows about ONE rule, in one place: where it lives (file:line), whether the agent actually loads it, whether a command or path it names exists, whether it's mechanically checkable (and if not, one suggested rewrite), and how it did over the last 30 days. Fuzzy-matches the rule text; if several match, lists them. Read-only — no verdict is created, nothing is sent."
+  )
+  .option("--json", "output machine-readable JSON (the same fields)")
+  .action(async (ruleWords: string[], opts: { json?: boolean }) => {
+    const cwd = process.cwd();
+    const query = ruleWords.join(" ").trim();
+    const rules = loadRules(cwd);
+    if (rules.length === 0) {
+      console.log("No rules file found here, so there is nothing to explain. Run `rulereceipt init` to add one.");
+      process.exitCode = 1;
+      return;
+    }
+    const result = await explainRule(cwd, query);
+    if (opts.json) {
+      console.log(JSON.stringify(result, null, 2));
+      return;
+    }
+    console.log(renderWhy(result));
+    if (result.matches === 0 || result.candidates) process.exitCode = 1;
   });
 
 program
