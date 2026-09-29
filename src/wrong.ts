@@ -29,12 +29,25 @@ export function reportedLabel(r: CheckResult): string {
 }
 
 const SECRET_PATTERNS: Array<[RegExp, string]> = [
+  // Private key blocks and passwords inside URLs go FIRST — before the email
+  // rule, which would otherwise partially rewrite a user:pass@host authority.
+  [/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g, "<redacted-private-key>"],
+  [/([a-zA-Z][a-zA-Z0-9+.-]*:\/\/[^\s:/@]+:)[^\s:/@]+(@)/g, "$1<redacted>$2"],
   [/\bsk-[A-Za-z0-9_-]{16,}/g, "<redacted-key>"],
   [/\b(?:ghp|gho|ghu|ghs|github_pat)_[A-Za-z0-9_]{16,}/g, "<redacted-token>"],
   [/\bxox[abprs]-[A-Za-z0-9-]{10,}/g, "<redacted-token>"],
+  // Stripe secret/publishable/restricted/webhook keys.
+  [/\b(?:sk|pk|rk)_(?:live|test)_[A-Za-z0-9]{16,}/g, "<redacted-stripe-key>"],
+  [/\bwhsec_[A-Za-z0-9]{16,}/g, "<redacted-stripe-secret>"],
   [/\bAKIA[0-9A-Z]{16}\b/g, "<redacted-aws-key>"],
-  [/\b(?:Bearer|token|apikey|api_key|password|passwd|secret)(\s*[:=]\s*|\s+)["']?[^\s"']{6,}/gi, "$1<redacted>"],
-  [/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g, "<redacted-private-key>"],
+  // JSON Web Tokens: header.payload.signature, each base64url.
+  [/\beyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/g, "<redacted-jwt>"],
+  // The value excludes a leading "<" so this never re-clobbers a more specific
+  // placeholder an earlier rule already inserted (e.g. "token <redacted-jwt>").
+  [/\b(?:Bearer|token|apikey|api_key|password|passwd|secret)(\s*[:=]\s*|\s+)["']?(?!<redacted)[^\s"']{6,}/gi, "$1<redacted>"],
+  // .env-style KEY=value: an UPPERCASE_KEY assigned a non-trivial value. A short
+  // value (DISABLE_LOCKS=1) is left alone so ordinary flags are not mangled.
+  [/\b([A-Z][A-Z0-9_]{2,})=(["']?)[^\s"']{8,}\2/g, "$1=<redacted>"],
   [/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g, "<email>"],
 ];
 
@@ -110,6 +123,7 @@ export function buildWrongReport(input: WrongReportInput): WrongReport {
     "",
     "> Read this before sharing. Obvious secrets, your home path and email addresses were masked,",
     "> but rule text and session lines are quoted as they are. Edit anything private.",
+    "> Masking catches common formats only. Read before sending.",
     "",
     `**Rule handle:** \`${handle}\`  (id ${result.ruleId}, ${result.ruleSource})`,
     "",

@@ -14,7 +14,9 @@ import { shadowedAgentsMd } from "./shadowedAgents.js";
 import { auditSessions, renderComplianceReport } from "./report/complianceReport.js";
 import { auditProject, renderProjectAudit } from "./audit.js";
 import { evaluateSession } from "./evaluate.js";
-import { buildWrongReport, findTarget } from "./wrong.js";
+import { buildWrongReport, findTarget, reportedLabel } from "./wrong.js";
+import { ghReady, issueTitle, issueCreateArgs, buildMailto, mailtoSubject } from "./wrongSubmit.js";
+import { spawnSync } from "node:child_process";
 import { detectSelfEditedRuleFiles } from "./checks/selfEditedRules.js";
 import { scanHistory, renderHistory } from "./historyReport.js";
 import { explainRule, renderWhy } from "./why.js";
@@ -1124,7 +1126,9 @@ program
   .option("--transcript <path>", "use a specific session file (same as check)")
   .option("--out <path>", "where to write the report (default .rulereceipt/wrong-<handle>.md)")
   .option("--no-context", "leave out the session lines around the evidence")
-  .action(async (ruleArg: string, opts: { transcript?: string; out?: string; context?: boolean }) => {
+  .option("--submit", "after showing the report, offer to open a PUBLIC GitHub issue (asks first; needs gh)")
+  .option("--email", "print a mailto: to send the report privately to the maintainer")
+  .action(async (ruleArg: string, opts: { transcript?: string; out?: string; context?: boolean; submit?: boolean; email?: boolean }) => {
     const cwd = process.cwd();
     const rules = loadRules(cwd);
     if (rules.length === 0) {
@@ -1143,7 +1147,12 @@ program
     const { results } = await evaluateSession(cwd, rules, events, false, needsLlmResult);
     const target = findTarget(ruleArg, rules, results);
     if (!target) {
-      console.log(`No checked rule matches "${ruleArg}". Use the handle from \`rulereceipt check --json\` or the rule id shown in the report.`);
+      console.log(`No checked rule matches "${ruleArg}".`);
+      const valid = results.map((r) => `  ${r.ruleId}  ${r.ruleTitle.replace(/\s+/g, " ").slice(0, 70)}`);
+      if (valid.length > 0) {
+        console.log("Valid ids from the latest session (use one of these, or the handle from `rulereceipt check --json`):");
+        for (const line of valid.slice(0, 40)) console.log(line);
+      }
       process.exitCode = 1;
       return;
     }
@@ -1159,8 +1168,55 @@ program
     writeFileSync(outPath, report.markdown);
     console.log(report.markdown);
     console.log(`\nSaved to ${outPath}. Nothing was sent.`);
-    console.log("Read it, edit anything private, then open this link to file it (the form is pre-filled; add what you expected):");
-    console.log(report.issueUrl);
+
+    const reported = reportedLabel(target.result);
+
+    if (opts.submit) {
+      // PUBLIC issue. Preview was just printed; --yes does NOT bypass this ask.
+      if (!ghReady()) {
+        console.log("\ngh (GitHub CLI) is not installed or not logged in — nothing was sent.");
+        console.log("Install/login with `gh auth login`, or open this pre-filled link yourself:");
+        console.log(report.issueUrl);
+        return;
+      }
+      const ok = await confirmYesNo(
+        "\nThis creates a PUBLIC issue on github.com/rulereceipt/rulereceipt from your GitHub account. Anyone can read it. Send it? (y/N) "
+      );
+      if (!ok) {
+        console.log("Not sent. The report is saved locally; you can open the link above anytime.");
+        return;
+      }
+      const title = issueTitle(reported, target.rule.title);
+      let res = spawnSync("gh", issueCreateArgs(title, report.markdown, true), { encoding: "utf-8" });
+      if (res.status !== 0) {
+        // The wrong-verdict label may not exist yet: retry without it.
+        res = spawnSync("gh", issueCreateArgs(title, report.markdown, false), { encoding: "utf-8" });
+      }
+      if (res.status === 0) {
+        const url = (res.stdout || "").trim();
+        console.log(`\nOpened: ${url || "issue created"}`);
+      } else {
+        console.log("\nCould not create the issue automatically — nothing was sent. Open this link instead:");
+        console.log(report.issueUrl);
+        process.exitCode = 1;
+      }
+      return;
+    }
+
+    if (opts.email) {
+      const { url, trimmed } = buildMailto(mailtoSubject(target.rule.title), report.markdown);
+      console.log("\nSend privately to the maintainer:");
+      console.log(url);
+      console.log(`\nIf your mail app doesn't open, email hello@rulereceipt.dev and attach: ${outPath}`);
+      if (trimmed) console.log("(The report was long, so the email body is trimmed — attach the saved file above.)");
+      return;
+    }
+
+    // No flag: show the three ways to send, plus the pre-filled link.
+    console.log(`\nRead it first, then:`);
+    console.log(`  Send publicly:   rulereceipt wrong ${ruleArg} --submit`);
+    console.log(`  Send privately:  rulereceipt wrong ${ruleArg} --email`);
+    console.log(`  Or open:         ${report.issueUrl}`);
   });
 
 program

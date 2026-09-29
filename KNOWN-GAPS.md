@@ -7,9 +7,10 @@ evidence runs out. When the tool hits one of these gaps it should say **Can't te
 not guess. If you ever see it guess instead, that is a bug: please report it with
 `rulereceipt wrong <rule>`.
 
-_Last reviewed: 2026-09-28, against 0.1.60 (one engine for check, hook and report;
-per-action approval check; `rulereceipt wrong`; audit load graph). Update this file with
-every release._
+_Last reviewed: 2026-09-29, against 0.1.75 (one engine for check, hook and report;
+per-action approval check; `rulereceipt wrong` with `--submit`/`--email`; audit load
+graph; `why`; session discovery matched on the stored cwd; `@import` following as
+Claude Code documents it). Update this file with every release._
 
 ---
 
@@ -27,6 +28,7 @@ invisible to it.
 | **Calls blocked by Claude Code's own permission rules** | Other projects report that such calls never appear in the transcript. We have not verified this ourselves yet. If true, a blocked attempt is invisible to RuleReceipt. A recorder hook to close this gap is planned. |
 | **Code written by shell commands** | Code checks read what was written with Write/Edit. Code written with `sed -i`, `>` or `cat > file` is not read by those checks. |
 | **Compaction** | When a long session is summarised, the log continues, but RuleReceipt does not yet split the report into "before" and "after" the summary. |
+| **Projects under the system temp folder** (`/tmp`, `$TMPDIR`) | These are treated as throwaway scratch space, so file-lifecycle checks like "`.env` was edited" do not apply there. Real projects live outside temp. |
 
 ## 2. Is the log itself trustworthy?
 
@@ -44,6 +46,13 @@ invisible to it.
   folder, across Claude Code and Codex.
 - With parallel sessions, worktrees or several agents at once, that may not be the one you
   meant. Use `--transcript <path>` to choose.
+- Sessions are matched by the real `cwd` stored inside the session file, so a project path
+  with a dot, underscore, space or symlink is found (this was broken before 0.1.75).
+  `CLAUDE_CONFIG_DIR` is honored.
+- **Monorepo:** a session started in a subfolder (e.g. `packages/api`) is now found when you
+  run from the repo root. But the rules it is checked against are still the ones loaded at
+  the folder you run in, not the session's own subfolder chain — per-session rule loading by
+  the session's cwd is not done yet. Run inside the subfolder for its exact rules.
 
 ## 4. Rules it cannot judge well
 

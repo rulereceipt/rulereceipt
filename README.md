@@ -332,12 +332,25 @@ npx rulereceipt wrong <rule-handle>
 
 Builds a report of that rule, the verdict, how it was decided and the
 session lines around it, with obvious secrets, your home path and email
-addresses masked. It is saved to `.rulereceipt/wrong-<handle>.md` and
-printed so you can read and edit it, along with a link to a pre-filled
-GitHub issue that you open yourself. Nothing is sent. `check` prints the
-command after every report that has a decided verdict, and the HTML report
-has a "Verdict wrong?" link on each one that carries only the version and
-the verdict, never the rule or the evidence.
+addresses masked (GitHub/Slack/Stripe tokens, JWTs, passwords in URLs,
+private-key blocks and `.env`-style `KEY=value` lines too — but masking
+catches common formats only, so read it before sending). It is saved to
+`.rulereceipt/wrong-<handle>.md` and printed so you can read and edit it.
+
+Nothing is ever sent automatically. After showing the report you get three
+choices:
+
+```bash
+rulereceipt wrong <rule> --submit   # open a PUBLIC GitHub issue (asks y/N first; needs gh)
+rulereceipt wrong <rule> --email    # a mailto: to hello@rulereceipt.dev, private
+rulereceipt wrong <rule>            # just print the report + a pre-filled issue link
+```
+
+`--submit` shows the full report, then asks before creating anything — the
+default answer is No, and `--yes` does not skip that question. If `gh` isn't
+installed or logged in, or you're not at a terminal, it never sends: it
+prints the pre-filled link for you to open yourself. You can pass a rule by
+the short handle or by the id shown in the report (e.g. `S1.2`).
 
 Every accuracy fix in this project has come from a report like this.
 
