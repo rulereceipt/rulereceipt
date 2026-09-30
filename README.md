@@ -6,15 +6,21 @@
 [![npm](https://img.shields.io/npm/v/rulereceipt)](https://www.npmjs.com/package/rulereceipt)
 [![provenance](https://img.shields.io/badge/npm-provenance%20signed-blue)](https://www.npmjs.com/package/rulereceipt#provenance)
 
-Checks whether your AI coding agent actually followed your rules — with
-evidence, not just a vibe. Works with Claude Code today (OpenAI Codex CLI
-support is built and in testing), and reads rules from CLAUDE.md, AGENTS.md,
-Cursor (`.cursor/rules`), GitHub Copilot, Windsurf, Gemini (`GEMINI.md`),
-Google's `.agents/rules`, and Claude Code memory.
+**Check if your AI coding agent followed the rules in your CLAUDE.md, with the exact line as proof.**
+
+[![RuleReceipt checking an agent session against your rules — three rules broken, each with the quoted line](https://raw.githubusercontent.com/rulereceipt/rulereceipt/main/docs/screenshot.png)](https://rulereceipt.dev)
+
+```bash
+npx rulereceipt
+```
 
 Runs entirely on your machine. Plain `rulereceipt check` makes zero network
-calls — [Trust, privacy and licensing](#trust-privacy-and-licensing) has the
-full detail, including the three off-by-default opt-ins.
+calls — [Trust, privacy and licensing](#trust-privacy-and-licensing) has the full
+detail, including the three off-by-default opt-ins. Works with Claude Code today
+(OpenAI Codex CLI in testing); reads rules from CLAUDE.md, AGENTS.md, Cursor
+(`.cursor/rules`), GitHub Copilot, Windsurf, Gemini (`GEMINI.md`), Google's
+`.agents/rules`, and Claude Code memory. [Accuracy](https://rulereceipt.dev/accuracy)
+· [Known gaps](KNOWN-GAPS.md) · Source-available, not OSI — see [LICENSE](LICENSE).
 
 ## See it in 10 seconds
 
