@@ -19,7 +19,7 @@ import { ghReady, issueTitle, issueCreateArgs, buildMailto, mailtoSubject } from
 import { spawnSync } from "node:child_process";
 import { detectSelfEditedRuleFiles } from "./checks/selfEditedRules.js";
 import { scanHistory, renderHistory } from "./historyReport.js";
-import { explainRule, renderWhy } from "./why.js";
+import { explainRule, renderWhy, explainAll, renderAllWhy, whyList, renderWhyList } from "./why.js";
 import { observeSessions, renderNoRules, draftRulesFromHistory } from "./sessionObserve.js";
 import { listSessionRows, renderSessionList } from "./listSessions.js";
 import { runSelfTestChecks, renderSelfTest } from "./selftest.js";
@@ -1095,18 +1095,31 @@ program
   });
 
 program
-  .command("why <rule...>")
+  .command("why [rule...]")
   .description(
-    "Everything the tool knows about ONE rule, in one place: where it lives (file:line), whether the agent actually loads it, whether a command or path it names exists, whether it's mechanically checkable (and if not, one suggested rewrite), and how it did over the last 30 days. Fuzzy-matches the rule text; if several match, lists them. Read-only — no verdict is created, nothing is sent."
+    "Everything the tool knows about ONE rule, in one place: where it lives (file:line), whether the agent actually loads it, whether a command or path it names exists, whether it's mechanically checkable (and if not, one suggested rewrite), and how it did over the last 30 days. With no argument, lists every rule with its id so you can pick one; with --all, shows every rule (problems first). Read-only — no verdict is created, nothing is sent."
   )
+  .option("--all", "show every rule, problems first (not loaded, missing command, broken recently), then the rest")
   .option("--json", "output machine-readable JSON (the same fields)")
-  .action(async (ruleWords: string[], opts: { json?: boolean }) => {
+  .action(async (ruleWords: string[], opts: { all?: boolean; json?: boolean }) => {
     const cwd = process.cwd();
-    const query = ruleWords.join(" ").trim();
+    const query = (ruleWords ?? []).join(" ").trim();
     const rules = loadRules(cwd);
     if (rules.length === 0) {
       console.log("No rules file found here, so there is nothing to explain. Run `rulereceipt init` to add one.");
       process.exitCode = 1;
+      return;
+    }
+    // --all: every rule, problems first.
+    if (opts.all) {
+      const all = await explainAll(cwd);
+      console.log(opts.json ? JSON.stringify(all, null, 2) : renderAllWhy(all));
+      return;
+    }
+    // No argument: list the rules with ids so the reader can pick one.
+    if (query.length === 0) {
+      const list = whyList(cwd);
+      console.log(opts.json ? JSON.stringify(list, null, 2) : renderWhyList(list));
       return;
     }
     const result = await explainRule(cwd, query);
