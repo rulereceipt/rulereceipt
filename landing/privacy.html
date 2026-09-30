@@ -10,10 +10,14 @@
         autocapture: false,
         disable_session_recording: true,
         capture_pageview: true,
+        capture_pageleave: true,
+        persistence: 'localStorage+cookie',
         mask_all_text: true,
         mask_all_element_attributes: true,
     })
+    ;(function(){try{var q=new URLSearchParams(location.search);if(q.get('internal')==='1'){try{localStorage.setItem('rr_internal','1')}catch(e){}}var f=false;try{f=localStorage.getItem('rr_internal')==='1'}catch(e){}if(f&&window.posthog&&posthog.register){posthog.register({internal:true})}}catch(e){}})();
 </script>
+<script src="/analytics.js" defer></script>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>RuleReceipt — Privacy</title>
@@ -76,7 +80,7 @@
     <p>Running <code>rulereceipt check --share</code> is opt-in and off by default. If you use it, it sends aggregate pass/fail/unclear counts — never rule text, file paths, or session content.</p>
 
     <h2>This website</h2>
-    <p>This landing page uses PostHog for anonymous analytics only: page visits, plus two button events — copying an install command, and submitting the early-access email form (the click alone; <strong>your email address is never sent to PostHog</strong>). Session recording is turned off, autocapture is off, and all text is masked, so nothing you type, paste, or drop on the site is recorded. The interactive demo runs entirely in your browser — the rules files and session logs you check with it are <strong>never sent to PostHog or anywhere else</strong>. The RuleReceipt CLI itself contains no analytics and never contacts PostHog; by default it makes no network calls at all. No cross-site tracking, no ad networks, and we don't sell or share this data with anyone.</p>
+    <p>This landing page uses PostHog for anonymous analytics only: how many people visit each page, how far down the page they scroll, and which buttons and links they click (recorded by a fixed name, like &ldquo;github&rdquo; or &ldquo;copy install command&rdquo;). <strong>We never record your screen, and never send anything you type, paste, or drop</strong> — no rule text, no session content, no results, and never your email address (the signup event records only that a submission happened). In the interactive demo, the rules files and session logs you check run entirely in your browser and are <strong>never sent to PostHog or anywhere else</strong>; at most we record a coarse size bucket like &ldquo;&gt;10k characters&rdquo; or &ldquo;1–10MB&rdquo;, never the content. Session recording and autocapture are turned off and all text is masked. The RuleReceipt CLI itself contains no analytics and never contacts PostHog; by default it makes no network calls at all. No cross-site tracking, no ad networks, and we don't sell or share this data.</p>
 
     <h2>Email signup</h2>
     <p>If you submit your email on this site (to get notified before pricing changes), we store it in a database (hosted by Upstash) so we can send you that one update. We don't sell it, share it with anyone else, or use it for anything beyond what you signed up for. There's currently no automatic expiry — it stays until you remove it.</p>

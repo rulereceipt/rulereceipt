@@ -10,10 +10,14 @@
         autocapture: false,
         disable_session_recording: true,
         capture_pageview: true,
+        capture_pageleave: true,
+        persistence: 'localStorage+cookie',
         mask_all_text: true,
         mask_all_element_attributes: true,
     })
+    ;(function(){try{var q=new URLSearchParams(location.search);if(q.get('internal')==='1'){try{localStorage.setItem('rr_internal','1')}catch(e){}}var f=false;try{f=localStorage.getItem('rr_internal')==='1'}catch(e){}if(f&&window.posthog&&posthog.register){posthog.register({internal:true})}}catch(e){}})();
 </script>
+<script src="/analytics.js" defer></script>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>RuleReceipt — Unsubscribe</title>
