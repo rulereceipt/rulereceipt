@@ -130,6 +130,34 @@ describe("why --all — every rule, problems first", () => {
   });
 });
 
+describe("renderWhy — how to actually block the rule (A3)", () => {
+  it("a branch rule shows a native permissions deny and the guard, with the honest caveat", async () => {
+    claude("## 1. Branch\nNever push to the `main` branch directly.\n");
+    const out = renderWhy(await explainRule(dir, "push to the main branch directly"));
+    expect(out).toContain("To stop this before it runs");
+    expect(out).toContain('"permissions"');
+    expect(out).toContain("Bash(git push:*)");
+    expect(out).toContain("rulereceipt protect");
+    // Must not overstate: the native rule can't scope to the branch.
+    expect(out.toLowerCase()).toContain("every push");
+  });
+
+  it("a file rule shows a precise Edit/Write deny for that path", async () => {
+    claude("## 1. Secrets\nNever modify `.env`.\n");
+    const out = renderWhy(await explainRule(dir, "modify `.env`"));
+    expect(out).toContain("Edit(.env)");
+    expect(out).toContain("Write(.env)");
+  });
+
+  it("a claim-evidence rule says it is judged after the run, not blocked", async () => {
+    claude("## 1. Evidence\nNever report a task done without pasting the test output as proof.\n");
+    const out = renderWhy(await explainRule(dir, "report a task done without pasting the test output"));
+    expect(out.toLowerCase()).toContain("after the run");
+    expect(out).toContain("rulereceipt check");
+    expect(out).not.toContain('"permissions"');
+  });
+});
+
 describe("renderWhy — plain text", () => {
   it("shows the not-loaded reason when a file is shadowed", () => {
     const out = renderWhy({

@@ -5,6 +5,7 @@ import { loadRules, describeRuleSources } from "./rules.js";
 import { classifyRule } from "./checks/classify.js";
 import { adviseRule } from "./checkability.js";
 import { scanHistory } from "./historyReport.js";
+import { blockHintFor, type BlockHint } from "./blockHint.js";
 import type { Rule } from "./types.js";
 
 /**
@@ -34,6 +35,8 @@ export interface WhyRule {
   kind: string;
   suggestion?: string;
   named?: { kind: "command" | "file"; name: string; exists: boolean };
+  /** How (and whether) this rule can actually be blocked/checked — see blockHint.ts. */
+  block?: BlockHint;
   brokenCount: number;
   brokenDates: string[];
   sessionsScanned: number;
@@ -122,6 +125,7 @@ function ruleFacts(cwd: string, rule: Rule, graph: ReturnType<typeof describeRul
     kind: cls.kind,
     suggestion: advice?.suggestion,
     named: namedCommandOrPath(rule, cwd),
+    block: blockHintFor(cls),
     brokenCount: b?.count ?? 0,
     brokenDates: b ? [new Date(b.lastMs).toISOString().slice(0, 10)] : [],
     sessionsScanned: hist.sessionsScanned,
@@ -204,10 +208,42 @@ export function renderWhy(r: WhyResult): string {
   out.push(w.checkable
     ? `  ✓ mechanically checkable (${w.kind}) — a session is judged against it with quoted evidence`
     : `  • needs your judgment${w.suggestion ? ` — ${w.suggestion}` : ` — no command or file to check it by; a human decides`}`);
+  renderBlockHint(w.block, out);
   out.push("");
   if (w.brokenCount > 0) out.push(`  last 30 days: broken ${w.brokenCount}× (last: ${w.brokenDates[0]}) across ${w.sessionsScanned} session${w.sessionsScanned === 1 ? "" : "s"}`);
   else out.push(`  last 30 days: no proven break across ${w.sessionsScanned} session${w.sessionsScanned === 1 ? "" : "s"}`);
   return out.join("\n");
+}
+
+/**
+ * How to actually enforce this rule, appended to the single-rule view. Prints
+ * only what the tool truly does: a native Claude Code permissions rule where one
+ * can genuinely express it (with its honest limitation), RuleReceipt's own guard
+ * where it covers the rule pre-flight, and — for rules judged only after the run —
+ * the after-the-fact path. Nothing here claims a block the guard doesn't make.
+ */
+function renderBlockHint(block: BlockHint | undefined, out: string[]): void {
+  if (!block) return;
+  out.push("");
+  if (block.preventable) {
+    out.push("  To stop this before it runs:");
+    if (block.native) {
+      const entries = block.native.entries.map((e) => `"${e}"`).join(", ");
+      out.push(`    • Claude Code settings (.claude/settings.json), no extra tool:`);
+      out.push(`        { "permissions": { "${block.native.kind}": [${entries}] } }`);
+      out.push(`      ${block.native.note}`);
+    } else if (block.nativeImpossibleReason) {
+      out.push(`    • A Claude Code permission rule can't express this — ${block.nativeImpossibleReason}.`);
+    }
+    if (block.guardCovers) {
+      out.push(`    • RuleReceipt's own guard checks this exact rule: run \`rulereceipt protect\``);
+      out.push(`      (adds a PreToolUse deny hook + a Stop hook, shown before it writes anything).`);
+    }
+  } else {
+    out.push("  Can't be blocked before an action — this rule is judged after the run.");
+    out.push("  Run `rulereceipt check` after a session; `rulereceipt protect` also adds a Stop");
+    out.push("  hook that won't let a session end on a broken rule.");
+  }
 }
 
 /** No-argument output: how to use `why`, then every rule with its id so you can pick one. */
