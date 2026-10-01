@@ -46,3 +46,6 @@ z_*
 
 # npm pack artifacts
 *.tgz
+
+# internal branch status (private)
+BRANCH-REPORT.md
