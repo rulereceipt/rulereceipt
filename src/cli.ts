@@ -1068,7 +1068,7 @@ const PERIOD_MS: Record<Cadence, number> = {
 program
   .command("report")
   .description(
-    "Compliance report across your recent sessions (not just the latest): which policy rules were broken, where, with evidence. Deterministic, local, no network. The org-wide version runs via the Claude Compliance API for Enterprise orgs."
+    "Compliance report across your recent sessions (not just the latest): which policy rules were broken, where, with evidence. Deterministic, local, no network. An org-wide version (multi-repo, trends, a manager digest) is coming in the team version."
   )
   .option("--last <n>", "how many recent sessions to audit", "25")
   .option("--markdown", "output as markdown, for a report you can send")
@@ -1134,7 +1134,7 @@ program
 program
   .command("wrong <rule>")
   .description(
-    "A verdict looks wrong? Builds a report of that rule, the verdict, how it was decided and the session lines around it, with obvious secrets masked. Written to a local file and shown first; prints a GitHub issue link for you to open. Nothing is sent."
+    "A verdict looks wrong? Builds a report of that rule, the verdict, how it was decided and the session lines around it, with obvious secrets masked. Written to a local file and shown first. Then --submit opens a public GitHub issue (asks first; needs gh) or --email sends it privately to the maintainer; with no flag it just prints the report and a pre-filled link. Nothing is sent without your say-so."
   )
   .option("--transcript <path>", "use a specific session file (same as check)")
   .option("--out <path>", "where to write the report (default .rulereceipt/wrong-<handle>.md)")
