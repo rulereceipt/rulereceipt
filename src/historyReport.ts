@@ -207,6 +207,8 @@ export function renderHistory(s: HistorySummary, projectName: string, now = Date
   out.push(`checked ${s.sessionsScanned} session${s.sessionsScanned === 1 ? "" : "s"} in ${secs}s`);
   out.push("");
   out.push("See one session in full:  rulereceipt check");
+  out.push("Make Claude ask first:     rulereceipt protect");
+  out.push("Share the result:          rulereceipt card");
   out.push("Think a verdict is wrong?  rulereceipt wrong <rule>");
   return out.join("\n");
 }
