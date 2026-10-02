@@ -70,6 +70,20 @@ const YES = /^\s*(?:y|yes|yep|yeah|yup|sure|ok(?:ay)?|go(?:\s+ahead)?|do\s+it|pl
 
 const NO_PROMPT_MODES = new Set(["bypassPermissions", "dontAsk", "auto"]);
 
+// A delete that plausibly hits a DATA STORE (what a "never wipe the database"
+// rule protects), as opposed to a throwaway cleanup. A SQL wipe always counts.
+// A throwaway target (tmp/scratch/build/dist/node_modules/cache/…) never counts,
+// even if it ends in .db. Otherwise a data-store file or a data/ or db/ dir counts.
+const SQL_WIPE = /\bdrop\s+(?:table|database|schema)\b|\bdelete\s+from\b|\btruncate\b/i;
+const THROWAWAY_TARGET = /(?:^|[\s/])(?:tmp|temp|scratch|build|dist|out|node_modules|\.cache|cache|coverage|\.next|\.turbo|\.venv|__pycache__|target)(?:[\s/]|$)|\/tmp\/|\/(?:private\/)?var\/folders\//i;
+const DATA_STORE_TARGET = /\.(?:db|sqlite\d?|mdb|rdb|dump|bak|ldf|mdf|frm|ibd)\b|(?:^|[\s/])(?:data|databases?|db|datastores?|storage|ledger|pgdata|mysql|postgres(?:ql)?|mongo(?:db)?|redis)(?:[\s/-]|$)/i;
+
+function looksLikeDataStoreDelete(command: string): boolean {
+  if (SQL_WIPE.test(command)) return true;
+  if (THROWAWAY_TARGET.test(command)) return false;
+  return DATA_STORE_TARGET.test(command);
+}
+
 function commandOf(e: TranscriptEvent): string {
   if (e.kind !== "tool_use" || e.toolName !== "Bash") return "";
   const c = (e.input as { command?: unknown } | null)?.command;
@@ -209,16 +223,18 @@ export function approvalOccurrences(events: TranscriptEvent[], actions: Action[]
       const listed = allowListed(command, opts.allow ?? []);
       const noPrompt = (mode && NO_PROMPT_MODES.has(mode)) || listed;
       if (action === "delete") {
-        // `rm` / `drop` / `delete` are far too common and generic to bind
-        // confidently to a specific rule's subject: a test-cleanup `rm -rf
-        // /tmp/x` is not "wiping the production database", but the command
-        // matcher can't tell them apart. So a delete gate NEVER produces a
-        // FAIL — it reports UNCLEAR, and the guard still asks before the call.
-        // Found 2026-09-28: a "Never wipe data storage databases" rule FAILed
-        // on an unrelated temp-dir `rm -rf` once the one-engine fix made
-        // approval-gate rules visible in `check`. push/commit/pr are specific
-        // git/gh operations and keep the FAIL path.
-        out.push({ action, command: short, verdict: "unclear", why: "a delete/rm command ran; a transcript can't tell whether it hit the data this rule protects, or whether it was approved" });
+        // Scope a delete gate to the DATA a data-wipe rule protects. A throwaway
+        // `rm -rf /tmp/scratch` (or build/, dist/, node_modules/, .cache/) is not
+        // "wiping the database" — it was a real GUARD false alarm (2026-10-02):
+        // "Never wipe data storage databases" stopped an unrelated scratch-dir
+        // cleanup in auto mode. So an occurrence is produced ONLY when the target
+        // looks like a data store (a .db/.sqlite file, a data/ or db/ directory)
+        // or the command is SQL (DROP/DELETE FROM/TRUNCATE); anything else yields
+        // no occurrence, so the guard never stops a scratch cleanup. A delete
+        // gate still NEVER produces a FAIL in `check` (verdict is UNCLEAR) — the
+        // transcript can't show a click on the prompt — but the guard may ask.
+        if (!looksLikeDataStoreDelete(command)) continue;
+        out.push({ action, command: short, verdict: "unclear", why: "a delete command hit something that looks like a data store; a transcript can't tell whether it was approved" });
       } else if (noPrompt) {
         out.push({ action, command: short, verdict: "unapproved", why: listed ? "the command is on the allow list, so no prompt was shown" : `permission mode was ${mode}, so no prompt was shown` });
       } else {
