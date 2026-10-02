@@ -97,19 +97,28 @@ function ruleSourcesAtLevel(dir: string): RuleSource[] {
     for (const f of markdownFilesIn(join(dir, rel))) out.push({ path: f, status: "loaded", format: ".claude/rules" });
   }
 
-  if (has("CLAUDE.md")) {
-    loaded("CLAUDE.md", "Claude (CLAUDE.md)");
-    // AGENTS.md (and the singular AGENT.md some tools use) are ignored when
-    // there's a CLAUDE.md at this level, mirroring Claude Code's shadow rule.
-    shadowed("AGENTS.md", "AGENTS.md", "a CLAUDE.md at the same level wins");
-    shadowed("AGENT.md", "AGENT.md", "a CLAUDE.md at the same level wins");
+  // AGENTS.md / AGENT.md load ONLY when this level has no Claude file at all.
+  // As of Claude Code 2.1.277 (default "Project instructions" = claude-md-or-
+  // agents-md), AGENTS.md is read only when none of CLAUDE.md / CLAUDE.local.md
+  // (nor .claude/CLAUDE.md, handled above) exists — so CLAUDE.local.md ALSO
+  // shadows AGENTS.md, not just CLAUDE.md. Checking a shadowed AGENTS.md would be
+  // a false accusation (it never reaches the agent).
+  // KNOWN LIMIT: the 2.1.277 rule is "no Claude file in cwd OR ABOVE"; this
+  // shadows at the SAME level only. A parent CLAUDE.md shadowing a child
+  // AGENTS.md across levels is not yet modelled (see KNOWN-GAPS).
+  const hasClaudeMd = has("CLAUDE.md");
+  const hasClaudeLocal = has("CLAUDE.local.md");
+  if (hasClaudeMd) loaded("CLAUDE.md", "Claude (CLAUDE.md)");
+  // .local always loads alongside the base CLAUDE.md when present.
+  if (hasClaudeLocal) loaded("CLAUDE.local.md", "Claude (CLAUDE.local.md)");
+  if (hasClaudeMd || hasClaudeLocal) {
+    const winner = hasClaudeMd ? "CLAUDE.md" : "CLAUDE.local.md";
+    shadowed("AGENTS.md", "AGENTS.md", `a ${winner} at the same level wins`);
+    shadowed("AGENT.md", "AGENT.md", `a ${winner} at the same level wins`);
   } else {
     loaded("AGENTS.md", "AGENTS.md");
     loaded("AGENT.md", "AGENT.md");
   }
-  // .local variants: precedence relative to the base files is not documented,
-  // so both are kept rather than guessing at a shadow rule.
-  loaded("CLAUDE.local.md", "Claude (CLAUDE.local.md)");
   loaded("AGENTS.local.md", "AGENTS (AGENTS.local.md)");
 
   // Non-Claude rule-file conventions (added 2026-09-26 for multi-tool

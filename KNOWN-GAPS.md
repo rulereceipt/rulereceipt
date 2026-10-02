@@ -159,3 +159,13 @@ Nothing leaves your machine by default. These send data only when you ask:
 
 Found a gap that isn't listed here? Open an issue. Gaps we know about are safer than gaps we
 don't.
+
+## Rules-file precedence across directory levels (2.1.277)
+
+Claude Code 2.1.277 reads AGENTS.md only when there is no CLAUDE.md,
+`.claude/CLAUDE.md` or CLAUDE.local.md in the working directory **or above** it.
+RuleReceipt applies that shadow rule at the **same level** (a CLAUDE.md or
+CLAUDE.local.md shadows a sibling AGENTS.md), but does not yet model a parent
+CLAUDE.md shadowing an AGENTS.md in a child directory. If you keep a CLAUDE.md at
+the repo root and an AGENTS.md in a subfolder, RuleReceipt may still read that
+AGENTS.md. Workaround: don't rely on an AGENTS.md below a CLAUDE.md.
