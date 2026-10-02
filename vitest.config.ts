@@ -1,14 +1,15 @@
-import { defineConfig } from "vitest/config";
+import { defineConfig, configDefaults } from "vitest/config";
 
+/**
+ * Keep vitest's default include/exclude, but also ignore `.claude/` — an
+ * isolated agent worktree lives at `.claude/worktrees/<id>/` and is a full copy
+ * of the repo, tests and all. Without this, a worktree present during a local
+ * run doubles the test count and reports its (un-built, no-dist) copies as
+ * failures. CI is unaffected (it checks out clean), but local release gating
+ * must see only the real tree.
+ */
 export default defineConfig({
   test: {
-    environment: "node",
-    // The landing site is a separate package with its own dependencies and
-    // its own vitest run (see landing/vitest.config.ts and the
-    // test-landing job in CI). Without this exclusion the root run
-    // discovers landing/api/*.test.ts and fails in CI, where landing's
-    // node_modules are deliberately not installed -- it only passed
-    // locally because both packages happened to be installed.
-    exclude: ["**/node_modules/**", "**/dist/**", "landing/**", "corpus/**"],
+    exclude: [...configDefaults.exclude, "**/.claude/**"],
   },
 });
