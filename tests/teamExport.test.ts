@@ -36,21 +36,24 @@ describe("mergeTeamExports — rules broken most, by whom, trend", () => {
   const ada = buildTeamExport([r("Never push to main", "FAIL"), r("Run tests", "FAIL")], "app", "Ada", "0.1.79", new Date("2026-10-01T00:00:00Z"));
   const ben = buildTeamExport([r("Never push to main", "FAIL"), r("Run tests", "PASS")], "app", "Ben", "0.1.79", new Date("2026-10-02T00:00:00Z"));
 
-  it("aggregates breaks across devs with who broke what, and a day trend", () => {
+  it("aggregates breaks across devs with who broke what (basic snapshot, no trend)", () => {
     const m = mergeTeamExports([ada, ben]);
     expect(m.devs).toEqual(["Ada", "Ben"]);
     expect(m.totalBroken).toBe(3);
     expect(m.broken[0]).toEqual({ title: "Never push to main", count: 2, devs: ["Ada", "Ben"] });
     expect(m.broken[1]).toEqual({ title: "Run tests", count: 1, devs: ["Ada"] });
-    expect(m.trend).toEqual([{ date: "2026-10-01", broken: 2 }, { date: "2026-10-02", broken: 1 }]);
+    // Public/free tier is a snapshot only — trends/history are the private tier.
+    expect(m).not.toHaveProperty("trend");
   });
 
-  it("renders a self-contained HTML (no external scripts/styles) with the names and the label", () => {
+  it("renders a self-contained HTML snapshot (no external assets, no over-time trend)", () => {
     const html = renderTeamHtml(mergeTeamExports([ada, ben]));
     expect(html).toContain("team preview");
     expect(html).toContain("Never push to main");
     expect(html).toContain("Ada");
     // Local-only: no CDN, no remote fetch.
     expect(html).not.toMatch(/https?:\/\/|cdn\.|src=|fetch\(/);
+    // No trend-over-time in the public build (that's the paid tier).
+    expect(html).not.toContain("Breaks by day");
   });
 });

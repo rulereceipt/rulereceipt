@@ -1,4 +1,5 @@
 import type { CheckResult } from "./types.js";
+import { redact } from "./wrong.js";
 
 /**
  * Team preview (LOCAL, free). Two halves:
@@ -54,7 +55,9 @@ export function buildTeamExport(
     project,
     date: now.toISOString().slice(0, 10),
     summary: { total: results.length, pass: count("PASS"), fail: count("FAIL"), unclear: count("UNCLEAR") },
-    rules: results.map((r) => ({ title: r.ruleTitle, source: r.ruleSource, status: r.status, evidence: r.evidence })),
+    // Evidence is masked before it leaves: an export is shared, so obvious
+    // secrets, the home path and emails are redacted (same patterns as `wrong`).
+    rules: results.map((r) => ({ title: redact(r.ruleTitle), source: r.ruleSource, status: r.status, evidence: redact(r.evidence) })),
   };
 }
 
@@ -74,35 +77,34 @@ export interface TeamMerge {
   exportsRead: number;
   /** Rules with at least one Broken verdict, most-broken first. */
   broken: { title: string; count: number; devs: string[] }[];
-  /** Broken counts per day (YYYY-MM-DD), oldest first. */
-  trend: { date: string; broken: number }[];
   totalBroken: number;
 }
 
-/** Merge several devs' exports: rules broken most, by whom, and a day trend. */
+/**
+ * Merge several devs' exports into a BASIC snapshot: rules broken most, by whom.
+ * Public/free tier — deliberately a snapshot of the exports given, with NO trend
+ * over time and NO stored history. Trends, history, cross-repo dashboards and
+ * compliance exports are the private Team tier (see DECISIONS.md open-core rule)
+ * and are never built into the public package.
+ */
 export function mergeTeamExports(exports: TeamExport[]): TeamMerge {
   const devs = [...new Set(exports.map((e) => e.dev))].sort();
   const byRule = new Map<string, { count: number; devs: Set<string> }>();
-  const byDay = new Map<string, number>();
   let totalBroken = 0;
   for (const e of exports) {
-    let brokeToday = 0;
     for (const r of e.rules) {
       if (r.status !== "FAIL") continue;
       totalBroken++;
-      brokeToday++;
       const cur = byRule.get(r.title) ?? { count: 0, devs: new Set<string>() };
       cur.count++;
       cur.devs.add(e.dev);
       byRule.set(r.title, cur);
     }
-    byDay.set(e.date, (byDay.get(e.date) ?? 0) + brokeToday);
   }
   const broken = [...byRule.entries()]
     .map(([title, v]) => ({ title, count: v.count, devs: [...v.devs].sort() }))
     .sort((a, b) => b.count - a.count || a.title.localeCompare(b.title));
-  const trend = [...byDay.entries()].map(([date, broken]) => ({ date, broken })).sort((a, b) => a.date.localeCompare(b.date));
-  return { devs, exportsRead: exports.length, broken, trend, totalBroken };
+  return { devs, exportsRead: exports.length, broken, totalBroken };
 }
 
 function esc(s: string): string {
@@ -114,10 +116,6 @@ export function renderTeamHtml(m: TeamMerge, now = new Date()): string {
   const rows = m.broken.length
     ? m.broken.map((b) => `<tr><td>${esc(b.title)}</td><td class="n">${b.count}</td><td>${b.devs.map(esc).join(", ")}</td></tr>`).join("\n")
     : `<tr><td colspan="3" class="muted">No proven breaks across these exports.</td></tr>`;
-  const maxDay = Math.max(1, ...m.trend.map((t) => t.broken));
-  const trend = m.trend
-    .map((t) => `<div class="bar"><span class="d">${esc(t.date)}</span><span class="track"><span class="fill" style="width:${Math.round((t.broken / maxDay) * 100)}%"></span></span><span class="n">${t.broken}</span></div>`)
-    .join("\n");
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>RuleReceipt team preview</title><style>
 :root{--fg:#111;--muted:#666;--line:#e2e2e2;--bg:#fff;--accent:#b44}
@@ -137,8 +135,6 @@ footer{color:var(--muted);font-size:12px;margin-top:28px;border-top:1px solid va
 <table><thead><tr><th>Rule</th><th class="n">Breaks</th><th>By</th></tr></thead><tbody>
 ${rows}
 </tbody></table>
-<h2 style="font-size:15px">Breaks by day</h2>
-${trend || '<p class="muted">No dated exports.</p>'}
-<footer>Built locally from the export files each dev chose to share. Nothing was uploaded; there is no server or account. Verdicts are what RuleReceipt could prove from each session; it detects and reports, and does not make the model obey. Dev names come from the export files and can be edited there.</footer>
+<footer>A snapshot of the export files each dev chose to share, merged locally. Nothing was uploaded; there is no server or account. Verdicts are what RuleReceipt could prove from each session; it detects and reports, and does not make the model obey. Dev names come from the export files and can be edited there. Trends over time, history and cross-repo views are a separate paid tier, not this local snapshot.</footer>
 </body></html>`;
 }

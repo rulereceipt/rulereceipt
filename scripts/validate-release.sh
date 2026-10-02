@@ -133,6 +133,26 @@ check "zero-network: plain check works with an unroutable proxy" 'echo "$ZN" | g
 ZG="$(printf '%s' "$GP" | (cd "$PB" && HTTPS_PROXY=http://127.0.0.1:9 ALL_PROXY=http://127.0.0.1:9 "$RR" guard 2>&1))"
 check "zero-network: guard denies with an unroutable proxy" 'echo "$ZG" | grep -q "deny"'
 
+echo "== dogfood: false passes must not read as 'followed'; examples aren't rules =="
+PFP="$(newproj pfp '## 1. Release\nAlways run `git tag` when cutting a release.\n')"
+jwrite "NOTES.md" "remember to run git tag v1.0.0 before the release" > "$PFP/wrote.jsonl"
+jbash "git tag v1.0.0" > "$PFP/ran.jsonl"
+check "false-pass: writing the command text into a file is NOT 'followed'" 'out "$PFP" check --transcript wrote.jsonl | grep -q "0 followed"'
+check "true-pass: actually running the command IS 'followed'"             'out "$PFP" check --transcript ran.jsonl | grep -q "1 followed"'
+PEX="$(newproj pex '## 1. Commits\nNever commit to `main`.\n\n## Example commit messages\n- feat: add the login page\n- fix: header spacing\n')"
+check "examples: sample bullets under an Examples heading are NOT rules" '! out "$PEX" audit | grep -q "feat: add the login page"'
+
+echo "== team preview (export is masked, no transcript; team merges to a snapshot) =="
+PT="$(newproj pt '## 1. Branch\nNever push to the `main` branch directly.\n')"
+jbash "git push origin main" > "$PT/s.jsonl"
+TEAMDIR="$WORK/teamdir"; mkdir -p "$TEAMDIR"
+(cd "$PT" && "$RR" check --transcript s.jsonl --export "$TEAMDIR/ada.json" --dev Ada >/dev/null 2>&1)
+check "export: written, no absolute path leaked"      '[ -f "$TEAMDIR/ada.json" ] && ! grep -q "$PT" "$TEAMDIR/ada.json"'
+check "export: carries the verdict + quoted evidence"  'grep -q "git push origin main" "$TEAMDIR/ada.json" && grep -q "\"status\": \"FAIL\"" "$TEAMDIR/ada.json"'
+(cd "$PT" && "$RR" team "$TEAMDIR" >/dev/null 2>&1)
+check "team: merges exports into an HTML snapshot"     '[ -f "$TEAMDIR/team-report.html" ] && grep -q "team preview" "$TEAMDIR/team-report.html"'
+check "team: public snapshot has NO over-time trend"   '! grep -q "Breaks by day" "$TEAMDIR/team-report.html"'
+
 echo "== no stack traces =="
 ALL="$B
 $(out "$PE" check --transcript s.jsonl)
