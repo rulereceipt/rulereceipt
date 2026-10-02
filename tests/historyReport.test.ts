@@ -64,7 +64,7 @@ describe("history render", () => {
   const base: HistorySummary = {
     sessionsScanned: 2, days: 30, tools: ["claude-code"],
     breaks: [{ ruleId: "1", ruleTitle: "Never push without asking", ruleSource: "project", count: 3, lastMs: Date.now(), quote: 'ran "git push origin main" with no approval' }],
-    totalBrokenCount: 3, followedRules: 9, judgmentRules: 14, elapsedMs: 1800,
+    totalBrokenCount: 3, followedRules: 9, judgmentRules: 14, notVisibleRules: 0, elapsedMs: 1800,
   };
 
   it("leads with the proven-break count and shows the quote + timing", () => {

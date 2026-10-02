@@ -139,7 +139,8 @@ export function blockingFailures(
   config: ProjectConfig,
   handleFor: (r: CheckResult) => string
 ): CheckResult[] {
-  return results.filter((r) => r.status === "FAIL" && modeForResult(r, config, handleFor) === "error");
+  // `notVisible` FAILs are "Rule not visible", not Broken — they never fail the build.
+  return results.filter((r) => r.status === "FAIL" && !r.notVisible && modeForResult(r, config, handleFor) === "error");
 }
 
 /** FAILs at `warn` mode — shown, but they do not fail the build. */
@@ -148,5 +149,5 @@ export function warningFailures(
   config: ProjectConfig,
   handleFor: (r: CheckResult) => string
 ): CheckResult[] {
-  return results.filter((r) => r.status === "FAIL" && modeForResult(r, config, handleFor) === "warn");
+  return results.filter((r) => r.status === "FAIL" && !r.notVisible && modeForResult(r, config, handleFor) === "warn");
 }

@@ -155,6 +155,17 @@ export interface CheckResult {
   unverifiedClaim?: boolean;
 
   /**
+   * Set when a would-be Broken verdict is downgraded to "Rule not visible":
+   * the session's working directory and history show the rule was never in the
+   * agent's context at the moment of the break (not loaded from this cwd, or
+   * dropped by a compaction and not re-injected). This is NOT a violation — the
+   * agent can't follow a rule it never saw — so it is never counted as Broken,
+   * never fails the build, and carries the fix. See visibility.ts. `reason`
+   * distinguishes "never in context" from "lost after a compaction".
+   */
+  notVisible?: { reason: "not-in-context" | "stale-after-compaction"; fix: string };
+
+  /**
    * The outcome in the five-value vocabulary. Optional while the checkers
    * are migrated one at a time; `status` remains the fallback.
    */

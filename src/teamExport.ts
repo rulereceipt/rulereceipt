@@ -34,8 +34,9 @@ export interface TeamExport {
   /** ISO date (day precision is enough for a trend). */
   date: string;
   summary: { total: number; pass: number; fail: number; unclear: number };
-  /** One entry per rule: the verdict and the quoted evidence, nothing else. */
-  rules: { title: string; source: string; status: CheckResult["status"]; evidence: string }[];
+  /** One entry per rule: the verdict and the quoted evidence. `notVisible` marks
+   * a would-be break the rule wasn't in context for — never counted as broken. */
+  rules: { title: string; source: string; status: CheckResult["status"]; evidence: string; notVisible?: boolean }[];
 }
 
 export function buildTeamExport(
@@ -46,6 +47,8 @@ export function buildTeamExport(
   now = new Date(),
 ): TeamExport {
   const count = (s: CheckResult["status"]) => results.filter((r) => r.status === s).length;
+  // A "rule not visible" FAIL is never counted as broken — same rule as the report.
+  const fail = results.filter((r) => r.status === "FAIL" && !r.notVisible).length;
   return {
     tool: "rulereceipt",
     kind: "export",
@@ -54,10 +57,10 @@ export function buildTeamExport(
     dev: dev.trim() || "unknown",
     project,
     date: now.toISOString().slice(0, 10),
-    summary: { total: results.length, pass: count("PASS"), fail: count("FAIL"), unclear: count("UNCLEAR") },
+    summary: { total: results.length, pass: count("PASS"), fail, unclear: count("UNCLEAR") },
     // Evidence is masked before it leaves: an export is shared, so obvious
     // secrets, the home path and emails are redacted (same patterns as `wrong`).
-    rules: results.map((r) => ({ title: redact(r.ruleTitle), source: r.ruleSource, status: r.status, evidence: redact(r.evidence) })),
+    rules: results.map((r) => ({ title: redact(r.ruleTitle), source: r.ruleSource, status: r.status, evidence: redact(r.evidence), ...(r.notVisible ? { notVisible: true } : {}) })),
   };
 }
 
@@ -93,7 +96,7 @@ export function mergeTeamExports(exports: TeamExport[]): TeamMerge {
   let totalBroken = 0;
   for (const e of exports) {
     for (const r of e.rules) {
-      if (r.status !== "FAIL") continue;
+      if (r.status !== "FAIL" || r.notVisible) continue; // a not-visible break is not broken
       totalBroken++;
       const cur = byRule.get(r.title) ?? { count: 0, devs: new Set<string>() };
       cur.count++;

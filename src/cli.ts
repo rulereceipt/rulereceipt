@@ -31,6 +31,7 @@ import { runHook } from "./hook.js";
 import { runGuard } from "./guard.js";
 import { generateReport, generateMarkdownReport, generateJsonReport, computeTranscriptHash, type ReportMeta } from "./report/generateReport.js";
 import { buildTeamExport, parseExport, mergeTeamExports, renderTeamHtml } from "./teamExport.js";
+import { applyVisibility } from "./visibility.js";
 import { gateOffer, hookIsInstalled } from "./report/gateOffer.js";
 import { generateHtmlReport } from "./report/generateHtmlReport.js";
 import { verifySessionHash } from "./verifyHash.js";
@@ -318,7 +319,19 @@ async function runCheck(opts: CheckOptions) {
   // back to its stable handle so the mark survives edits that renumber ids.
   const projectConfig = loadProjectConfig(cwd);
   const handleFor = handleMap(rules);
-  const results = visibleResults(rawResults, projectConfig, handleFor);
+  // The raw session text — for A4 "why it broke" context AND for the
+  // visibility pass (#4). Best-effort: if it can't be read, visibility is left
+  // undetermined (a would-be break stays Broken) and no A4 context is shown.
+  let transcriptText: string | undefined;
+  try {
+    if (sessionFilePath) transcriptText = readFileSync(sessionFilePath, "utf-8");
+  } catch {
+    /* unreadable: never a crash */
+  }
+  // "Rule not visible" (#4): downgrade a FAIL whose rule was never in the
+  // agent's context at the break. Applied HERE, before anything counts a break,
+  // so the report, the exit code and the export all agree.
+  const results = applyVisibility(visibleResults(rawResults, projectConfig, handleFor), transcriptText);
   const blockingFails = blockingFailures(results, projectConfig, handleFor);
   const warnedFails = warningFailures(results, projectConfig, handleFor);
 
@@ -353,14 +366,6 @@ async function runCheck(opts: CheckOptions) {
       : "";
   // Kept in human/markdown form for --email and any other reader below, even
   // when stdout is JSON — a manager gets a readable report, not raw JSON.
-  // The raw session text, for A4 "why it broke" context under each Broken verdict.
-  // Best-effort: if it can't be read, the report simply omits the context.
-  let transcriptText: string | undefined;
-  try {
-    if (sessionFilePath) transcriptText = readFileSync(sessionFilePath, "utf-8");
-  } catch {
-    /* unreadable: no A4 context, never a crash */
-  }
   const reportText = markdown ? generateMarkdownReport(results, meta) : generateReport(results, meta, transcriptText);
   if (json) {
     console.log(generateJsonReport(results, meta, pkg.version, editedRuleFiles));

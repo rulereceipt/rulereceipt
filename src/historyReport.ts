@@ -1,6 +1,7 @@
-import { statSync } from "node:fs";
+import { statSync, readFileSync } from "node:fs";
 import { listAllSessions } from "./adapters/index.js";
 import { evaluateSession } from "./evaluate.js";
+import { applyVisibility } from "./visibility.js";
 import type { CheckResult, Rule } from "./types.js";
 
 /**
@@ -55,6 +56,8 @@ export interface HistorySummary {
   followedRules: number;
   /** Rules that need a human's judgment (never mechanically decided). */
   judgmentRules: number;
+  /** Rules whose only would-be breaks happened while the rule wasn't in context. */
+  notVisibleRules: number;
   elapsedMs: number;
 }
 
@@ -86,6 +89,7 @@ export async function scanHistory(
     breaks: { ms: number; quote: string }[];
     passed: boolean;
     judgment: boolean;
+    notVisible: boolean;
   }
   const rules_ = new Map<string, Agg>();
   const tools = new Set<string>();
@@ -123,15 +127,21 @@ export async function scanHistory(
     // today" for it is wrong (found by a real test, 2026-09-29). Falls back to
     // the mtime only when the transcript carries no usable timestamp.
     const sessionMs = lastEventMs(events) ?? ms;
-    const { results } = await evaluateSession(cwd, rules, events, false, needsLlmResult);
+    const { results: rawResults } = await evaluateSession(cwd, rules, events, false, needsLlmResult);
+    // "Rule not visible" (#4): a FAIL whose rule wasn't in context is not a break
+    // here either, so the headline count stays honest across sessions.
+    let rawText: string | undefined;
+    try { rawText = readFileSync(file, "utf-8"); } catch { /* keep undefined */ }
+    const results = applyVisibility(rawResults, rawText);
     for (const r of results) {
       const k = key(r);
       let a = rules_.get(k);
       if (!a) {
-        a = { title: r.ruleTitle, source: r.ruleSource, id: r.ruleId, breaks: [], passed: false, judgment: false };
+        a = { title: r.ruleTitle, source: r.ruleSource, id: r.ruleId, breaks: [], passed: false, judgment: false, notVisible: false };
         rules_.set(k, a);
       }
-      if (r.status === "FAIL") a.breaks.push({ ms: sessionMs, quote: r.evidence });
+      if (r.status === "FAIL" && r.notVisible) a.notVisible = true;
+      else if (r.status === "FAIL") a.breaks.push({ ms: sessionMs, quote: r.evidence });
       else if (r.status === "PASS") a.passed = true;
       else if (r.status === "UNCLEAR" && r.needsHuman) a.judgment = true;
     }
@@ -140,10 +150,14 @@ export async function scanHistory(
   const breaks: HistoryBreak[] = [];
   let followedRules = 0;
   let judgmentRules = 0;
+  let notVisibleRules = 0;
   for (const a of rules_.values()) {
     if (a.breaks.length > 0) {
       const last = a.breaks.reduce((m, b) => (b.ms > m.ms ? b : m), a.breaks[0]);
       breaks.push({ ruleId: a.id, ruleTitle: a.title, ruleSource: a.source, count: a.breaks.length, lastMs: last.ms, quote: a.breaks[0].quote });
+    } else if (a.notVisible) {
+      // Would-be break(s), but the rule was never in context — not a violation.
+      notVisibleRules++;
     } else if (a.passed) {
       followedRules++;
     } else if (a.judgment) {
@@ -160,6 +174,7 @@ export async function scanHistory(
     totalBrokenCount: breaks.reduce((n, b) => n + b.count, 0),
     followedRules,
     judgmentRules,
+    notVisibleRules,
     elapsedMs: Date.now() - started,
   };
 }
@@ -203,6 +218,9 @@ export function renderHistory(s: HistorySummary, projectName: string, now = Date
   }
   out.push("");
   out.push(`  ${s.followedRules} rule${s.followedRules === 1 ? "" : "s"} followed every time · ${s.judgmentRules} need${s.judgmentRules === 1 ? "s" : ""} your judgment`);
+  if (s.notVisibleRules > 0) {
+    out.push(`  ${s.notVisibleRules} rule${s.notVisibleRules === 1 ? " was" : "s were"} not in context when the agent acted — NOT counted as broken. Start sessions from the project root, or add a SessionStart hook that injects your rules.`);
+  }
   out.push("");
   out.push(`checked ${s.sessionsScanned} session${s.sessionsScanned === 1 ? "" : "s"} in ${secs}s`);
   out.push("");

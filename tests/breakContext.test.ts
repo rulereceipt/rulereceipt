@@ -25,16 +25,25 @@ describe("breakContext — the three facts, read from the raw transcript", () =>
     expect(c.precedingUser).toBe("fix the login bug");
   });
 
-  it("shell-heavy session, no rules file ever injected: NOT in context", () => {
+  it("thin shell-heavy session (no context machinery): can't tell, not a guess", () => {
     const t = [userMsg("deploy it"), push()].join("\n");
     const c = breakContext(t, EV);
     expect(c.located).toBe(true);
     expect(c.rulesInContext).toBe(false);
+    // No system-reminder / attachment / compaction anywhere -> can't conclude absent.
+    expect(c.contextObserved).toBe(false);
     const out = renderBreakContext(c).join("\n");
-    expect(out).toContain("NOT in context");
-    expect(out).toContain("SessionStart");
-    // Must NEVER imply the agent ignored a rule it never saw.
+    expect(out.toLowerCase()).toContain("couldn't tell");
     expect(out.toLowerCase()).not.toContain("ignored");
+  });
+
+  it("session WITH context machinery but no rules file: contextObserved, not in context", () => {
+    // a system-reminder for something else, but never the rules file
+    const other = JSON.stringify({ type: "user", message: { role: "user", content: "<system-reminder>Background note, not a rules file.</system-reminder>" } });
+    const t = [other, userMsg("deploy it"), push()].join("\n");
+    const c = breakContext(t, EV);
+    expect(c.rulesInContext).toBe(false);
+    expect(c.contextObserved).toBe(true);
   });
 
   it("ef53e676 pattern: rules present BEFORE a compaction, gone after → stale", () => {
@@ -43,8 +52,8 @@ describe("breakContext — the three facts, read from the raw transcript", () =>
     expect(c.rulesInContext).toBe(true);
     expect(c.compactionBefore).toBe(true);
     expect(c.rulesStaleAfterCompaction).toBe(true);
+    expect(c.contextObserved).toBe(true);
     expect(c.precedingUser).toBe("continue");
-    expect(renderBreakContext(c).join("\n")).toContain("NOT after the last compaction");
   });
 
   it("rules re-injected AFTER the compaction: not stale", () => {

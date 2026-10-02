@@ -32,6 +32,13 @@ export interface BreakContext {
   /** Did a compaction occur before the break? */
   compactionBefore: boolean;
   /**
+   * Did the transcript show ANY context-injection machinery (a system-reminder,
+   * a claudeMd/instructions attachment, a compaction)? When false, the log is
+   * too thin to tell whether the rules file was loaded — so "rules not in
+   * context" would be a guess, and the caller must treat it as can't-tell.
+   */
+  contextObserved: boolean;
+  /**
    * The rules file was in context earlier, but its last appearance was BEFORE
    * the last compaction and it was not re-injected after — so the summary may
    * have dropped it. (The real session ef53e676: CLAUDE.md present before a
@@ -47,6 +54,13 @@ const RULES_INJECTION =
   /Contents of [^\n"]*(?:CLAUDE|AGENTS|GEMINI|AGENT)[^\n"]*\.md \(project instructions|project instructions, checked into|\\?"(?:claudeMd|type\\?":\\?"claudeMd)\\?"|\\?"type\\?":\s*\\?"claudeMd/;
 
 const COMPACTION = /"isCompactSummary"\s*:\s*true/;
+
+// Evidence that THIS transcript records context-injection at all: a
+// system-reminder block, a claudeMd / instructions / attachment line, a
+// rules-file block, or a compaction. If none of this appears, the log is too
+// thin to conclude the rules file was absent (vs simply not recorded).
+const CONTEXT_MACHINERY =
+  /<system-reminder>|\\?"claudeMd\\?"|"type"\s*:\s*"(?:instructions|attachment|system)"|project instructions|Contents of [^\n"]*\.md|"isCompactSummary"\s*:\s*true/i;
 
 /** Longest-first distinctive fragments of the evidence to find the break line by. */
 function needles(evidence: string): string[] {
@@ -95,8 +109,9 @@ export function breakContext(transcriptText: string, evidence: string): BreakCon
       if (ns.some((n) => flat.includes(n))) { breakIdx = i; break; }
     }
   }
+  const contextObserved = lines.some((l) => CONTEXT_MACHINERY.test(l));
   if (breakIdx === -1)
-    return { located: false, rulesInContext: false, compactionBefore: false, rulesStaleAfterCompaction: false };
+    return { located: false, rulesInContext: false, compactionBefore: false, rulesStaleAfterCompaction: false, contextObserved };
 
   let lastRulesIdx = -1;
   let lastCompactionIdx = -1;
@@ -116,6 +131,7 @@ export function breakContext(transcriptText: string, evidence: string): BreakCon
     rulesInContext,
     compactionBefore,
     rulesStaleAfterCompaction: rulesInContext && compactionBefore && lastRulesIdx < lastCompactionIdx,
+    contextObserved,
   };
 }
 
@@ -124,18 +140,17 @@ export function renderBreakContext(ctx: BreakContext): string[] {
   if (!ctx.located) return [];
   const out: string[] = ["     why it broke:"];
   if (ctx.precedingUser) out.push(`       just before, you said: "${ctx.precedingUser}"`);
-  if (!ctx.rulesInContext) {
-    out.push("       your rules file was NOT in context at this point — not the agent ignoring a");
-    out.push("       rule it never saw. Claude Code can load CLAUDE.md only when a Read touches its");
-    out.push("       directory, so a shell-heavy session can miss it. Fix: a SessionStart (and");
-    out.push("       post-compaction) hook that injects your rules every session.");
-  } else if (ctx.rulesStaleAfterCompaction) {
-    out.push("       your rules file was in context earlier but NOT after the last compaction — the");
-    out.push("       summary may have dropped it. Fix: a post-compaction hook that re-injects your rules.");
-  } else {
+  // This renders only for a break that was NOT downgraded to "Rule not visible"
+  // (see visibility.ts). So either the rules file WAS in context, or the log is
+  // too thin to tell — never the confident not-visible case, which shows its own
+  // fix in the "Rule not visible" section.
+  if (ctx.rulesInContext) {
     out.push("       your rules file was in context before this.");
     if (ctx.compactionBefore)
-      out.push("       (a compaction happened earlier in this session; context before it was summarised.)");
+      out.push("       (a compaction happened earlier in this session; it was re-injected after.)");
+  } else {
+    out.push("       couldn't tell whether your rules file was in context here — the session log");
+    out.push("       doesn't record it. If it wasn't, this isn't the agent ignoring a rule it never saw.");
   }
   return out;
 }

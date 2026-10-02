@@ -30,7 +30,7 @@ describe("generateJsonReport", () => {
 
   it("summary counts match the results", () => {
     const j = JSON.parse(generateJsonReport(RESULTS, META, "9.9.9"));
-    expect(j.summary).toEqual({ total: 3, pass: 1, fail: 1, unclear: 1 });
+    expect(j.summary).toEqual({ total: 3, pass: 1, fail: 1, unclear: 1, ruleNotVisible: 0 });
   });
 
   it("maps every result with its fields", () => {

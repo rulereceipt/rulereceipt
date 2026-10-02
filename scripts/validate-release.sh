@@ -153,6 +153,20 @@ check "export: carries the verdict + quoted evidence"  'grep -q "git push origin
 check "team: merges exports into an HTML snapshot"     '[ -f "$TEAMDIR/team-report.html" ] && grep -q "team preview" "$TEAMDIR/team-report.html"'
 check "team: public snapshot has NO over-time trend"   '! grep -q "Breaks by day" "$TEAMDIR/team-report.html"'
 
+echo "== #4: a rule not in context is NOT counted as broken =="
+PV="$(newproj pv '## 1. Branch\nNever push to the `main` branch directly.\n')"
+# visible: the transcript carries the CLAUDE.md injection, then the push -> Broken.
+{ printf '%s\n' '{"type":"user","message":{"role":"user","content":"<system-reminder>\nContents of /x/CLAUDE.md (project instructions, checked into the codebase):\nNever push to main.\n</system-reminder>"}}'; jbash "git push origin main"; } > "$PV/visible.jsonl"
+check "visible break: Broken, exit 1"                   '[ "$(rc "$PV" check --transcript visible.jsonl)" = "1" ]'
+# not visible: context machinery present (a reminder) but NO rules file, then a push.
+{ printf '%s\n' '{"type":"user","message":{"role":"user","content":"<system-reminder>a background note, not a rules file</system-reminder>"}}'; jbash "git push origin main"; } > "$PV/notvisible.jsonl"
+NV="$(out "$PV" check --transcript notvisible.jsonl)"
+check "not-visible break: exit 0 (never counted as broken)" '[ "$(rc "$PV" check --transcript notvisible.jsonl)" = "0" ]'
+check "not-visible break: shown as Rule not visible + a fix" 'echo "$NV" | grep -qi "rule not visible" && echo "$NV" | grep -qi "fix:"'
+# thin log (no machinery): can't tell -> stays Broken, never silently downgraded.
+jbash "git push origin main" > "$PV/thin.jsonl"
+check "thin log: can't-tell stays Broken, exit 1"       '[ "$(rc "$PV" check --transcript thin.jsonl)" = "1" ]'
+
 echo "== no stack traces =="
 ALL="$B
 $(out "$PE" check --transcript s.jsonl)

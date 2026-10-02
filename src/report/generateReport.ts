@@ -88,6 +88,7 @@ function ruleLabel(r: CheckResult, results: CheckResult[]): string {
 function summaryLine(results: CheckResult[]): string {
   const n = (b: Bucket) => results.filter((r) => bucketOf(r) === b).length;
   const parts = [`${n("PASS")} followed`, `${n("FAIL")} not followed`];
+  if (n("RULE_NOT_VISIBLE") > 0) parts.push(`${n("RULE_NOT_VISIBLE")} rule not visible`);
   if (n("UNCLEAR_EVIDENCE") > 0) parts.push(`${n("UNCLEAR_EVIDENCE")} couldn't tell`);
   if (n("NOT_RUN") > 0) parts.push(`${n("NOT_RUN")} not run`);
   if (n("NOT_APPLICABLE") > 0) parts.push(`${n("NOT_APPLICABLE")} didn't apply`);
@@ -95,7 +96,7 @@ function summaryLine(results: CheckResult[]): string {
   return parts.join(" · ");
 }
 
-type Bucket = "FAIL" | "UNCLEAR_EVIDENCE" | "NOT_RUN" | "PASS" | "NOT_APPLICABLE" | "UNCLEAR_JUDGMENT";
+type Bucket = "FAIL" | "RULE_NOT_VISIBLE" | "UNCLEAR_EVIDENCE" | "NOT_RUN" | "PASS" | "NOT_APPLICABLE" | "UNCLEAR_JUDGMENT";
 
 /**
  * Six buckets, because "the tool looked and could not decide", "the tool
@@ -113,6 +114,9 @@ type Bucket = "FAIL" | "UNCLEAR_EVIDENCE" | "NOT_RUN" | "PASS" | "NOT_APPLICABLE
  * fallback while the rest are migrated.
  */
 function bucketOf(result: CheckResult): Bucket {
+  // A would-be Broken whose rule wasn't in context is "Rule not visible", never
+  // Broken — decided before anything else so it can't be counted as a violation.
+  if (result.notVisible) return "RULE_NOT_VISIBLE";
   switch (result.outcome) {
     case "fail":
       return "FAIL";
@@ -141,6 +145,7 @@ function bucketOf(result: CheckResult): Bucket {
  */
 const BUCKET_LABEL: Record<Bucket, string> = {
   FAIL: "Not followed",
+  RULE_NOT_VISIBLE: "Rule not visible (not a violation)",
   UNCLEAR_EVIDENCE: "Couldn't tell",
   NOT_RUN: "Not run",
   PASS: "Followed",
@@ -156,6 +161,7 @@ const BUCKET_LABEL: Record<Bucket, string> = {
  */
 const BUCKET_ORDER: Bucket[] = [
   "FAIL",
+  "RULE_NOT_VISIBLE",
   "UNCLEAR_EVIDENCE",
   "NOT_RUN",
   "PASS",
@@ -245,10 +251,14 @@ export function generateReport(results: CheckResult[], meta: ReportMeta, transcr
       // may not say the act did not happen. That distinction shipped for six
       // versions as a PASS on a session that ran `git push -f`.
       if (r.ceiling) lines.push(`  this means: ${r.ceiling}`);
-      // A4: why it broke — the context around a proven break, read from the raw
-      // transcript. Honest by construction: if the rules file was never in
-      // context before the break, it says so rather than implying it was ignored.
-      if (r.status === "FAIL" && transcriptText && r.evidence) {
+      // "Rule not visible": not a violation. Say plainly why, and the fix.
+      if (r.notVisible) {
+        lines.push(`  not a violation: the agent never had this rule in context at that moment.`);
+        lines.push(`  fix: ${r.notVisible.fix}`);
+      }
+      // A4: why it broke — the context around a PROVEN break (one that WAS
+      // visible). Skipped for a not-visible result, which shows its own fix above.
+      if (r.status === "FAIL" && !r.notVisible && transcriptText && r.evidence) {
         for (const l of renderBreakContext(breakContext(transcriptText, r.evidence))) lines.push(l);
       }
     }
@@ -340,13 +350,16 @@ export function generateJsonReport(results: CheckResult[], meta: ReportMeta, too
     summary: {
       total: clean.length,
       pass: count("PASS"),
-      fail: count("FAIL"),
+      // A "rule not visible" FAIL is never counted as broken — same everywhere.
+      fail: clean.filter((r) => r.status === "FAIL" && !r.notVisible).length,
       unclear: count("UNCLEAR"),
+      ruleNotVisible: clean.filter((r) => Boolean(r.notVisible)).length,
     },
     results: clean.map((r) => ({
       ruleId: r.ruleId,
       ruleTitle: r.ruleTitle,
       ruleSource: r.ruleSource,
+      ...(r.notVisible ? { notVisible: r.notVisible } : {}),
       // Absolute path + 1-based line of the rule's heading, when unambiguous
       // (see attachSourceLocation). A consumer can jump straight to the rule.
       sourcePath: r.sourcePath ?? null,
