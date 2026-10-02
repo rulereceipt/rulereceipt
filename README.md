@@ -17,7 +17,7 @@ npx rulereceipt
 Runs entirely on your machine. Plain `rulereceipt check` makes zero network
 calls — [Trust, privacy and licensing](#trust-privacy-and-licensing) has the full
 detail, including the three off-by-default opt-ins. Works with Claude Code today
-(OpenAI Codex CLI in testing); reads rules from CLAUDE.md, AGENTS.md, Cursor
+(OpenAI Codex CLI supported); reads rules from CLAUDE.md, AGENTS.md, Cursor
 (`.cursor/rules`), GitHub Copilot, Windsurf, Gemini (`GEMINI.md`), Google's
 `.agents/rules`, and Claude Code memory. [Accuracy](https://rulereceipt.dev/accuracy)
 · [Known gaps](KNOWN-GAPS.md) · Source-available, not OSI — see [LICENSE](LICENSE).
@@ -77,7 +77,7 @@ Published and live on npm, actively developed.
    current project directory and your global rules file.
 2. Reads your most recent agent session transcript — Claude Code today
    (including hosted/enterprise variants under a different directory), and
-   OpenAI Codex CLI (in testing); newest session across tools wins.
+   OpenAI Codex CLI (supported); newest session across tools wins.
 3. Routes each rule to the narrowest check that can actually answer it:
    - **Structured checks** read what the session really did — an actual
      git command's branch argument, actual file edits, actual file
