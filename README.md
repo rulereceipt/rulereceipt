@@ -538,6 +538,15 @@ rm -rf .rulereceipt/           # the local reports/receipts folder, if you want 
 `protect --undo` is only needed if you ran `protect`. Nothing else is
 installed anywhere on your system.
 
+## Team plan
+
+The CLI is free and runs locally, forever. A separate **Team plan** — an
+org-wide, hosted view with trends over time, history, cross-repo dashboards and
+compliance-ready exports — is a genuinely different product from the local
+check. It's in **early access** while we finish setting it up; email
+hello@rulereceipt.dev if you want it early. The local check (and the free
+`rulereceipt team <folder>` snapshot of exports you already have) stays free.
+
 ## Contact
 
 Questions, bugs, or anything else — hello@rulereceipt.dev.

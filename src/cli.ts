@@ -32,6 +32,7 @@ import { runGuard } from "./guard.js";
 import { generateReport, generateMarkdownReport, generateJsonReport, computeTranscriptHash, type ReportMeta } from "./report/generateReport.js";
 import { buildTeamExport, parseExport, mergeTeamExports, renderTeamHtml } from "./teamExport.js";
 import { applyVisibility } from "./visibility.js";
+import { teamPlanNote, activateNote } from "./teamPlan.js";
 import { gateOffer, hookIsInstalled } from "./report/gateOffer.js";
 import { generateHtmlReport } from "./report/generateHtmlReport.js";
 import { verifySessionHash } from "./verifyHash.js";
@@ -1586,6 +1587,14 @@ program
     const outPath = opts.out ? resolve(process.cwd(), opts.out) : join(dir, "team-report.html");
     writeFileSync(outPath, renderTeamHtml(merged));
     console.log(`team preview: merged ${merged.exportsRead} export(s) from ${merged.devs.length} dev(s), ${merged.totalBroken} break(s) — wrote ${outPath}`);
+    console.log(`\n${teamPlanNote()}`);
+  });
+
+program
+  .command("activate <key>")
+  .description("activate a Team plan seat. (Early access while the paid tier is being set up.)")
+  .action((key: string) => {
+    console.log(activateNote(key));
   });
 
 // Bare `rulereceipt` (no subcommand, no flags) runs history mode — the first-run

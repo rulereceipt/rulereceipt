@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Thanks — RuleReceipt Team</title>
+<meta name="description" content="Activate your RuleReceipt Team plan and manage your subscription." />
+<meta name="robots" content="noindex" />
+<style>
+:root{--fg:#111;--muted:#666;--line:#e3e3e3;--bg:#fff;--accent:#b44}
+@media(prefers-color-scheme:dark){:root{--fg:#eee;--muted:#9a9a9a;--line:#333;--bg:#131313;--accent:#e88}}
+:root[data-theme="dark"]{--fg:#eee;--muted:#9a9a9a;--line:#333;--bg:#131313;--accent:#e88}
+body{font:16px/1.6 -apple-system,system-ui,sans-serif;color:var(--fg);background:var(--bg);margin:0;padding:48px 20px;max-width:680px;margin:0 auto}
+h1{font-size:26px;margin:0 0 6px}.sub{color:var(--muted);margin:0 0 28px}
+code{background:color-mix(in srgb,var(--fg) 8%,transparent);padding:2px 6px;border-radius:4px;font-size:14px}
+.card{border:1px solid var(--line);border-radius:10px;padding:18px 20px;margin:16px 0}
+a{color:var(--accent)}
+footer{color:var(--muted);font-size:13px;margin-top:36px;border-top:1px solid var(--line);padding-top:14px}
+</style>
+</head>
+<body>
+<h1>Team plan</h1>
+<p class="sub">RuleReceipt — the trusted check for whether your AI agent followed your rules.</p>
+
+<!-- TEAM_CHECKOUT_LIVE is false. While false, show the early-access card below.
+     When Polar is live (flip src/teamPlan.ts: live:true + checkoutUrl + portalUrl),
+     replace the early-access card with the activation + portal instructions, e.g.:
+       1. After checkout you'll get a licence key by email.
+       2. Run `rulereceipt activate <key>` in your project.
+       3. Manage or cancel anytime at PASTE_POLAR_PORTAL_URL.
+     Keep this page noindex. -->
+
+<div class="card">
+  <h2 style="margin-top:0;font-size:18px">Early access</h2>
+  <p>The Team plan (trends over time, history, cross-repo dashboards, compliance-ready
+  exports) is being set up right now. It's a separate, hosted product from the free
+  local CLI — which stays free.</p>
+  <p>Want it early? Email <a href="mailto:hello@rulereceipt.dev">hello@rulereceipt.dev</a>
+  and we'll set you up. The free CLI and the local <code>rulereceipt team &lt;folder&gt;</code>
+  snapshot work today with no account.</p>
+</div>
+
+<footer>Nothing on this page collects payment or credentials. RuleReceipt runs locally; the free CLI makes zero network calls on a plain check.</footer>
+</body>
+</html>
