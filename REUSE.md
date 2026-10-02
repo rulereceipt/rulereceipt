@@ -66,3 +66,27 @@ only if the size/speed budget holds.
   (MIT + Commons Clause), somogyijanos/cursor-chat-export (no LICENSE, archived),
   ericmjl/opencode-session-viewer (LICENSE unverifiable). Read for ideas only;
   reimplement independently if needed.
+
+## Adapter-source decision (2026-10-02)
+- **cli-continues** (yigitkonur/cli-continues) = main adapter source. **MIT**
+  (file-verified). Reverse-engineered from **Pilan-AI/mnemo**, also **MIT** —
+  clean chain. Reads 16 agents, one parser per file in `src/parsers/`, captures
+  shell commands with exit codes, edits, reads, MCP calls, subagents.
+- **PORT, don't depend:** copy parser files into our adapter layer one agent at a
+  time, pinned to a recorded commit SHA, credit in NOTICE + file header; map to
+  our neutral events. Record agent version + pinned SHA per adapter here.
+- **Node constraint:** ours is `engines.node >=20`; cli-continues needs `>=22.5`
+  only because it uses `node:sqlite`. DECISION: keep `>=20`. JSON/JSONL agents
+  (Copilot CLI, Gemini, Cline/Roo/Kilo, Aider, Antigravity, Kimi, Qwen, Droid,
+  Amp, Kiro) port to Node 20 directly. SQLite agents (OpenCode, Crush, old Cursor)
+  use a WASM sqlite (sql.js, as ai-timeline does) instead of `node:sqlite`, so we
+  do not force a Node bump. Cursor newer `agent-transcripts` are JSONL (no SQLite).
+- **Licence results (2026-10-02, gh api):** MIT — cli-continues, mnemo, ai-timeline,
+  S2thend/cursor-history, anasabbasdev/cursor-chat-bulk-export,
+  markwroberts0/cursor-chat-recovery, junxit/agentic-session-explorer,
+  Reality-Shifting-Tech/sessionport, Ickleslimer/codetalker. **NO LICENSE (do not
+  use):** kruzovic7/ai-data-extractor (404), agentscrub (404). Never: ChatWizard
+  (Commons Clause), monkai-trace.
+- Each ported adapter does a **schema fingerprint**: unknown fields/shape ->
+  "format newer than tested (last tested: <agent version>)", never a guess.
+  "supported" needs real sample + planted + clean fixtures; else "experimental".
