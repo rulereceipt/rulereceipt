@@ -267,3 +267,16 @@ describe("cold-start smoke states never crash and always name the next step", ()
     noStackTrace(out);
   });
 });
+
+describe("help text", () => {
+  it("wrong --help mentions --submit and --email", () => {
+    const { out } = run(["wrong", "--help"]);
+    expect(out).toContain("--submit");
+    expect(out).toContain("--email");
+  });
+  it("report --help describes the team version, not a Compliance API", () => {
+    const { out } = run(["report", "--help"]);
+    expect(out.toLowerCase()).toContain("team version");
+    expect(out).not.toContain("Compliance API");
+  });
+});

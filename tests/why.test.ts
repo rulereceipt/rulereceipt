@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, writeFileSync, rmSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { explainRule, findRules, renderWhy } from "../src/why.js";
+import { explainRule, findRules, renderWhy, explainAll, renderAllWhy, whyList, renderWhyList } from "../src/why.js";
 import { loadRules } from "../src/rules.js";
 
 /**
@@ -90,6 +90,71 @@ describe("explainRule — the facts for one rule", () => {
     const r = await explainRule(dir, "push straight to main");
     expect(r.rule!.brokenCount).toBe(0);
     expect(renderWhy(r)).toContain("no proven break");
+  });
+});
+
+// loadRules also loads the real global ~/.claude rules, so these assert on PRESENCE
+// and RELATIVE order of the project rules, never an exact count.
+describe("why with no argument — list every rule with its id", () => {
+  it("whyList includes the project rules with their id + title", () => {
+    claude("# Rules\n\n- Never push to main.\n- Always run tests.\n");
+    const list = whyList(dir);
+    expect(list.some((r) => r.title.includes("Never push to main"))).toBe(true);
+    expect(list.length).toBeGreaterThanOrEqual(2);
+  });
+  it("renderWhyList shows the how-to lines and the rule text", () => {
+    claude("# Rules\n\n- Never push to main.\n");
+    const out = renderWhyList(whyList(dir));
+    expect(out).toContain('rulereceipt why "');
+    expect(out).toContain("why --all");
+    expect(out).toContain("Never push to main");
+  });
+});
+
+describe("why --all — every rule, problems first", () => {
+  it("puts a rule naming a missing command before a plain judgment rule", async () => {
+    claude("# Rules\n\n- Write clean, elegant code.\n- Always run `npm run nope` before pushing.\n");
+    // no package.json, so `npm run nope` is a named command that does not exist -> ranks first
+    const all = await explainAll(dir);
+    const idxMissing = all.rules.findIndex((w) => w.named?.name === "nope");
+    const idxStyle = all.rules.findIndex((w) => w.title.includes("clean"));
+    expect(idxMissing).toBeGreaterThanOrEqual(0);
+    expect(idxStyle).toBeGreaterThanOrEqual(0);
+    expect(idxMissing).toBeLessThan(idxStyle);
+  });
+  it("renderAllWhy marks the missing-command rule with an ✗ and its reason", async () => {
+    claude("# Rules\n\n- Always run `npm run nope` before pushing.\n");
+    const out = renderAllWhy(await explainAll(dir));
+    expect(out).toContain("✗");
+    expect(out).toContain("does not exist");
+  });
+});
+
+describe("renderWhy — how to actually block the rule (A3)", () => {
+  it("a branch rule shows a native permissions deny and the guard, with the honest caveat", async () => {
+    claude("## 1. Branch\nNever push to the `main` branch directly.\n");
+    const out = renderWhy(await explainRule(dir, "push to the main branch directly"));
+    expect(out).toContain("To stop this before it runs");
+    expect(out).toContain('"permissions"');
+    expect(out).toContain("Bash(git push:*)");
+    expect(out).toContain("rulereceipt protect");
+    // Must not overstate: the native rule can't scope to the branch.
+    expect(out.toLowerCase()).toContain("every push");
+  });
+
+  it("a file rule shows a precise Edit/Write deny for that path", async () => {
+    claude("## 1. Secrets\nNever modify `.env`.\n");
+    const out = renderWhy(await explainRule(dir, "modify `.env`"));
+    expect(out).toContain("Edit(.env)");
+    expect(out).toContain("Write(.env)");
+  });
+
+  it("a claim-evidence rule says it is judged after the run, not blocked", async () => {
+    claude("## 1. Evidence\nNever report a task done without pasting the test output as proof.\n");
+    const out = renderWhy(await explainRule(dir, "report a task done without pasting the test output"));
+    expect(out.toLowerCase()).toContain("after the run");
+    expect(out).toContain("rulereceipt check");
+    expect(out).not.toContain('"permissions"');
   });
 });
 

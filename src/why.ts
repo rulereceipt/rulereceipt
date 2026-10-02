@@ -5,6 +5,7 @@ import { loadRules, describeRuleSources } from "./rules.js";
 import { classifyRule } from "./checks/classify.js";
 import { adviseRule } from "./checkability.js";
 import { scanHistory } from "./historyReport.js";
+import { blockHintFor, type BlockHint } from "./blockHint.js";
 import type { Rule } from "./types.js";
 
 /**
@@ -34,6 +35,8 @@ export interface WhyRule {
   kind: string;
   suggestion?: string;
   named?: { kind: "command" | "file"; name: string; exists: boolean };
+  /** How (and whether) this rule can actually be blocked/checked — see blockHint.ts. */
+  block?: BlockHint;
   brokenCount: number;
   brokenDates: string[];
   sessionsScanned: number;
@@ -89,6 +92,46 @@ function namedCommandOrPath(rule: Rule, cwd: string): WhyRule["named"] {
   return undefined;
 }
 
+/** Break counts per rule id+title, plus the total sessions scanned. Computed once. */
+type HistLookup = { sessionsScanned: number; byRule: Map<string, { count: number; lastMs: number }> };
+
+async function historyLookup(cwd: string, rules: Rule[]): Promise<HistLookup> {
+  try {
+    const hist = await scanHistory(cwd, rules, 30);
+    const byRule = new Map<string, { count: number; lastMs: number }>();
+    for (const b of hist.breaks) byRule.set(`${b.ruleId}\u0000${b.ruleTitle}`, { count: b.count, lastMs: b.lastMs });
+    return { sessionsScanned: hist.sessionsScanned, byRule };
+  } catch {
+    return { sessionsScanned: 0, byRule: new Map() };
+  }
+}
+
+/** Build the WhyRule facts for one rule, reusing an already-computed load graph and history. */
+function ruleFacts(cwd: string, rule: Rule, graph: ReturnType<typeof describeRuleSources>, hist: HistLookup): WhyRule {
+  const src = rule.sourcePath ? graph.find((e) => e.path === rule.sourcePath) : undefined;
+  const cls = classifyRule(rule);
+  const checkable = CHECKABLE_KINDS.has(cls.kind);
+  const advice = checkable ? null : adviseRule(rule);
+  const b = hist.byRule.get(`${rule.id}\u0000${rule.title}`);
+  return {
+    id: rule.id,
+    title: rule.title,
+    source: rule.source,
+    location: locationOf(rule),
+    loaded: src ? src.status === "loaded" : true,
+    loadNote: src?.note,
+    pathScoped: rule.paths ? rule.paths.join(", ") : undefined,
+    checkable,
+    kind: cls.kind,
+    suggestion: advice?.suggestion,
+    named: namedCommandOrPath(rule, cwd),
+    block: blockHintFor(cls),
+    brokenCount: b?.count ?? 0,
+    brokenDates: b ? [new Date(b.lastMs).toISOString().slice(0, 10)] : [],
+    sessionsScanned: hist.sessionsScanned,
+  };
+}
+
 export async function explainRule(cwd: string, query: string): Promise<WhyResult> {
   const rules = loadRules(cwd);
   const matches = findRules(rules, query);
@@ -100,48 +143,45 @@ export async function explainRule(cwd: string, query: string): Promise<WhyResult
       candidates: matches.slice(0, 12).map((r) => ({ title: r.title, location: locationOf(r) })),
     };
   }
-  const rule = matches[0];
   const graph = describeRuleSources(cwd);
-  const src = rule.sourcePath ? graph.find((e) => e.path === rule.sourcePath) : undefined;
-  const cls = classifyRule(rule);
-  const checkable = CHECKABLE_KINDS.has(cls.kind);
-  const advice = checkable ? null : adviseRule(rule);
+  const hist = await historyLookup(cwd, rules);
+  return { query, matches: 1, rule: ruleFacts(cwd, matches[0], graph, hist) };
+}
 
-  let brokenCount = 0;
-  let brokenDates: string[] = [];
-  let sessionsScanned = 0;
-  try {
-    const hist = await scanHistory(cwd, rules, 30);
-    sessionsScanned = hist.sessionsScanned;
-    const b = hist.breaks.find((x) => x.ruleId === rule.id && x.ruleTitle === rule.title);
-    if (b) {
-      brokenCount = b.count;
-      brokenDates = [new Date(b.lastMs).toISOString().slice(0, 10)];
-    }
-  } catch {
-    /* history is best-effort; a rule can still be explained without it */
-  }
+/** A "problem" rank so `why --all` can put the ones that need attention first. */
+function problemRank(w: WhyRule): number {
+  if (!w.loaded) return 0; // the agent never sees it
+  if (w.named && !w.named.exists) return 1; // names a command/file that does not exist
+  if (w.brokenCount > 0) return 2; // broken recently
+  if (!w.checkable) return 3; // needs judgment
+  return 4; // fine
+}
 
-  return {
-    query,
-    matches: 1,
-    rule: {
-      id: rule.id,
-      title: rule.title,
-      source: rule.source,
-      location: locationOf(rule),
-      loaded: src ? src.status === "loaded" : true,
-      loadNote: src?.note,
-      pathScoped: rule.paths ? rule.paths.join(", ") : undefined,
-      checkable,
-      kind: cls.kind,
-      suggestion: advice?.suggestion,
-      named: namedCommandOrPath(rule, cwd),
-      brokenCount,
-      brokenDates,
-      sessionsScanned,
-    },
-  };
+export interface WhyAll {
+  rules: WhyRule[];
+  sessionsScanned: number;
+}
+
+/**
+ * `why --all` — the same facts for every loaded rule, problems first (not loaded, then a
+ * named command/file missing, then broken recently, then judgment-only, then the rest).
+ * Read-only, facts only, no verdicts. Order within a rank is the rule's own order.
+ */
+export async function explainAll(cwd: string): Promise<WhyAll> {
+  const rules = loadRules(cwd);
+  const graph = describeRuleSources(cwd);
+  const hist = await historyLookup(cwd, rules);
+  const facts = rules.map((r) => ruleFacts(cwd, r, graph, hist));
+  const ranked = facts
+    .map((w, i) => ({ w, i }))
+    .sort((a, b) => problemRank(a.w) - problemRank(b.w) || a.i - b.i)
+    .map((x) => x.w);
+  return { rules: ranked, sessionsScanned: hist.sessionsScanned };
+}
+
+/** The no-argument help: how to use `why`, plus every rule with its id, so people can pick. */
+export function whyList(cwd: string): { id: string; title: string; location: string }[] {
+  return loadRules(cwd).map((r) => ({ id: r.id, title: r.title, location: locationOf(r) }));
 }
 
 function locationOf(rule: Rule): string {
@@ -168,8 +208,65 @@ export function renderWhy(r: WhyResult): string {
   out.push(w.checkable
     ? `  ✓ mechanically checkable (${w.kind}) — a session is judged against it with quoted evidence`
     : `  • needs your judgment${w.suggestion ? ` — ${w.suggestion}` : ` — no command or file to check it by; a human decides`}`);
+  renderBlockHint(w.block, out);
   out.push("");
   if (w.brokenCount > 0) out.push(`  last 30 days: broken ${w.brokenCount}× (last: ${w.brokenDates[0]}) across ${w.sessionsScanned} session${w.sessionsScanned === 1 ? "" : "s"}`);
   else out.push(`  last 30 days: no proven break across ${w.sessionsScanned} session${w.sessionsScanned === 1 ? "" : "s"}`);
+  return out.join("\n");
+}
+
+/**
+ * How to actually enforce this rule, appended to the single-rule view. Prints
+ * only what the tool truly does: a native Claude Code permissions rule where one
+ * can genuinely express it (with its honest limitation), RuleReceipt's own guard
+ * where it covers the rule pre-flight, and — for rules judged only after the run —
+ * the after-the-fact path. Nothing here claims a block the guard doesn't make.
+ */
+function renderBlockHint(block: BlockHint | undefined, out: string[]): void {
+  if (!block) return;
+  out.push("");
+  if (block.preventable) {
+    out.push("  To stop this before it runs:");
+    if (block.native) {
+      const entries = block.native.entries.map((e) => `"${e}"`).join(", ");
+      out.push(`    • Claude Code settings (.claude/settings.json), no extra tool:`);
+      out.push(`        { "permissions": { "${block.native.kind}": [${entries}] } }`);
+      out.push(`      ${block.native.note}`);
+    } else if (block.nativeImpossibleReason) {
+      out.push(`    • A Claude Code permission rule can't express this — ${block.nativeImpossibleReason}.`);
+    }
+    if (block.guardCovers) {
+      out.push(`    • RuleReceipt's own guard checks this exact rule: run \`rulereceipt protect\``);
+      out.push(`      (adds a PreToolUse deny hook + a Stop hook, shown before it writes anything).`);
+    }
+  } else {
+    out.push("  Can't be blocked before an action — this rule is judged after the run.");
+    out.push("  Run `rulereceipt check` after a session; `rulereceipt protect` also adds a Stop");
+    out.push("  hook that won't let a session end on a broken rule.");
+  }
+}
+
+/** No-argument output: how to use `why`, then every rule with its id so you can pick one. */
+export function renderWhyList(list: { id: string; title: string; location: string }[]): string {
+  if (list.length === 0) return "No rules file found here. Run `rulereceipt init` to add one, then `rulereceipt why \"<rule>\"`.";
+  const out = ['Explain one rule:  rulereceipt why "<some words from the rule>"', "Or all of them:    rulereceipt why --all", "", "Rules found:"];
+  for (const r of list) out.push(`  ${r.id.padEnd(6)}  ${r.title.replace(/\s+/g, " ").slice(0, 72)}`);
+  return out.join("\n");
+}
+
+/** One short line per rule for `why --all`, problems first. */
+export function renderAllWhy(all: WhyAll): string {
+  if (all.rules.length === 0) return "No rules file found here. Run `rulereceipt init` to add one.";
+  const out: string[] = [];
+  for (const w of all.rules) {
+    let mark = "  ✓"; let note = w.checkable ? `checkable (${w.kind})` : "needs your judgment";
+    if (!w.loaded) { mark = "  ✗"; note = `NOT loaded — ${w.loadNote ?? "the agent never sees this file"}`; }
+    else if (w.named && !w.named.exists) { mark = "  ✗"; note = `names a ${w.named.kind} that does not exist: ${w.named.name}`; }
+    else if (w.brokenCount > 0) { mark = "  ✗"; note = `broken ${w.brokenCount}× (last: ${w.brokenDates[0]})`; }
+    out.push(`${mark} ${w.id.padEnd(6)} ${w.title.replace(/\s+/g, " ").slice(0, 60)}`);
+    out.push(`         ${note}`);
+  }
+  out.push("");
+  out.push(`across ${all.sessionsScanned} session${all.sessionsScanned === 1 ? "" : "s"} · run \`rulereceipt why "<rule>"\` for one rule in full`);
   return out.join("\n");
 }

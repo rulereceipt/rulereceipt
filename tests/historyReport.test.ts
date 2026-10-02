@@ -83,6 +83,12 @@ describe("history render", () => {
     expect(out.toLowerCase()).toContain("no coding-agent sessions found");
   });
 
+  it("the footer points to protect (ask first) and card (share)", () => {
+    const out = renderHistory(base, "my-app");
+    expect(out).toContain("rulereceipt protect");
+    expect(out).toContain("rulereceipt card");
+  });
+
   it("never overstates: the headline counts only proven breaks, judgment is separate", () => {
     const out = renderHistory(base, "x");
     // the big number is 3 (proven), not 3+14

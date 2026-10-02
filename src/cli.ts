@@ -19,7 +19,7 @@ import { ghReady, issueTitle, issueCreateArgs, buildMailto, mailtoSubject } from
 import { spawnSync } from "node:child_process";
 import { detectSelfEditedRuleFiles } from "./checks/selfEditedRules.js";
 import { scanHistory, renderHistory } from "./historyReport.js";
-import { explainRule, renderWhy } from "./why.js";
+import { explainRule, renderWhy, explainAll, renderAllWhy, whyList, renderWhyList } from "./why.js";
 import { observeSessions, renderNoRules, draftRulesFromHistory } from "./sessionObserve.js";
 import { listSessionRows, renderSessionList } from "./listSessions.js";
 import { runSelfTestChecks, renderSelfTest } from "./selftest.js";
@@ -1068,7 +1068,7 @@ const PERIOD_MS: Record<Cadence, number> = {
 program
   .command("report")
   .description(
-    "Compliance report across your recent sessions (not just the latest): which policy rules were broken, where, with evidence. Deterministic, local, no network. The org-wide version runs via the Claude Compliance API for Enterprise orgs."
+    "Compliance report across your recent sessions (not just the latest): which policy rules were broken, where, with evidence. Deterministic, local, no network. An org-wide version (multi-repo, trends, a manager digest) is coming in the team version."
   )
   .option("--last <n>", "how many recent sessions to audit", "25")
   .option("--markdown", "output as markdown, for a report you can send")
@@ -1095,18 +1095,31 @@ program
   });
 
 program
-  .command("why <rule...>")
+  .command("why [rule...]")
   .description(
-    "Everything the tool knows about ONE rule, in one place: where it lives (file:line), whether the agent actually loads it, whether a command or path it names exists, whether it's mechanically checkable (and if not, one suggested rewrite), and how it did over the last 30 days. Fuzzy-matches the rule text; if several match, lists them. Read-only — no verdict is created, nothing is sent."
+    "Everything the tool knows about ONE rule, in one place: where it lives (file:line), whether the agent actually loads it, whether a command or path it names exists, whether it's mechanically checkable (and if not, one suggested rewrite), and how it did over the last 30 days. With no argument, lists every rule with its id so you can pick one; with --all, shows every rule (problems first). Read-only — no verdict is created, nothing is sent."
   )
+  .option("--all", "show every rule, problems first (not loaded, missing command, broken recently), then the rest")
   .option("--json", "output machine-readable JSON (the same fields)")
-  .action(async (ruleWords: string[], opts: { json?: boolean }) => {
+  .action(async (ruleWords: string[], opts: { all?: boolean; json?: boolean }) => {
     const cwd = process.cwd();
-    const query = ruleWords.join(" ").trim();
+    const query = (ruleWords ?? []).join(" ").trim();
     const rules = loadRules(cwd);
     if (rules.length === 0) {
       console.log("No rules file found here, so there is nothing to explain. Run `rulereceipt init` to add one.");
       process.exitCode = 1;
+      return;
+    }
+    // --all: every rule, problems first.
+    if (opts.all) {
+      const all = await explainAll(cwd);
+      console.log(opts.json ? JSON.stringify(all, null, 2) : renderAllWhy(all));
+      return;
+    }
+    // No argument: list the rules with ids so the reader can pick one.
+    if (query.length === 0) {
+      const list = whyList(cwd);
+      console.log(opts.json ? JSON.stringify(list, null, 2) : renderWhyList(list));
       return;
     }
     const result = await explainRule(cwd, query);
@@ -1121,7 +1134,7 @@ program
 program
   .command("wrong <rule>")
   .description(
-    "A verdict looks wrong? Builds a report of that rule, the verdict, how it was decided and the session lines around it, with obvious secrets masked. Written to a local file and shown first; prints a GitHub issue link for you to open. Nothing is sent."
+    "A verdict looks wrong? Builds a report of that rule, the verdict, how it was decided and the session lines around it, with obvious secrets masked. Written to a local file and shown first. Then --submit opens a public GitHub issue (asks first; needs gh) or --email sends it privately to the maintainer; with no flag it just prints the report and a pre-filled link. Nothing is sent without your say-so."
   )
   .option("--transcript <path>", "use a specific session file (same as check)")
   .option("--out <path>", "where to write the report (default .rulereceipt/wrong-<handle>.md)")
