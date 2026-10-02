@@ -680,7 +680,7 @@ function runAdvise() {
   console.log(`  ${advice.length} cannot yet — here is what each one needs:\n`);
   // Project rules first: those are the ones the reader can act on today.
   const ordered = advice
-    .map((a, i) => ({ a, source: rules.find((r) => r.title === a.ruleTitle)?.source }))
+    .map((a) => ({ a, source: rules.find((r) => r.title === a.ruleTitle)?.source }))
     .sort((x, y) => Number(x.source === "global") - Number(y.source === "global"))
     .map((x) => x.a);
   for (const a of ordered) {
