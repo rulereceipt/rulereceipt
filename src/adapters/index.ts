@@ -6,6 +6,7 @@ import { listCodexSessions, parseCodexTranscript } from "./codex.js";
 import { listCopilotSessions, parseCopilotTranscript, copilotFormatIsKnown } from "./copilot.js";
 import { listGeminiSessions, parseGeminiTranscript, geminiFormatIsKnown } from "./gemini.js";
 import { listCursorSessions, parseCursorTranscript, cursorFormatIsKnown } from "./cursor.js";
+import { listOpenCodeSessions, parseOpenCodeTranscript, openCodeFormatIsKnown } from "./opencode.js";
 
 /**
  * A session adapter turns one coding agent's on-disk session log into the
@@ -88,8 +89,16 @@ export const cursorAdapter: SessionAdapter = {
   experimental: true,
 };
 
+/** OpenCode — EXPERIMENTAL. JSON file store (3-dir join); opencode.db SQLite deferred. */
+export const openCodeAdapter: SessionAdapter = {
+  tool: "opencode",
+  listSessions: (cwd) => listOpenCodeSessions(cwd),
+  parse: (sessionFile) => parseOpenCodeTranscript(sessionFile),
+  experimental: true,
+};
+
 /** Experimental adapters: reader exists, awaiting real+planted+clean fixtures. */
-export const EXPERIMENTAL_ADAPTERS: SessionAdapter[] = [copilotCliAdapter, geminiCliAdapter, cursorAdapter];
+export const EXPERIMENTAL_ADAPTERS: SessionAdapter[] = [copilotCliAdapter, geminiCliAdapter, cursorAdapter, openCodeAdapter];
 
 /**
  * Tools deliberately NOT read yet, with the honest reason. Kept as data (not
@@ -98,7 +107,6 @@ export const EXPERIMENTAL_ADAPTERS: SessionAdapter[] = [copilotCliAdapter, gemin
  */
 export const UNSUPPORTED_TOOLS: { tool: string; reason: string }[] = [
   { tool: "aider", reason: "history is a Markdown transcript (.aider.chat.history.md), not structured events — needs a prose parser, not a field mapping" },
-  { tool: "opencode", reason: "stores sessions in a SQLite DB (opencode.db) — needs a WASM sqlite reader; planned next" },
   { tool: "windsurf", reason: "IDE-embedded; history in undocumented internal state, same as old Cursor" },
 ];
 
@@ -197,6 +205,9 @@ export function parseSessionFile(file: string): TranscriptEvent[] {
   // Cursor agent-transcript: a JSONL line `{role, content:[...]}` with no Claude
   // `message` wrapper and no `type`. Gated the same way.
   if (cursorFormatIsKnown(file)) return parseCursorTranscript(file);
+  // OpenCode: a single session JSON (`id` starting `ses_`); the message/part
+  // dirs are resolved relative to this file.
+  if (openCodeFormatIsKnown(file)) return parseOpenCodeTranscript(file);
   return readTranscriptFromFile(file);
 }
 
