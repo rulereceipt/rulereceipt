@@ -103,6 +103,10 @@ GA='{"cwd":"'"$PB"'","tool_name":"Bash","tool_input":{"command":"ls -la"}}'
 check "guard: allows a benign ls"                        '[ "$(guard "$GA" "$PB")" = "{}" ]'
 GH='{"cwd":"'"$PB"'","tool_input":{"command":"cat <<'"'"'EOF'"'"' > n.txt\nhi\nEOF\ngit push origin main"},"tool_name":"Bash","permission_mode":"bypassPermissions"}'
 check "guard: denies a push chained after a heredoc"     'guard "$GH" "$PB" | grep -q "\"permissionDecision\":\"deny\""'
+# Live-blocking shadow mode: logs a would-block and ALLOWS (never blocks).
+SHADOW_OUT="$(printf '%s' "$GP" | (cd "$PB" && RULERECEIPT_GUARD_SHADOW=1 "$RR" guard 2>&1))"
+check "guard shadow: allows (does not block)"            '[ "$SHADOW_OUT" = "{}" ]'
+check "guard: writes a receipt line (deny + would-deny)" 'grep -q "\"action\":\"deny\"" "$PB/.rulereceipt/guard-log.jsonl" && grep -q "\"action\":\"would-deny\"" "$PB/.rulereceipt/guard-log.jsonl"'
 
 echo "== protect apply + undo =="
 PP="$(newproj pp '## 1. Branch\nNever push to `main`.\n')"

@@ -25,9 +25,9 @@ function gitCurrentBranch(cwd: string): string | undefined {
     return undefined;
   }
 }
-import { readFileSync } from "node:fs";
+import { readFileSync, appendFileSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
 import type { CheckResult, Rule, TranscriptEvent } from "./types.js";
 
 /**
@@ -382,6 +382,44 @@ export function guardDecision(
   return allow;
 }
 
+/**
+ * Shadow mode (live-blocking rollout, vs Failproof): set RULERECEIPT_GUARD_SHADOW=1
+ * and the guard never blocks — it LOGS what it WOULD have blocked and allows the
+ * call. The honest way to turn on enforcement: run shadow first, read the log,
+ * then drop the flag. Enforcement is the default (no env needed).
+ */
+function guardShadowEnabled(): boolean {
+  const v = process.env.RULERECEIPT_GUARD_SHADOW;
+  return v === "1" || v === "true" || v === "yes";
+}
+
+/** One line for the guard receipt log — every block (or would-block) is recorded. */
+export function guardReceiptLine(
+  decision: GuardDecision,
+  command: string,
+  shadow: boolean,
+): { ts: string; mode: "shadow" | "enforce"; action: "deny" | "would-deny" | "ask" | "would-ask"; command: string; rules: { id: string; title: string }[] } {
+  const base = decision.deny ? "deny" : "ask";
+  return {
+    ts: new Date().toISOString(),
+    mode: shadow ? "shadow" : "enforce",
+    action: (shadow ? `would-${base}` : base) as "deny" | "would-deny" | "ask" | "would-ask",
+    command: command.replace(/\s+/g, " ").trim().slice(0, 120),
+    rules: decision.blocks.map((b) => ({ id: b.rule.id, title: b.rule.title })),
+  };
+}
+
+/** Append a receipt line to .rulereceipt/guard-log.jsonl. Fail-open: never breaks the guard. */
+function writeGuardReceipt(cwd: string, line: unknown): void {
+  try {
+    const p = join(cwd, ".rulereceipt", "guard-log.jsonl");
+    mkdirSync(dirname(p), { recursive: true });
+    appendFileSync(p, `${JSON.stringify(line)}\n`);
+  } catch {
+    /* logging must never stop (or crash) the guard */
+  }
+}
+
 export async function runGuard(): Promise<void> {
   const allow = (): void => {
     process.stdout.write(JSON.stringify({}));
@@ -403,6 +441,16 @@ export async function runGuard(): Promise<void> {
       }
     }
     const decision = guardDecision(cwd, tool, toolInput, events, input.permission_mode);
+    const shadow = guardShadowEnabled();
+    const commandStr = typeof (toolInput as { command?: unknown }).command === "string" ? (toolInput.command as string) : tool;
+
+    // Every block (or would-block) writes a receipt line — the audit trail of
+    // what the guard stopped, in both shadow and enforce mode.
+    if (decision.deny || decision.ask) writeGuardReceipt(cwd, guardReceiptLine(decision, commandStr, shadow));
+
+    // Shadow mode: log above, then ALLOW — never block, never ask.
+    if (shadow) return allow();
+
     if (!decision.deny && decision.ask) {
       // "ask" is not a refusal: no exit 2. Claude Code shows its permission
       // prompt with this reason; the user's click decides.
