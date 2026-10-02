@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+<script>
+    !function(t,e){var o,n,p,r;e.__SV||(window.posthog && window.posthog.__loaded)||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}p||((p=t.createElement("script")).type="text/javascript",p.crossOrigin="anonymous",p.async=!0,p.src=s.api_host.replace(".i.posthog.com","-assets.i.posthog.com")+"/static/array.js",p.onerror=function(){p=null},(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r));var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+".people (stub)"},o="Sn Cn init Hn Un Gn Yi zn Kn qn capture Vn kn calculateEventProperties es register register_once register_for_session unregister unregister_for_session os Bn ss getFeatureFlag getFeatureFlagPayload getFeatureFlagResult getAllFeatureFlags isFeatureEnabled reloadFeatureFlags updateFlags updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures on onFeatureFlags onSurveysLoaded onSessionId getSurveys getActiveMatchingSurveys renderSurvey displaySurvey cancelPendingSurvey canRenderSurvey canRenderSurveyAsync ls identify setPersonProperties unsetPersonProperties group resetGroups setPersonPropertiesForFlags resetPersonPropertiesForFlags setGroupPropertiesForFlags resetGroupPropertiesForFlags reset us shutdown setIdentity clearIdentity get_distinct_id getGroups get_session_id get_session_replay_url alias set_config startSessionRecording stopSessionRecording sessionRecordingStarted captureException addExceptionStep captureLog startExceptionAutocapture stopExceptionAutocapture loadToolbar get_property getSessionProperty rs Xn createPersonProfile setInternalOrTestUser ns $n vs opt_in_capturing opt_out_capturing has_opted_in_capturing has_opted_out_capturing get_explicit_consent_status is_capturing clear_opt_in_out_capturing Jn debug tr At getPageViewId captureTraceFeedback captureTraceMetric Ln".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
+    posthog.init('phc_A4TBtMr58tNcGFEnoC82pPqzrKxXRGw84B8RVd8JK2nW', {
+        api_host: 'https://us.i.posthog.com',
+        defaults: '2026-05-30',
+        person_profiles: 'identified_only',
+        autocapture: false,
+        disable_session_recording: true,
+        capture_pageview: true,
+        capture_pageleave: true,
+        persistence: 'localStorage+cookie',
+        mask_all_text: true,
+        mask_all_element_attributes: true,
+    })
+    ;(function(){try{var q=new URLSearchParams(location.search);if(q.get('internal')==='1'){try{localStorage.setItem('rr_internal','1')}catch(e){}}var f=false;try{f=localStorage.getItem('rr_internal')==='1'}catch(e){}if(f&&window.posthog&&posthog.register){posthog.register({internal:true})}}catch(e){}})();
+</script>
+<script src="/analytics.js" defer></script>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>RuleReceipt vs claude-md-doctor</title>
+<meta name="description" content="claude-md-doctor is the closest tool to RuleReceipt — and it does some things we don't: file-health auditing and an arming ladder. A scrupulously fair comparison of where each one leads." />
+<link rel="canonical" href="https://rulereceipt.dev/compare/claude-md-doctor" />
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23FAFAF7'/%3E%3Cpath d='M9 8h14v17l-3-2-3 2-3-2-3 2-2-2z' fill='none' stroke='%2317191C' stroke-width='1.6'/%3E%3Cpath d='M12 14h8M12 18h6' stroke='%2317805F' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E" />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="https://rulereceipt.dev/compare/claude-md-doctor" />
+<meta property="og:title" content="RuleReceipt vs claude-md-doctor" />
+<meta property="og:description" content="The closest overlap in the space. Where claude-md-doctor does more than us, and where our focus differs." />
+<meta property="og:image" content="https://rulereceipt.dev/og-image.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:image" content="https://rulereceipt.dev/og-image.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap" />
+<style>
+  :root {
+    --bg: #FAF9F5; --bg-deep: #F0EEE6; --panel: #FFFFFF; --panel-line: #E8E6DC; --panel-line-strong: #DEDCD1;
+    --paper: #141413; --paper-dim: #55534E; --paper-faint: #7A756E; --amber: #C4551F; --amber-dim: #AD4A17; --cyan: #17805F; --red: #C2402C;
+    --font-display: 'Newsreader', 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--paper); font-family: var(--font-sans); font-size: 17px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
+  a { color: var(--amber-dim); }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 0 24px; }
+  .back { display: inline-block; font-family: var(--font-mono); font-size: 0.8rem; text-decoration: none; }
+  .back:hover { text-decoration: underline; }
+  header.page { padding: 34px 0 0; border-bottom: 1px solid var(--panel-line); margin-bottom: 44px; }
+  .eyebrow { font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.11em; text-transform: uppercase; color: var(--amber-dim); margin: 30px 0 12px; }
+  h1 { font-family: var(--font-display); font-weight: 600; font-size: clamp(2rem, 5vw, 2.9rem); line-height: 1.1; letter-spacing: -0.02em; margin: 0 0 16px; text-wrap: balance; }
+  .deck { font-size: 1.15rem; line-height: 1.5; color: var(--paper-dim); margin: 0 0 34px; max-width: 34em; }
+  section { margin-bottom: 54px; }
+  h2 { font-family: var(--font-display); font-weight: 600; font-size: 1.6rem; letter-spacing: -0.015em; margin: 0 0 6px; text-wrap: balance; }
+  .sec-sub { color: var(--paper-faint); font-size: 0.92rem; margin: 0 0 24px; padding-bottom: 14px; border-bottom: 1px solid var(--panel-line); }
+  p { color: var(--paper-dim); margin: 0 0 18px; }
+  .lede { font-size: 1.08rem; color: var(--paper); }
+  strong { color: var(--paper); font-weight: 600; }
+  em { font-style: italic; }
+  .card { background: var(--panel); border: 1px solid var(--panel-line-strong); border-radius: 16px; padding: 24px 26px; margin-bottom: 18px; box-shadow: 0 1px 2px rgba(20,20,19,0.03), 0 14px 30px -24px rgba(20,20,19,0.22); }
+  .card.theirs { border-left: 3px solid var(--cyan); }
+  .card.ours { border-left: 3px solid var(--amber); }
+  .card h3 { font-family: var(--font-sans); font-weight: 600; font-size: 1.02rem; margin: 0 0 10px; color: var(--paper); }
+  .card p { font-size: 0.95rem; margin: 0 0 12px; }
+  .card p:last-child { margin-bottom: 0; }
+  .card ul { margin: 0; padding-left: 20px; color: var(--paper-dim); font-size: 0.95rem; }
+  .card li { margin-bottom: 8px; }
+  .card li:last-child { margin-bottom: 0; }
+  .src { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--paper-faint); margin: 0 0 10px; overflow-wrap: anywhere; }
+  .src a { color: var(--paper-faint); }
+  .better { color: var(--cyan); font-weight: 600; }
+  code { font-family: var(--font-mono); background: var(--bg-deep); padding: 1px 6px; border-radius: 4px; font-size: 0.88em; color: var(--paper); }
+  .footnote { font-size: 0.86rem; color: var(--paper-faint); border-top: 1px solid var(--panel-line); padding-top: 18px; margin-top: 8px; }
+  footer.page { border-top: 1px solid var(--panel-line); padding: 26px 0 70px; font-family: var(--font-mono); font-size: 0.8rem; }
+  footer.page a { text-decoration: none; }
+  footer.page a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="page">
+      <a class="back" href="/compare">&larr; All comparisons</a>
+      <div class="eyebrow">deep dive &middot; closest overlap</div>
+      <h1>RuleReceipt vs claude-md-doctor</h1>
+      <p class="deck">Of everything in this space, this is the tool nearest to ours &mdash; and in places it does more than we do. If you want the one-sentence version: it leans toward keeping your CLAUDE.md healthy; we lean toward a per-rule verdict on a specific session. Both are MIT and both run locally.</p>
+    </header>
+
+    <section>
+      <h2>What we actually share</h2>
+      <p class="sec-sub">This is real overlap, not a strawman.</p>
+      <div class="card">
+        <div class="src"><a href="https://github.com/agent-clinic/claude-md-doctor" target="_blank" rel="noopener">github.com/agent-clinic/claude-md-doctor</a></div>
+        <h3>Both replay your rules against the session transcript</h3>
+        <p>claude-md-doctor&rsquo;s &ldquo;session adherence&rdquo; exam runs your rules against transcript history and reports per-rule compliance percentages with quoted evidence. That is the same core idea as RuleReceipt&rsquo;s check: look at what the agent did, and grade it rule by rule with the line that proves it. If you only looked at that one feature, you&rsquo;d struggle to tell us apart &mdash; so we won&rsquo;t pretend they&rsquo;re miles apart.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>Where claude-md-doctor does more than us</h2>
+      <p class="sec-sub">Said plainly, because it&rsquo;s true.</p>
+      <div class="card theirs">
+        <h3><span class="better">It audits the CLAUDE.md file itself</span></h3>
+        <p>Beyond replaying rules, it inspects the rules file as an artifact: dead references, overall size, and rules that are never actually used. That&rsquo;s a whole category of problem RuleReceipt doesn&rsquo;t touch &mdash; we check whether a session followed your rules; we don&rsquo;t tell you your rules file has rot in it. If your CLAUDE.md has grown messy over months, that&rsquo;s a reason to reach for claude-md-doctor, not us.</p>
+      </div>
+      <div class="card theirs">
+        <h3><span class="better">It proposes an arming ladder: reminder &rarr; warn &rarr; block</span></h3>
+        <p>It offers a graduated path for tightening enforcement over time, rather than a single pass/fail. That&rsquo;s a more opinionated workflow for progressively hardening a project&rsquo;s rules than anything we ship. We give you a verdict and the evidence; what you do to enforce it is left to you (and to your hooks).</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>Where we lead</h2>
+      <p class="sec-sub">Narrower on purpose.</p>
+      <div class="card ours">
+        <h3>The per-rule transcript verdict is the whole product</h3>
+        <p>Our single job is: for this session, which of your rules were followed, which were broken, which can&rsquo;t be told &mdash; each pinned to the exact quoted transcript line. No file-health layer, no enforcement ladder diluting it. If what you need is a defensible, evidence-backed receipt for one session &mdash; for a review, a CI gate, or your own peace of mind &mdash; that focus is the point.</p>
+      </div>
+      <div class="card ours">
+        <h3>Evidence first, and quiet when it isn&rsquo;t sure</h3>
+        <p>A FAIL only comes from hard evidence in the transcript; when the session doesn&rsquo;t settle it, the answer is &ldquo;couldn&rsquo;t tell,&rdquo; never a guess. The deterministic checks make zero network calls. That&rsquo;s the discipline we optimise for &mdash; a wrong accusation is worse than no answer.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>Which to pick</h2>
+      <p class="sec-sub">Honestly, you could run both.</p>
+      <div class="card">
+        <ul>
+          <li><strong>Reach for claude-md-doctor</strong> if your problem is a sprawling, aging CLAUDE.md you want cleaned up and a staged plan to tighten enforcement.</li>
+          <li><strong>Reach for RuleReceipt</strong> if you want a focused, evidence-quoted pass/fail on a specific session against the rules exactly as written.</li>
+          <li>They&rsquo;re not mutually exclusive &mdash; both are MIT and local, so there&rsquo;s no cost to trying each on the same repo and keeping whichever fits your workflow.</li>
+        </ul>
+      </div>
+    </section>
+
+    <p class="footnote">License and feature claims about claude-md-doctor are from its own README (<a href="https://github.com/agent-clinic/claude-md-doctor" target="_blank" rel="noopener">github.com/agent-clinic/claude-md-doctor</a>), MIT-stated there. If any of that has changed since you&rsquo;re reading this, trust its repo over this page and tell us so we can fix it.</p>
+  </div>
+
+  <footer class="page">
+    <div class="wrap">
+      <a href="/compare">&larr; All comparisons</a> &nbsp;&middot;&nbsp; <a href="/compare/hooks">vs hooks</a> &nbsp;&middot;&nbsp; <a href="/">RuleReceipt</a>
+    </div>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+<script>
+    !function(t,e){var o,n,p,r;e.__SV||(window.posthog && window.posthog.__loaded)||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}p||((p=t.createElement("script")).type="text/javascript",p.crossOrigin="anonymous",p.async=!0,p.src=s.api_host.replace(".i.posthog.com","-assets.i.posthog.com")+"/static/array.js",p.onerror=function(){p=null},(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r));var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+".people (stub)"},o="Sn Cn init Hn Un Gn Yi zn Kn qn capture Vn kn calculateEventProperties es register register_once register_for_session unregister unregister_for_session os Bn ss getFeatureFlag getFeatureFlagPayload getFeatureFlagResult getAllFeatureFlags isFeatureEnabled reloadFeatureFlags updateFlags updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures on onFeatureFlags onSurveysLoaded onSessionId getSurveys getActiveMatchingSurveys renderSurvey displaySurvey cancelPendingSurvey canRenderSurvey canRenderSurveyAsync ls identify setPersonProperties unsetPersonProperties group resetGroups setPersonPropertiesForFlags resetPersonPropertiesForFlags setGroupPropertiesForFlags resetGroupPropertiesForFlags reset us shutdown setIdentity clearIdentity get_distinct_id getGroups get_session_id get_session_replay_url alias set_config startSessionRecording stopSessionRecording sessionRecordingStarted captureException addExceptionStep captureLog startExceptionAutocapture stopExceptionAutocapture loadToolbar get_property getSessionProperty rs Xn createPersonProfile setInternalOrTestUser ns $n vs opt_in_capturing opt_out_capturing has_opted_in_capturing has_opted_out_capturing get_explicit_consent_status is_capturing clear_opt_in_out_capturing Jn debug tr At getPageViewId captureTraceFeedback captureTraceMetric Ln".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
+    posthog.init('phc_A4TBtMr58tNcGFEnoC82pPqzrKxXRGw84B8RVd8JK2nW', {
+        api_host: 'https://us.i.posthog.com',
+        defaults: '2026-05-30',
+        person_profiles: 'identified_only',
+        autocapture: false,
+        disable_session_recording: true,
+        capture_pageview: true,
+        capture_pageleave: true,
+        persistence: 'localStorage+cookie',
+        mask_all_text: true,
+        mask_all_element_attributes: true,
+    })
+    ;(function(){try{var q=new URLSearchParams(location.search);if(q.get('internal')==='1'){try{localStorage.setItem('rr_internal','1')}catch(e){}}var f=false;try{f=localStorage.getItem('rr_internal')==='1'}catch(e){}if(f&&window.posthog&&posthog.register){posthog.register({internal:true})}}catch(e){}})();
+</script>
+<script src="/analytics.js" defer></script>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>RuleReceipt — How it compares</title>
+<meta name="description" content="An honest comparison of RuleReceipt with Claude Code hooks, claude-md-doctor, agent-strace, Model Citizen, blackbox and rulereach — including where each of them is genuinely better." />
+<link rel="canonical" href="https://rulereceipt.dev/compare" />
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23FAFAF7'/%3E%3Cpath d='M9 8h14v17l-3-2-3 2-3-2-3 2-2-2z' fill='none' stroke='%2317191C' stroke-width='1.6'/%3E%3Cpath d='M12 14h8M12 18h6' stroke='%2317805F' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E" />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="https://rulereceipt.dev/compare" />
+<meta property="og:title" content="RuleReceipt — How it compares" />
+<meta property="og:description" content="An honest comparison with the other tools in this space — including where each of them is genuinely better than us." />
+<meta property="og:image" content="https://rulereceipt.dev/og-image.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:image" content="https://rulereceipt.dev/og-image.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap" />
+<style>
+  :root {
+    --bg: #FAF9F5;
+    --bg-deep: #F0EEE6;
+    --panel: #FFFFFF;
+    --panel-line: #E8E6DC;
+    --panel-line-strong: #DEDCD1;
+    --paper: #141413;
+    --paper-dim: #55534E;
+    --paper-faint: #7A756E;
+    --amber: #C4551F;
+    --amber-dim: #AD4A17;
+    --cyan: #17805F;
+    --red: #C2402C;
+    --font-display: 'Newsreader', 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--paper); font-family: var(--font-sans); font-size: 17px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
+  a { color: var(--amber-dim); }
+  .wrap { max-width: 820px; margin: 0 auto; padding: 0 24px; }
+  .back { display: inline-block; font-family: var(--font-mono); font-size: 0.8rem; text-decoration: none; }
+  .back:hover { text-decoration: underline; }
+  header.page { padding: 34px 0 0; border-bottom: 1px solid var(--panel-line); margin-bottom: 44px; }
+  .eyebrow { font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.11em; text-transform: uppercase; color: var(--amber-dim); margin: 30px 0 12px; }
+  h1 { font-family: var(--font-display); font-weight: 600; font-size: clamp(2rem, 5vw, 2.9rem); line-height: 1.1; letter-spacing: -0.02em; margin: 0 0 16px; text-wrap: balance; }
+  .deck { font-size: 1.15rem; line-height: 1.5; color: var(--paper-dim); margin: 0 0 34px; max-width: 36em; }
+  section { margin-bottom: 54px; }
+  h2 { font-family: var(--font-display); font-weight: 600; font-size: 1.6rem; letter-spacing: -0.015em; margin: 0 0 6px; text-wrap: balance; }
+  .sec-sub { color: var(--paper-faint); font-size: 0.92rem; margin: 0 0 24px; padding-bottom: 14px; border-bottom: 1px solid var(--panel-line); }
+  p { color: var(--paper-dim); margin: 0 0 18px; }
+  .lede { font-size: 1.08rem; color: var(--paper); }
+  strong { color: var(--paper); font-weight: 600; }
+  em { font-style: italic; }
+  .card { background: var(--panel); border: 1px solid var(--panel-line-strong); border-radius: 16px; padding: 24px 26px; margin-bottom: 18px; box-shadow: 0 1px 2px rgba(20,20,19,0.03), 0 14px 30px -24px rgba(20,20,19,0.22); }
+  .card h3 { font-family: var(--font-sans); font-weight: 600; font-size: 1.02rem; margin: 0 0 10px; color: var(--paper); }
+  .card h3 a { text-decoration: none; }
+  .card h3 a:hover { text-decoration: underline; }
+  .card p { font-size: 0.95rem; margin: 0 0 12px; }
+  .card p:last-child { margin-bottom: 0; }
+  .src { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--paper-faint); margin: 0 0 10px; overflow-wrap: anywhere; }
+  .src a { color: var(--paper-faint); }
+  .better { color: var(--cyan); font-weight: 600; }
+  code { font-family: var(--font-mono); background: var(--bg-deep); padding: 1px 6px; border-radius: 4px; font-size: 0.88em; color: var(--paper); }
+
+  /* ---------- comparison table ---------- */
+  .tscroll { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 4px 0 10px; border: 1px solid var(--panel-line-strong); border-radius: 14px; }
+  table.ctable { border-collapse: collapse; width: 100%; min-width: 620px; font-size: 0.9rem; background: var(--panel); }
+  table.ctable th, table.ctable td { text-align: left; padding: 13px 15px; border-bottom: 1px solid var(--panel-line); vertical-align: top; }
+  table.ctable thead th { font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--paper-faint); background: var(--bg-deep); }
+  table.ctable tbody tr:last-child td { border-bottom: none; }
+  table.ctable td.tool { font-weight: 600; color: var(--paper); white-space: nowrap; }
+  table.ctable td.tool a { text-decoration: none; }
+  table.ctable .us { background: #F3F7F4; }
+  table.ctable td { color: var(--paper-dim); }
+  .scroll-hint { font-family: var(--font-mono); font-size: 0.7rem; color: var(--paper-faint); margin: 0 0 24px; }
+  .footnote { font-size: 0.86rem; color: var(--paper-faint); border-top: 1px solid var(--panel-line); padding-top: 18px; margin-top: 8px; }
+  footer.page { border-top: 1px solid var(--panel-line); padding: 26px 0 70px; font-family: var(--font-mono); font-size: 0.8rem; }
+  footer.page a { text-decoration: none; }
+  footer.page a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="page">
+      <a class="back" href="/">&larr; RuleReceipt</a>
+      <div class="eyebrow">how it compares</div>
+      <h1>The honest comparison</h1>
+      <p class="deck">There are good tools in this space, and most of them are local, free and open-source &mdash; same as us. So this page says what each one does <em>better</em>, not just where we fit. If you only read one line: they mostly check a fixed list of signals or block actions in-flight; we read the session afterwards and check it against <strong>your own</strong> written CLAUDE.md / AGENTS.md rules, quoting the exact line as evidence.</p>
+    </header>
+
+    <section>
+      <h2>At a glance</h2>
+      <p class="sec-sub">Where each tool is strongest, and how we differ. Every claim links to that tool's own docs or repo.</p>
+      <div class="tscroll">
+        <table class="ctable">
+          <thead>
+            <tr>
+              <th>Tool</th>
+              <th>Where it&rsquo;s genuinely better</th>
+              <th>Overlap &amp; how we differ</th>
+              <th>License &middot; data</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="us">
+              <td class="tool">RuleReceipt</td>
+              <td>Checks <em>your</em> free-text rules, not a fixed list; quotes the exact transcript line as evidence.</td>
+              <td>Detects &amp; reports after the fact. Only a narrow file/branch guard blocks in-flight. Doesn&rsquo;t make the model obey.</td>
+              <td>MIT &middot; local, no upload on <code>check</code></td>
+            </tr>
+            <tr>
+              <td class="tool"><a href="https://code.claude.com/docs/en/hooks" target="_blank" rel="noopener">Claude Code hooks</a></td>
+              <td><span class="better">Actually preventive</span> &mdash; a PreToolUse hook can block an action <em>before</em> it runs.</td>
+              <td>The gate can fail open (per Anthropic&rsquo;s docs). We catch, after the fact, what it missed. <a href="/compare/hooks">Deep dive &rarr;</a></td>
+              <td>Built-in &middot; local</td>
+            </tr>
+            <tr>
+              <td class="tool"><a href="https://github.com/agent-clinic/claude-md-doctor" target="_blank" rel="noopener">claude-md-doctor</a></td>
+              <td><span class="better">Audits the CLAUDE.md file itself</span> (dead refs, size, unused rules) and proposes a reminder&rarr;warn&rarr;block ladder.</td>
+              <td>Closest overlap: it also replays rules against transcript history. It leans file-maintenance; we lean per-rule transcript verdict. <a href="/compare/claude-md-doctor">Deep dive &rarr;</a></td>
+              <td>MIT &middot; local</td>
+            </tr>
+            <tr>
+              <td class="tool"><a href="https://github.com/Siddhant-K-code/agent-trace" target="_blank" rel="noopener">agent-strace</a></td>
+              <td><span class="better">Live control &amp; multi-tool observability</span> &mdash; a real-time kill-switch on cost / file / tool-count that stops a run mid-flight.</td>
+              <td>It records and limits; it doesn&rsquo;t give per-rule followed/broken verdicts against your CLAUDE.md. Its CLI telemetry is on by default (ours isn&rsquo;t).</td>
+              <td>MIT &middot; anon telemetry on by default</td>
+            </tr>
+            <tr>
+              <td class="tool"><a href="https://github.com/JakeSelby/model-citizen" target="_blank" rel="noopener">Model Citizen</a></td>
+              <td><span class="better">Broader governance &amp; prevention</span> &mdash; in-flight hook enforcement, command risk-grading and sandboxing across Claude Code + Codex.</td>
+              <td>Overlaps only in keeping a per-rule ledger. It&rsquo;s a control-plane; we&rsquo;re a post-hoc receipt against your own rules.</td>
+              <td>MIT &middot; local, OTLP export off by default</td>
+            </tr>
+            <tr>
+              <td class="tool"><a href="https://github.com/cgallic/blackbox" target="_blank" rel="noopener">blackbox</a></td>
+              <td><span class="better">Cross-session scoring &amp; trends</span> &mdash; a weighted score over time and a weekly <code>/retro</code>.</td>
+              <td>Closest in spirit (local, no telemetry, post-hoc Claude Code). But it checks 7 hardcoded signals, not your written rules. Small/early.</td>
+              <td>MIT &middot; local, no telemetry</td>
+            </tr>
+            <tr>
+              <td class="tool"><a href="https://github.com/Topicspot/rulereach" target="_blank" rel="noopener">rulereach</a></td>
+              <td><span class="better">Complementary, not competing</span> &mdash; a pre-flight linter catching rules that will silently fail to load (broken globs, @import chains, size limits).</td>
+              <td>It answers &ldquo;will the agent ever load these rules?&rdquo; We answer &ldquo;given the session, did it follow them?&rdquo; Pre-flight vs post-flight.</td>
+              <td>MIT &middot; local</td>
+            </tr>
+            <tr>
+              <td class="tool">Ask the agent itself</td>
+              <td>Zero setup &mdash; nothing to install.</td>
+              <td>Documented LLM self-preference bias makes self-grading unreliable, worst exactly when its own output is wrong. We use the quoted transcript line, not the model&rsquo;s self-judgment.</td>
+              <td>&mdash;</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="scroll-hint">Table scrolls sideways on a phone &mdash; the full detail is in the cards below.</p>
+    </section>
+
+    <section>
+      <h2>The detail, tool by tool</h2>
+      <p class="sec-sub">Enough to decide honestly &mdash; including the parts where we&rsquo;re not the right pick.</p>
+
+      <div class="card">
+        <div class="src"><a href="https://code.claude.com/docs/en/hooks" target="_blank" rel="noopener">code.claude.com/docs/en/hooks</a> &middot; <a href="https://code.claude.com/docs/en/permissions" target="_blank" rel="noopener">/permissions</a></div>
+        <h3><a href="/compare/hooks">Claude Code hooks &amp; permissions</a></h3>
+        <p><span class="better">Better than us at one thing that matters:</span> a <code>PreToolUse</code> hook can <strong>block an action before it runs</strong>. That is real prevention, which a post-hoc checker like ours is not. If your only goal is to stop a specific command, start there.</p>
+        <p>The honest wedge is that the gate can fail open. Anthropic&rsquo;s own docs say a timed-out hook &ldquo;doesn&rsquo;t block the tool call&hellip; so don&rsquo;t count on a stalled hook to act as a gate,&rdquo; and that a hook &ldquo;can deny the call, but staying silent doesn&rsquo;t approve it.&rdquo; We check <em>every</em> rule after the fact and quote the line &mdash; we catch what the gate missed. <a href="/compare/hooks">Full comparison &rarr;</a></p>
+      </div>
+
+      <div class="card">
+        <div class="src"><a href="https://github.com/agent-clinic/claude-md-doctor" target="_blank" rel="noopener">github.com/agent-clinic/claude-md-doctor</a></div>
+        <h3><a href="/compare/claude-md-doctor">claude-md-doctor</a> &mdash; the closest overlap</h3>
+        <p>This is the one that overlaps most. Its &ldquo;session adherence&rdquo; exam already replays your rules against transcript history with per-rule compliance percentages and quoted evidence &mdash; the same idea we built.</p>
+        <p><span class="better">Where it does more than us:</span> it also audits the CLAUDE.md file itself &mdash; dead references, file size, rules that are never used &mdash; and proposes a reminder&rarr;warn&rarr;block arming ladder. If maintaining a healthy rules file is your problem, it goes further than we do. The fair split: it leans CLAUDE.md maintenance, we lean per-rule transcript verdict. MIT, runs locally. <a href="/compare/claude-md-doctor">Full comparison &rarr;</a></p>
+      </div>
+
+      <div class="card">
+        <div class="src"><a href="https://github.com/Siddhant-K-code/agent-trace" target="_blank" rel="noopener">github.com/Siddhant-K-code/agent-trace</a> &middot; PyPI <code>agent-strace</code></div>
+        <h3>agent-strace</h3>
+        <p><span class="better">Better at live control:</span> it&rsquo;s an observability and replay tool with a real-time kill-switch &mdash; cost, file and tool-count limits that stop the agent mid-run, across multiple tools. If you want to cap a runaway session while it&rsquo;s happening, that&rsquo;s its job, not ours.</p>
+        <p>It does not produce per-rule followed/broken verdicts against your CLAUDE.md &mdash; that&rsquo;s the gap we fill. One difference worth knowing: its CLI ships with anonymous telemetry <strong>on by default</strong>; plain <code>rulereceipt check</code> makes zero network calls. MIT (README-stated).</p>
+      </div>
+
+      <div class="card">
+        <div class="src"><a href="https://github.com/JakeSelby/model-citizen" target="_blank" rel="noopener">github.com/JakeSelby/model-citizen</a> (formerly agent-harness)</div>
+        <h3>Model Citizen</h3>
+        <p><span class="better">Broader and more preventive than us:</span> a full control-plane with in-flight hook enforcement, command risk-grading and sandboxing across Claude Code and Codex. For org-wide governance with live prevention, it does far more than a post-hoc receipt.</p>
+        <p>We overlap only in keeping a per-rule ledger. Our narrower job &mdash; read the finished session, grade it against your own written rules, quote the line &mdash; is a different product. MIT (README-stated); local, OTLP export off by default.</p>
+      </div>
+
+      <div class="card">
+        <div class="src"><a href="https://github.com/cgallic/blackbox" target="_blank" rel="noopener">github.com/cgallic/blackbox</a></div>
+        <h3>blackbox &mdash; closest in spirit</h3>
+        <p>Closest to us in philosophy: local, no telemetry, post-hoc Claude Code session compliance. <span class="better">Where it goes further:</span> cross-session scoring and trends, plus a weekly <code>/retro</code> &mdash; we focus on a single session&rsquo;s receipt.</p>
+        <p>The real difference is what it checks: 7 hardcoded signals (read-before-edit, test-before-commit, destructive commands, correction count, a weighted score) &mdash; <strong>not</strong> your written rules. It can&rsquo;t grade a rule you wrote in your own words; that&rsquo;s exactly what we do. It&rsquo;s small and early (a couple of stars, last pushed mid-2026), so weigh maturity accordingly &mdash; for both of us.</p>
+      </div>
+
+      <div class="card">
+        <div class="src"><a href="https://github.com/Topicspot/rulereach" target="_blank" rel="noopener">github.com/Topicspot/rulereach</a> &middot; <a href="https://pypi.org/project/rulereach" target="_blank" rel="noopener">PyPI</a></div>
+        <h3>rulereach &mdash; use it <em>with</em> us, not instead</h3>
+        <p>Not a competitor &mdash; a complement. It&rsquo;s a static pre-flight linter that answers a question we can&rsquo;t see: <strong>will the agent ever load these rules at all?</strong> It catches malformed Cursor globs, broken <code>@import</code> chains, size limits and shadowing across Claude, Cursor, Copilot and Codex.</p>
+        <p>Pre-flight vs post-flight: rulereach checks the rules will reach the model; we check whether the session that followed actually obeyed them. It catches silent load-failures that would otherwise make our &ldquo;rule followed&rdquo; meaningless. Run both. MIT (LICENSE-verified).</p>
+      </div>
+
+      <div class="card">
+        <div class="src"><a href="https://arxiv.org/pdf/2404.13076" target="_blank" rel="noopener">arxiv.org/pdf/2404.13076</a> &middot; <a href="https://arxiv.org/html/2504.03846" target="_blank" rel="noopener">follow-up</a></div>
+        <h3>&ldquo;Just ask the agent to check itself&rdquo;</h3>
+        <p>It&rsquo;s free and needs no setup, and for a quick gut-check it&rsquo;s fine. But as a reliable check it has a documented problem: LLM self-preference bias (NeurIPS 2024), with a follow-up finding models are least reliable exactly when their own output is the thing that&rsquo;s wrong &mdash; the worst possible time for a self-grade.</p>
+        <p>Our modest claim: we lean on the quoted transcript line as evidence rather than the model&rsquo;s self-judgment. That doesn&rsquo;t make us bias-free &mdash; the judgment rules still use a model &mdash; but the verdict is anchored to what the transcript actually says, which a self-report inside the same session isn&rsquo;t.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>Two we deliberately left out</h2>
+      <p class="sec-sub">Named so you know we looked, not because they earned a row.</p>
+      <div class="card">
+        <p>There&rsquo;s a single-purpose &ldquo;tests-pass&rdquo; tripwire project (an &ldquo;actually&rdquo;-style live check) &mdash; a two-day-old repo doing one narrow thing. Worth a mention, not a full comparison. And &ldquo;rulestack&rdquo; isn&rsquo;t a product at all &mdash; it&rsquo;s a dev.to post plus a Gumroad rule-pack for sale &mdash; so it isn&rsquo;t comparable here.</p>
+      </div>
+    </section>
+
+    <p class="footnote">Every tool above is open-source and local, so nobody here is &ldquo;the only private one&rdquo; &mdash; we&rsquo;re not, and we won&rsquo;t say we are. Our two real differences: we check the rules <em>you</em> wrote in plain language, and we quote the exact transcript line as the evidence. If another tool fits your problem better, use it &mdash; several pair well with this one.</p>
+  </div>
+
+  <footer class="page">
+    <div class="wrap">
+      <a href="/">&larr; Back to RuleReceipt</a> &nbsp;&middot;&nbsp; <a href="/compare/hooks">vs hooks</a> &nbsp;&middot;&nbsp; <a href="/compare/claude-md-doctor">vs claude-md-doctor</a> &nbsp;&middot;&nbsp; <a href="/why">Why an outside check</a>
+    </div>
+  </footer>
+</body>
+</html>
