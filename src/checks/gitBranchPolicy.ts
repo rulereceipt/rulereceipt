@@ -160,9 +160,14 @@ export function runGitBranchPolicyChecks(
     }
   }
 
-  const anyGitCommand = events.some(
-    (e) => e.kind === "tool_use" && /\bgit\s/.test(JSON.stringify(e.input ?? ""))
-  );
+  // "Did a git command actually run?" — tested on the real command segments, not
+  // JSON.stringify(input). Two bugs that caused: (1) a newline before `git`
+  // becomes the two chars `\n` once stringified, so `\bgit` lost its word
+  // boundary and a `git push` on the line after a heredoc was missed entirely
+  // (check AND guard reported "didn't apply"); (2) a mere mention in a quote or
+  // heredoc body counted as a git command. leadingCommand over heredoc-stripped
+  // segments answers the real question: a git invocation in an executable segment.
+  const anyGitCommand = commands.some((c) => segments(c).some((seg) => leadingCommand(seg) === "git"));
   return classifications.map(({ rule, branchName, polarity, polarityInferred }) => {
     // No git command ran, so a git rule never had a situation to govern.
     // Calling that "followed" is how an empty session produced 2,770 green

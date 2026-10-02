@@ -230,3 +230,29 @@ describe("runGitBranchPolicyChecks", () => {
     });
   });
 });
+
+const forbidMainRule: GitBranchPolicyClassification = {
+  kind: "gitBranchPolicy",
+  rule: { id: "1", title: "Branch", text: "Never push to the `main` branch directly.", source: "project" },
+  branchName: "main",
+  polarity: "forbid",
+};
+
+describe("git-command detection is robust to heredocs and mentions", () => {
+  // Real gap found 2026-10-02 by the expanded validate-release.sh: a `git push`
+  // on the line AFTER a heredoc was missed by check AND guard, because the
+  // "did any git command run?" test ran `/\bgit\s/` over JSON.stringify(input),
+  // where a real newline becomes the chars `\n` and kills the word boundary.
+  it("catches a git push chained AFTER a heredoc (a newline sits before git)", () => {
+    const events = [bash("cat <<'EOF' > n.txt\nhi\nEOF\ngit push origin main")];
+    const [r] = runGitBranchPolicyChecks([forbidMainRule], events);
+    expect(r.status).toBe("FAIL");
+    expect(r.evidence).toContain("git push origin main");
+  });
+
+  it("does NOT treat a mention of a push inside an echo as a git command", () => {
+    const events = [bash("echo 'reminder: git push origin main later'")];
+    const [r] = runGitBranchPolicyChecks([forbidMainRule], events);
+    expect(r.status).not.toBe("FAIL");
+  });
+});
