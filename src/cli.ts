@@ -350,6 +350,19 @@ async function runCheck(opts: CheckOptions) {
     if (sourceNote) console.log(`\n${sourceNote}`);
     const subNote = subagentNote(sessionFilePath);
     if (subNote) console.log(`\n${subNote}`);
+    // A4/dogfood #4: say plainly how many rules were actually CHECKED vs left to
+    // judgment, so a wordy rules file can't read as "mostly followed". Suggest
+    // --llm for the judgment pile, local model first (nothing is sent without it).
+    if (!llm) {
+      const judgment = results.filter((r) => r.status === "UNCLEAR" && r.needsHuman).length;
+      const decided = results.filter((r) => r.status === "FAIL" || r.status === "PASS").length;
+      if (judgment > 0) {
+        console.log(
+          `\n${decided} of ${results.length} rules were checked here; ${judgment} need judgment and were NOT checked. ` +
+            `Grade those with \`rulereceipt check --llm\` — a local model (Ollama or LM Studio) works, and nothing is sent anywhere without that flag.`
+        );
+      }
+    }
   }
 
   // Shown only to someone who has just read their own broken rules, and only

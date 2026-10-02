@@ -665,3 +665,18 @@ describe("widening the inference verbs must not break mixed-polarity detection",
     expect("polarity" in c ? c.polarity : null).toBe("require");
   });
 });
+
+describe("names are not branches (dogfood 2026-10-02)", () => {
+  it("a dotfile named with a ref verb is NOT a branch (git refs can't start with a dot)", () => {
+    expect(classifyRule(makeRule("Never commit `.gitignore` without review.")).kind).not.toBe("gitBranchPolicy");
+  });
+  it("an account name is NOT a branch, even with a ref verb elsewhere", () => {
+    expect(classifyRule(makeRule("Before you commit, check you're on the `prod-acct` account.")).kind).not.toBe("gitBranchPolicy");
+  });
+  it("still classifies a real push-to-main rule as gitBranchPolicy (no regression)", () => {
+    expect(classifyRule(makeRule("Never push to `main` directly.")).kind).toBe("gitBranchPolicy");
+  });
+  it("still classifies 'the main branch' rules as gitBranchPolicy (no regression)", () => {
+    expect(classifyRule(makeRule("Never work on the `main` branch.", "Branch policy")).kind).toBe("gitBranchPolicy");
+  });
+});

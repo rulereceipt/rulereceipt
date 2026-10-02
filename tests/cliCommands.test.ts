@@ -280,3 +280,22 @@ describe("help text", () => {
     expect(out).not.toContain("Compliance API");
   });
 });
+
+describe("summary names how many rules were not checked, and suggests --llm (dogfood #4)", () => {
+  const home = mkdtempSync(join(tmpdir(), "rr-llm-home-"));
+  afterAll(() => rmSync(home, { recursive: true, force: true }));
+  it("a judgment-only rule reports it was NOT checked and points at --llm", () => {
+    const d = mkdtempSync(join(tmpdir(), "rr-llm-"));
+    writeFileSync(join(d, "CLAUDE.md"), "## 1. Clarity\nAlways write clean, elegant, maintainable code.\n");
+    writeFileSync(join(d, "s.jsonl"), JSON.stringify({ type: "assistant", message: { role: "assistant", content: [{ type: "tool_use", name: "Bash", input: { command: "ls" } }] } }));
+    let out = "";
+    try {
+      out = execFileSync("node", [CLI, "check", "--transcript", "s.jsonl"], { cwd: d, encoding: "utf-8", env: { ...process.env, HOME: home, USERPROFILE: home } });
+    } catch (e) {
+      out = `${(e as { stdout?: string }).stdout ?? ""}`;
+    }
+    rmSync(d, { recursive: true, force: true });
+    expect(out).toContain("need judgment and were NOT checked");
+    expect(out).toContain("--llm");
+  });
+});

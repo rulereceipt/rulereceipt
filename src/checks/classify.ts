@@ -433,9 +433,21 @@ const BRANCH_NAME_PATTERN = /^[A-Za-z0-9._/-]{1,100}$/;
 function isBranchName(literal: string): boolean {
   if (!BRANCH_NAME_PATTERN.test(literal)) return false;
   if (literal.startsWith("-") || literal.startsWith("/")) return false;
+  // git refnames cannot begin with a dot, so a dotfile is never a branch. Found
+  // dogfooding (2026-10-02): a rule naming `.gitignore` was read as a branch
+  // target. This also rules out `.env`, `.npmrc`, etc.
+  if (literal.startsWith(".")) return false;
   if (literal.includes("..") || literal.endsWith(".lock") || literal.endsWith("/")) return false;
   return true;
 }
+
+/**
+ * A literal a rule introduces as an IDENTITY, not a branch — "check you're on
+ * account `prod`", "use the `ci` profile". Found dogfooding (2026-10-02): an
+ * account name was read as a git branch target. When the rule names one of these
+ * right before the literal and never says "branch", it is not a branch rule.
+ */
+const IDENTITY_CONTEXT = /\b(account|user|username|org|organi[sz]ation|profile|credential|identity|email|workspace|tenant|project)\b/i;
 
 // A function/method-call shape ("print(", "analytics.track(") is a strong,
 // simple signal that a backtick literal names actual CODE, not a CLI
@@ -930,8 +942,21 @@ export function classifyRule(rule: Rule): Classification {
   // A branch name is a backticked, branch-shaped literal that is NOT a file
   // token (`.env`, `dist/`) — those belong to fileLifecycle, not a ref check.
   const branchName = [...patterns].find((p) => isBranchName(p) && !looksLikeFilePathToken(p));
-  if ((BRANCH_WORD.test(text) || GIT_REF_ACTION.test(text)) && branchName !== undefined) {
-    return { kind: "gitBranchPolicy", rule, branchName, polarity , polarityInferred };
+  if (branchName !== undefined) {
+    const saysBranch = BRANCH_WORD.test(text);
+    const esc = branchName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    // A ref verb sitting just before the literal ("push to `main`", "merge into
+    // `release`") is a clear branch position. A ref verb mentioned elsewhere in a
+    // rule that is really about an account/profile is not — that was the dogfood
+    // false positive. Require the literal word "branch", or a ref verb within a
+    // few tokens before the literal.
+    const inRefPosition = new RegExp(`(?:${GIT_REF_ACTION.source})\\b[^.\\n\`]{0,40}\`?${esc}\`?`, "i").test(text);
+    // An identity word next to the literal ("account `prod`") with no "branch"
+    // word means it is an identity, not a branch.
+    const identityNear = new RegExp(`(?:${IDENTITY_CONTEXT.source})[^.\\n]{0,25}\`?${esc}\`?|\`?${esc}\`?[^.\\n]{0,25}(?:${IDENTITY_CONTEXT.source})`, "i").test(text);
+    if ((saysBranch || inRefPosition) && !(identityNear && !saysBranch)) {
+      return { kind: "gitBranchPolicy", rule, branchName, polarity, polarityInferred };
+    }
   }
 
   // A forbid scoped by a condition the literal checkers cannot evaluate.

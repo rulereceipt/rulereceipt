@@ -31,9 +31,36 @@ function requirePerformedBy(event: TranscriptEvent, pattern: string): boolean {
     }
     return false;
   }
-  // A non-Bash tool_use (Write/Edit/…) that carries the pattern in its input
-  // genuinely produced it (e.g. `Closes #N` written into a PR body).
+  // A non-Bash tool_use (Write/Edit/…) counts as PERFORMING a require only when
+  // the pattern is a genuine CONTENT token — an import, a scoped package, a
+  // value carrying code punctuation (`lucide-react`, `@scope/pkg`, `timeout:30`).
+  //
+  // It must NOT count when the pattern is a COMMAND (`git tag`, `npm run x`) or a
+  // bare/generic word (`main`, `tests`): the agent writing those into a notes or
+  // status file is a MENTION, not performance. Real false PASSES found dogfooding
+  // on a 174-rule repo (2026-10-02): "tag the release when merging to main" was
+  // marked followed only because the word "main" appeared in a file the agent
+  // wrote, and a command rule was marked followed because its text sat in a
+  // status file — no command ran. A command rule needs the command; text written
+  // into a file never counts. The safe direction for everything else is UNCLEAR,
+  // never a false "followed".
+  if (!isContentToken(pattern)) return false;
   return matchesPattern(searchHaystack(event), pattern);
+}
+
+/**
+ * A pattern distinctive enough that finding it inside written file content is
+ * evidence the content was produced, not merely mentioned: a single token (no
+ * whitespace), not a flag, carrying code punctuation (`. - / @ # :`) with at
+ * least three alphanumerics. A command (`git tag`), a phrase, or a bare word
+ * (`main`) is none of these, so a file-write of it is a mention, not proof.
+ */
+function isContentToken(pattern: string): boolean {
+  const p = pattern.trim();
+  if (/\s/.test(p)) return false;
+  if (p.startsWith("-")) return false;
+  if (!/[.\-/@#:]/.test(p)) return false;
+  return (p.match(/[A-Za-z0-9]/g) ?? []).length >= 3;
 }
 
 /**

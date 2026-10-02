@@ -308,3 +308,28 @@ describe("HTML comments are not rules", () => {
     expect(rules.some((r) => /a real HTML comment in a sample stays/.test(r.text))).toBe(true);
   });
 });
+
+describe("example/sample sections are context, not rules (dogfood 2026-10-02)", () => {
+  it("skips sample commit-message bullets under an Examples heading, keeps the real rule", () => {
+    const md = [
+      "## 1. Commits",
+      "Never commit directly to `main`.",
+      "",
+      "## Example commit messages",
+      "- feat: add the login page",
+      "- fix: correct the header spacing",
+      "- `src/components/`",
+    ].join("\n");
+    const rules = parseClaudeMdText(md, "project");
+    const titles = rules.map((r) => r.title).join(" | ");
+    expect(titles).toContain("Commits");
+    expect(titles).not.toContain("feat: add the login page");
+    expect(titles).not.toContain("fix: correct the header spacing");
+  });
+
+  it("a heading that OPENS with a directive is still a rule, even if it says 'example'", () => {
+    const md = "## Never follow the bad example below\n- do not hardcode secrets\n";
+    const rules = parseClaudeMdText(md, "project");
+    expect(rules.length).toBeGreaterThan(0);
+  });
+});

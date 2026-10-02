@@ -185,6 +185,14 @@ export function parseClaudeMdText(rawInput: string, source: "global" | "project"
   let currentIsMarkedRule = false; // true for numbered/bold rules: bullets in their body stay as body text
   let bodyLines: string[] = [];
   let pendingSectionTitle: string | null = null;
+  // Bullets under an "## Examples" / "## Sample commit messages" heading are
+  // samples, not directives. Found dogfooding (2026-10-02): ~8 sample lines were
+  // read as rules that "must have run", producing meaningless can't-tell. A
+  // heading that OPENS with a directive ("Never ... for example") stays a rule.
+  let inExampleSection = false;
+  const EXAMPLE_HEADING = /\b(?:examples?|samples?)\b/i;
+  const HEADING_DIRECTIVE = /^\s*(?:never|always|must|do ?not|don'?t|dont|avoid|ensure|only|no|prefer)\b/i;
+  const isExampleHeading = (h: string) => EXAMPLE_HEADING.test(h) && !HEADING_DIRECTIVE.test(h);
   let pendingSectionLine = 0; // 1-based line of the plain header awaiting its prose rule
   let lineNo = 0; // 1-based index of the line currently being read
   let sectionCount = 0;
@@ -214,7 +222,7 @@ export function parseClaudeMdText(rawInput: string, source: "global" | "project"
   const appendBody = (line: string) => {
     if (currentIsMarkedRule) {
       bodyLines.push(line);
-    } else if (pendingSectionTitle !== null && line.trim() !== "") {
+    } else if (pendingSectionTitle !== null && !inExampleSection && line.trim() !== "") {
       current = { id: `${assignSectionId()}.0`, title: pendingSectionTitle, text: "", source, sourceLine: pendingSectionLine };
       bodyLines = [line];
       pendingSectionTitle = null;
@@ -248,6 +256,7 @@ export function parseClaudeMdText(rawInput: string, source: "global" | "project"
     if (numbered) {
       flush();
       pendingSectionTitle = null;
+      inExampleSection = false;
       current = { id: numbered[1], title: numbered[2].trim(), text: "", source, sourceLine: lineNo };
       currentIsMarkedRule = true;
       continue;
@@ -257,6 +266,7 @@ export function parseClaudeMdText(rawInput: string, source: "global" | "project"
     if (bold) {
       flush();
       pendingSectionTitle = null;
+      inExampleSection = false;
       current = { id: bold[1], title: bold[2].trim(), text: "", source, sourceLine: lineNo };
       currentIsMarkedRule = true;
       continue;
@@ -270,6 +280,7 @@ export function parseClaudeMdText(rawInput: string, source: "global" | "project"
       pendingSectionTitle = plain[1].trim();
       pendingSectionLine = lineNo;
       currentIsMarkedRule = false;
+      inExampleSection = isExampleHeading(plain[1].trim());
       continue;
     }
 
@@ -277,7 +288,8 @@ export function parseClaudeMdText(rawInput: string, source: "global" | "project"
     if (bullet) {
       if (currentIsMarkedRule) {
         bodyLines.push(line);
-      } else {
+      } else if (!inExampleSection) {
+        // A bullet under an example heading is a sample, not a rule — skip it.
         bulletIndex += 1;
         const text = bullet[1].trim();
         rules.push({ id: `${assignSectionId()}.${bulletIndex}`, title: text, text, source, sourceLine: lineNo });

@@ -372,3 +372,42 @@ describe("the matcher must not fire inside a longer word", () => {
     expect(r.status).toBe("UNCLEAR");
   });
 });
+
+describe("require PASS needs the right event, not text the agent wrote into a file (dogfood 2026-10-02)", () => {
+  const tagRule: DeterministicClassification = {
+    kind: "deterministic",
+    rule: { id: "40", title: "Tag release", text: "Always run `git tag` when cutting a release.", source: "project" },
+    patterns: ["git tag"],
+    polarity: "require",
+  };
+  it("a command rule is NOT marked followed just because its text sits in a notes file", () => {
+    const events = [toolUse("Write", { file_path: "NOTES.md", content: "remember to run git tag v1.0.0 before release" })];
+    expect(runDeterministicChecks([tagRule], events)[0].status).not.toBe("PASS");
+  });
+  it("a command rule IS followed when the command actually ran", () => {
+    const events = [toolUse("Bash", { command: "git tag v1.0.0" })];
+    expect(runDeterministicChecks([tagRule], events)[0].status).toBe("PASS");
+  });
+
+  const mainRule: DeterministicClassification = {
+    kind: "deterministic",
+    rule: { id: "41", title: "Merge to main", text: "Tag the release when merging to `main`.", source: "project" },
+    patterns: ["main"],
+    polarity: "require",
+  };
+  it("a generic word appearing in a written file does not mark a require rule followed", () => {
+    const events = [toolUse("Write", { file_path: "STATUS.md", content: "merged the feature to main today" })];
+    expect(runDeterministicChecks([mainRule], events)[0].status).not.toBe("PASS");
+  });
+
+  const importRule: DeterministicClassification = {
+    kind: "deterministic",
+    rule: { id: "42", title: "Use lucide", text: "Always import icons from `lucide-react`.", source: "project" },
+    patterns: ["lucide-react"],
+    polarity: "require",
+  };
+  it("a genuine content token written into a file still counts as followed (no regression)", () => {
+    const events = [toolUse("Write", { file_path: "app.tsx", content: "import { X } from 'lucide-react'" })];
+    expect(runDeterministicChecks([importRule], events)[0].status).toBe("PASS");
+  });
+});
