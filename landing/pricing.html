@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<script>
+    !function(t,e){var o,n,p,r;e.__SV||(window.posthog && window.posthog.__loaded)||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}p||((p=t.createElement("script")).type="text/javascript",p.crossOrigin="anonymous",p.async=!0,p.src=s.api_host.replace(".i.posthog.com","-assets.i.posthog.com")+"/static/array.js",p.onerror=function(){p=null},(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r));var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+".people (stub)"},o="Sn Cn init Hn Un Gn Yi zn Kn qn capture Vn kn calculateEventProperties es register register_once register_for_session unregister unregister_for_session os Bn ss getFeatureFlag getFeatureFlagPayload getFeatureFlagResult getAllFeatureFlags isFeatureEnabled reloadFeatureFlags updateFlags updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures on onFeatureFlags onSurveysLoaded onSessionId getSurveys getActiveMatchingSurveys renderSurvey displaySurvey cancelPendingSurvey canRenderSurvey canRenderSurveyAsync ls identify setPersonProperties unsetPersonProperties group resetGroups setPersonPropertiesForFlags resetPersonPropertiesForFlags setGroupPropertiesForFlags resetGroupPropertiesForFlags reset us shutdown setIdentity clearIdentity get_distinct_id getGroups get_session_id get_session_replay_url alias set_config startSessionRecording stopSessionRecording sessionRecordingStarted captureException addExceptionStep captureLog startExceptionAutocapture stopExceptionAutocapture loadToolbar get_property getSessionProperty rs Xn createPersonProfile setInternalOrTestUser ns $n vs opt_in_capturing opt_out_capturing has_opted_in_capturing has_opted_out_capturing get_explicit_consent_status is_capturing clear_opt_in_out_capturing Jn debug tr At getPageViewId captureTraceFeedback captureTraceMetric Ln".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
+    posthog.init('phc_A4TBtMr58tNcGFEnoC82pPqzrKxXRGw84B8RVd8JK2nW', {
+        api_host: 'https://us.i.posthog.com',
+        defaults: '2026-05-30',
+        person_profiles: 'identified_only',
+        autocapture: false,
+        disable_session_recording: true,
+        capture_pageview: true,
+        capture_pageleave: true,
+        persistence: 'localStorage+cookie',
+        mask_all_text: true,
+        mask_all_element_attributes: true,
+    })
+    ;(function(){try{var q=new URLSearchParams(location.search);if(q.get('internal')==='1'){try{localStorage.setItem('rr_internal','1')}catch(e){}}var f=false;try{f=localStorage.getItem('rr_internal')==='1'}catch(e){}if(f&&window.posthog&&posthog.register){posthog.register({internal:true})}}catch(e){}})();
+</script>
+<script src="/analytics.js" defer></script>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>RuleReceipt — Pricing</title>
+<meta name="description" content="The CLI is free and runs locally. Team features are coming later; the free CLI stays free." />
+<link rel="canonical" href="https://rulereceipt.dev/pricing" />
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23FAFAF7'/%3E%3Cpath d='M9 8h14v17l-3-2-3 2-3-2-3 2-2-2z' fill='none' stroke='%2317191C' stroke-width='1.6'/%3E%3Cpath d='M12 14h8M12 18h6' stroke='%2317805F' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E" />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="https://rulereceipt.dev/pricing" />
+<meta property="og:title" content="RuleReceipt — Pricing" />
+<meta property="og:description" content="The CLI is free and runs locally. Team features are coming later; the free CLI stays free." />
+<meta property="og:image" content="https://rulereceipt.dev/og-image.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:image" content="https://rulereceipt.dev/og-image.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap" />
+<style>
+  :root {
+    --bg: #FAF9F5; --bg-deep: #F0EEE6; --panel: #FFFFFF; --panel-line: #E8E6DC; --panel-line-strong: #DEDCD1;
+    --paper: #141413; --paper-dim: #55534E; --paper-faint: #7A756E; --amber: #C4551F; --amber-dim: #AD4A17; --cyan: #17805F; --red: #C2402C;
+    --font-display: 'Newsreader', 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--paper); font-family: var(--font-sans); font-size: 17px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
+  a { color: var(--amber-dim); }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 0 24px; }
+  .back { display: inline-block; font-family: var(--font-mono); font-size: 0.8rem; text-decoration: none; }
+  .back:hover { text-decoration: underline; }
+  header.page { padding: 34px 0 0; border-bottom: 1px solid var(--panel-line); margin-bottom: 44px; }
+  .eyebrow { font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.11em; text-transform: uppercase; color: var(--amber-dim); margin: 30px 0 12px; }
+  h1 { font-family: var(--font-display); font-weight: 600; font-size: clamp(2rem, 5vw, 2.9rem); line-height: 1.1; letter-spacing: -0.02em; margin: 0 0 16px; text-wrap: balance; }
+  .deck { font-size: 1.2rem; line-height: 1.5; color: var(--paper); margin: 0 0 34px; max-width: 32em; }
+  section { margin-bottom: 48px; }
+  h2 { font-family: var(--font-display); font-weight: 600; font-size: 1.6rem; letter-spacing: -0.015em; margin: 0 0 6px; text-wrap: balance; }
+  .sec-sub { color: var(--paper-faint); font-size: 0.92rem; margin: 0 0 24px; padding-bottom: 14px; border-bottom: 1px solid var(--panel-line); }
+  p { color: var(--paper-dim); margin: 0 0 18px; }
+  strong { color: var(--paper); font-weight: 600; }
+  em { font-style: italic; }
+  .pricing { display: flex; gap: 22px; flex-wrap: wrap; margin-bottom: 8px; }
+  .price-card { flex: 1 1 240px; background: var(--panel); border: 1px solid var(--panel-line-strong); padding: 24px 24px; border-radius: 16px; box-shadow: 0 1px 2px rgba(23,25,28,0.04), 0 12px 28px -18px rgba(23,25,28,0.18); }
+  .price-card.accent { border-color: var(--amber); }
+  .price-card .tier { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--paper-faint); }
+  .price-card .amount { font-family: var(--font-display); font-weight: 600; font-size: 2.1rem; color: var(--paper); margin: 6px 0 12px; font-variant-numeric: tabular-nums; }
+  .price-card p { color: var(--paper-dim); font-size: 0.95rem; margin: 0; }
+  .price-card p + p { margin-top: 10px; }
+  .price-card code { font-family: var(--font-mono); background: var(--bg-deep); padding: 1px 6px; border-radius: 4px; font-size: 0.86em; color: var(--paper); }
+  .card { background: var(--panel); border: 1px solid var(--panel-line-strong); border-radius: 16px; padding: 22px 24px; margin-bottom: 18px; box-shadow: 0 1px 2px rgba(20,20,19,0.03), 0 14px 30px -24px rgba(20,20,19,0.22); }
+  .card h3 { font-family: var(--font-sans); font-weight: 600; font-size: 1.02rem; margin: 0 0 10px; color: var(--paper); }
+  .card p { font-size: 0.95rem; margin: 0; }
+  code { font-family: var(--font-mono); background: var(--bg-deep); padding: 1px 6px; border-radius: 4px; font-size: 0.88em; color: var(--paper); }
+  .footnote { font-size: 0.86rem; color: var(--paper-faint); border-top: 1px solid var(--panel-line); padding-top: 18px; margin-top: 8px; }
+  footer.page { border-top: 1px solid var(--panel-line); padding: 26px 0 70px; font-family: var(--font-mono); font-size: 0.8rem; }
+  footer.page a { text-decoration: none; }
+  footer.page a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="page">
+      <a class="back" href="/">&larr; RuleReceipt</a>
+      <div class="eyebrow">pricing</div>
+      <h1>Pricing</h1>
+      <p class="deck">The CLI is free and runs locally. Team features are coming later; the free CLI stays free.</p>
+    </header>
+
+    <section>
+      <div class="pricing">
+        <div class="price-card accent">
+          <div class="tier">The CLI</div>
+          <div class="amount">Free</div>
+          <p>The whole tool, not a cut-down trial. Unlimited checks, no card, no account. <code>rulereceipt check</code> runs on your machine and makes zero network calls.</p>
+          <p>This part stays free. It&rsquo;s source-available &mdash; you can read every line it runs.</p>
+        </div>
+        <div class="price-card">
+          <div class="tier">For teams</div>
+          <div class="amount">Later</div>
+          <p>An org-wide, hosted view &mdash; trends across people and repos, compliance reports for audits and vendor reviews &mdash; is in development. It&rsquo;s a genuinely different product from the local check.</p>
+          <p>We&rsquo;ll announce it with a real price when it exists. We&rsquo;re not quoting a number for something that isn&rsquo;t built. <a href="mailto:hello@rulereceipt.dev">Get in touch</a> if you need it early.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>No asterisks</h2>
+      <p class="sec-sub">The questions people actually ask about the price.</p>
+      <div class="card">
+        <h3>Will the CLI start costing money later?</h3>
+        <p>No. We make money from the paid Team tier, never from the CLI. There&rsquo;s no paywall part-way through a command, and no feature that gets pulled behind a subscription later. The free CLI stays free.</p>
+      </div>
+      <div class="card">
+        <h3>Is &ldquo;free&rdquo; just a launch promotion?</h3>
+        <p>No. It&rsquo;s not free &ldquo;for now&rdquo; and it isn&rsquo;t a time-limited offer &mdash; the local CLI is the free product, permanently. The Team tier is how the project is funded, and it&rsquo;s a separate, hosted thing.</p>
+      </div>
+      <div class="card">
+        <h3>Do I need an account or an API key?</h3>
+        <p>No account, ever, to use the CLI. For the rules that need judgment you can supply the same Anthropic API key your Claude Code setup already uses &mdash; rules naming something concrete (a branch, a file, a command) are checked locally with no key and no cost.</p>
+      </div>
+    </section>
+
+    <p class="footnote">If the Team tier&rsquo;s pricing is ever set, it&rsquo;ll be announced clearly and in advance &mdash; never a silent switch. Want a heads-up? There&rsquo;s a one-email notify option on the <a href="/">home page</a>.</p>
+  </div>
+
+  <footer class="page">
+    <div class="wrap">
+      <a href="/">&larr; Back to RuleReceipt</a> &nbsp;&middot;&nbsp; <a href="/compare">How it compares</a> &nbsp;&middot;&nbsp; <a href="/terms">Terms</a>
+    </div>
+  </footer>
+</body>
+</html>

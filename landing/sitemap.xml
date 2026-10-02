@@ -15,4 +15,19 @@
   <url>
     <loc>https://rulereceipt.dev/postmortem</loc>
   </url>
+  <url>
+    <loc>https://rulereceipt.dev/pricing</loc>
+  </url>
+  <url>
+    <loc>https://rulereceipt.dev/compare</loc>
+  </url>
+  <url>
+    <loc>https://rulereceipt.dev/compare/hooks</loc>
+  </url>
+  <url>
+    <loc>https://rulereceipt.dev/compare/claude-md-doctor</loc>
+  </url>
+  <url>
+    <loc>https://rulereceipt.dev/stories/database-corruption</loc>
+  </url>
 </urlset>

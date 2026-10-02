@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<script>
+    !function(t,e){var o,n,p,r;e.__SV||(window.posthog && window.posthog.__loaded)||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}p||((p=t.createElement("script")).type="text/javascript",p.crossOrigin="anonymous",p.async=!0,p.src=s.api_host.replace(".i.posthog.com","-assets.i.posthog.com")+"/static/array.js",p.onerror=function(){p=null},(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r));var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+".people (stub)"},o="Sn Cn init Hn Un Gn Yi zn Kn qn capture Vn kn calculateEventProperties es register register_once register_for_session unregister unregister_for_session os Bn ss getFeatureFlag getFeatureFlagPayload getFeatureFlagResult getAllFeatureFlags isFeatureEnabled reloadFeatureFlags updateFlags updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures on onFeatureFlags onSurveysLoaded onSessionId getSurveys getActiveMatchingSurveys renderSurvey displaySurvey cancelPendingSurvey canRenderSurvey canRenderSurveyAsync ls identify setPersonProperties unsetPersonProperties group resetGroups setPersonPropertiesForFlags resetPersonPropertiesForFlags setGroupPropertiesForFlags resetGroupPropertiesForFlags reset us shutdown setIdentity clearIdentity get_distinct_id getGroups get_session_id get_session_replay_url alias set_config startSessionRecording stopSessionRecording sessionRecordingStarted captureException addExceptionStep captureLog startExceptionAutocapture stopExceptionAutocapture loadToolbar get_property getSessionProperty rs Xn createPersonProfile setInternalOrTestUser ns $n vs opt_in_capturing opt_out_capturing has_opted_in_capturing has_opted_out_capturing get_explicit_consent_status is_capturing clear_opt_in_out_capturing Jn debug tr At getPageViewId captureTraceFeedback captureTraceMetric Ln".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
+    posthog.init('phc_A4TBtMr58tNcGFEnoC82pPqzrKxXRGw84B8RVd8JK2nW', {
+        api_host: 'https://us.i.posthog.com',
+        defaults: '2026-05-30',
+        person_profiles: 'identified_only',
+        autocapture: false,
+        disable_session_recording: true,
+        capture_pageview: true,
+        capture_pageleave: true,
+        persistence: 'localStorage+cookie',
+        mask_all_text: true,
+        mask_all_element_attributes: true,
+    })
+    ;(function(){try{var q=new URLSearchParams(location.search);if(q.get('internal')==='1'){try{localStorage.setItem('rr_internal','1')}catch(e){}}var f=false;try{f=localStorage.getItem('rr_internal')==='1'}catch(e){}if(f&&window.posthog&&posthog.register){posthog.register({internal:true})}}catch(e){}})();
+</script>
+<script src="/analytics.js" defer></script>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>RuleReceipt vs Claude Code hooks</title>
+<meta name="description" content="Claude Code hooks can block an action before it runs — real prevention. But the gate can fail open, by Anthropic's own docs. Here's how RuleReceipt catches what it missed, after the fact." />
+<link rel="canonical" href="https://rulereceipt.dev/compare/hooks" />
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23FAFAF7'/%3E%3Cpath d='M9 8h14v17l-3-2-3 2-3-2-3 2-2-2z' fill='none' stroke='%2317191C' stroke-width='1.6'/%3E%3Cpath d='M12 14h8M12 18h6' stroke='%2317805F' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E" />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="https://rulereceipt.dev/compare/hooks" />
+<meta property="og:title" content="RuleReceipt vs Claude Code hooks" />
+<meta property="og:description" content="Hooks prevent in-flight but can fail open per Anthropic's own docs. We audit every rule after the fact and quote the line." />
+<meta property="og:image" content="https://rulereceipt.dev/og-image.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:image" content="https://rulereceipt.dev/og-image.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap" />
+<style>
+  :root {
+    --bg: #FAF9F5; --bg-deep: #F0EEE6; --panel: #FFFFFF; --panel-line: #E8E6DC; --panel-line-strong: #DEDCD1;
+    --paper: #141413; --paper-dim: #55534E; --paper-faint: #7A756E; --amber: #C4551F; --amber-dim: #AD4A17; --cyan: #17805F; --red: #C2402C;
+    --font-display: 'Newsreader', 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--paper); font-family: var(--font-sans); font-size: 17px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
+  a { color: var(--amber-dim); }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 0 24px; }
+  .back { display: inline-block; font-family: var(--font-mono); font-size: 0.8rem; text-decoration: none; }
+  .back:hover { text-decoration: underline; }
+  header.page { padding: 34px 0 0; border-bottom: 1px solid var(--panel-line); margin-bottom: 44px; }
+  .eyebrow { font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.11em; text-transform: uppercase; color: var(--amber-dim); margin: 30px 0 12px; }
+  h1 { font-family: var(--font-display); font-weight: 600; font-size: clamp(2rem, 5vw, 2.9rem); line-height: 1.1; letter-spacing: -0.02em; margin: 0 0 16px; text-wrap: balance; }
+  .deck { font-size: 1.15rem; line-height: 1.5; color: var(--paper-dim); margin: 0 0 34px; max-width: 34em; }
+  section { margin-bottom: 54px; }
+  h2 { font-family: var(--font-display); font-weight: 600; font-size: 1.6rem; letter-spacing: -0.015em; margin: 0 0 6px; text-wrap: balance; }
+  .sec-sub { color: var(--paper-faint); font-size: 0.92rem; margin: 0 0 24px; padding-bottom: 14px; border-bottom: 1px solid var(--panel-line); }
+  p { color: var(--paper-dim); margin: 0 0 18px; }
+  .lede { font-size: 1.08rem; color: var(--paper); }
+  strong { color: var(--paper); font-weight: 600; }
+  em { font-style: italic; }
+  .card { background: var(--panel); border: 1px solid var(--panel-line-strong); border-radius: 16px; padding: 24px 26px; margin-bottom: 18px; box-shadow: 0 1px 2px rgba(20,20,19,0.03), 0 14px 30px -24px rgba(20,20,19,0.22); }
+  .card h3 { font-family: var(--font-sans); font-weight: 600; font-size: 1.02rem; margin: 0 0 10px; color: var(--paper); }
+  .card p { font-size: 0.95rem; margin: 0 0 12px; }
+  .card p:last-child { margin-bottom: 0; }
+  .card ul { margin: 0; padding-left: 20px; color: var(--paper-dim); font-size: 0.95rem; }
+  .card li { margin-bottom: 8px; }
+  .card li:last-child { margin-bottom: 0; }
+  .src { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--paper-faint); margin: 0 0 10px; overflow-wrap: anywhere; }
+  .src a { color: var(--paper-faint); }
+  .better { color: var(--cyan); font-weight: 600; }
+  blockquote { margin: 14px 0; padding-left: 16px; border-left: 2px solid var(--panel-line-strong); font-family: var(--font-display); font-size: 1.08rem; line-height: 1.45; color: var(--paper); }
+  blockquote cite { display: block; font-family: var(--font-mono); font-size: 0.7rem; font-style: normal; letter-spacing: 0.05em; text-transform: uppercase; color: var(--paper-faint); margin-top: 8px; }
+  code { font-family: var(--font-mono); background: var(--bg-deep); padding: 1px 6px; border-radius: 4px; font-size: 0.88em; color: var(--paper); }
+  .footnote { font-size: 0.86rem; color: var(--paper-faint); border-top: 1px solid var(--panel-line); padding-top: 18px; margin-top: 8px; }
+  footer.page { border-top: 1px solid var(--panel-line); padding: 26px 0 70px; font-family: var(--font-mono); font-size: 0.8rem; }
+  footer.page a { text-decoration: none; }
+  footer.page a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="page">
+      <a class="back" href="/compare">&larr; All comparisons</a>
+      <div class="eyebrow">deep dive</div>
+      <h1>RuleReceipt vs Claude Code hooks</h1>
+      <p class="deck">Hooks are the one tool in this space that genuinely <em>prevents</em> &mdash; they block an action before it runs. We don&rsquo;t. So this isn&rsquo;t &ldquo;we&rsquo;re better&rdquo;; it&rsquo;s &ldquo;here&rsquo;s where a preventive gate falls short, and what a post-hoc check adds.&rdquo;</p>
+    </header>
+
+    <section>
+      <h2>Where hooks win outright</h2>
+      <p class="sec-sub">Prevention is something a report can&rsquo;t do. Credit where it&rsquo;s due.</p>
+      <div class="card">
+        <div class="src"><a href="https://code.claude.com/docs/en/hooks" target="_blank" rel="noopener">code.claude.com/docs/en/hooks</a> &middot; <a href="https://code.claude.com/docs/en/permissions" target="_blank" rel="noopener">/permissions</a></div>
+        <h3>A <code>PreToolUse</code> hook can stop the action before it happens</h3>
+        <p>You can wire a hook to inspect a tool call and return <code>permissionDecision: "deny"</code> &mdash; and the call never runs. That is real, in-flight prevention. For a specific, well-defined danger (&ldquo;never let <code>rm -rf</code> touch this path&rdquo;), a hook is the right tool, and it beats a checker that only tells you afterwards.</p>
+        <p>RuleReceipt is post-hoc by design: it reads the transcript after the session and reports. It does <strong>not</strong> make the model obey, and it can&rsquo;t un-run a command. If prevention of one known action is your whole problem, use a hook &mdash; you may not need us at all.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>Why a gate alone isn&rsquo;t enough</h2>
+      <p class="sec-sub">Straight from Anthropic&rsquo;s own hooks documentation &mdash; quoted, not paraphrased.</p>
+
+      <div class="card">
+        <h3>A stalled hook doesn&rsquo;t block &mdash; it fails open</h3>
+        <blockquote>
+          &ldquo;A timed-out <code>command</code>, <code>http</code>, or <code>mcp_tool</code> hook doesn&rsquo;t block the tool call. The call continues through the normal permission flow, so don&rsquo;t count on a stalled hook to act as a gate.&rdquo;
+          <cite>Claude Code docs &middot; Hooks &middot; PreToolUse</cite>
+        </blockquote>
+        <p>The default timeout for those hook types is 600 seconds. If your check hangs &mdash; a slow subprocess, a network call, a wedged script &mdash; it is discarded and the action proceeds. The gate you were relying on quietly isn&rsquo;t there.</p>
+      </div>
+
+      <div class="card">
+        <h3>Silence is not approval &mdash; but it isn&rsquo;t denial either</h3>
+        <blockquote>
+          &ldquo;The hook can deny the call, but staying silent doesn&rsquo;t approve it.&rdquo;
+          <cite>Claude Code docs &middot; Hooks &middot; How a hook resolves</cite>
+        </blockquote>
+        <p>A hook that exits cleanly with no decision hands the call back to the normal permission flow. That&rsquo;s sensible &mdash; but it means a hook only stops what you explicitly told it to deny. Anything you didn&rsquo;t anticipate isn&rsquo;t caught by the hook; it falls through to whatever the permission settings allow.</p>
+      </div>
+
+      <div class="card">
+        <h3>A hook guards the actions you listed; your rules are broader than that</h3>
+        <p>Hooks match on tool calls &mdash; a command pattern, a file path, a tool name. Most CLAUDE.md rules aren&rsquo;t shaped like that: &ldquo;update the changelog before finishing,&rdquo; &ldquo;don&rsquo;t weaken a threshold without saying so,&rdquo; &ldquo;surface bad news first.&rdquo; You can&rsquo;t write a <code>PreToolUse</code> matcher for most of what you actually wrote down. A hook can&rsquo;t verify a rule it can&rsquo;t express as a tool-call pattern.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>What RuleReceipt adds</h2>
+      <p class="sec-sub">Not instead of hooks &mdash; after them, over everything.</p>
+      <div class="card">
+        <h3>Every rule, checked against what actually happened</h3>
+        <p>After the session, RuleReceipt reads the transcript and goes rule by rule through your CLAUDE.md / AGENTS.md: followed, broken, or can&rsquo;t-tell &mdash; each with the <strong>exact quoted line</strong> from the session as evidence. It covers the rules a hook can&rsquo;t express, and it catches the case where the hook was meant to fire but failed open.</p>
+        <p>We&rsquo;re honest about the ceiling: this is detection and reporting, after the fact. It does not prevent, and it does not make the model comply. There is <strong>one</strong> narrow exception &mdash; an optional guard hook that blocks a small, specific set of file and branch actions. That&rsquo;s a deliberately limited guard, not a general enforcement layer, and we won&rsquo;t describe it as one.</p>
+      </div>
+      <div class="card">
+        <h3>The honest summary</h3>
+        <ul>
+          <li><strong>Use hooks</strong> to prevent specific, known-dangerous actions in-flight. Nothing here replaces that.</li>
+          <li><strong>Use RuleReceipt</strong> to verify, after the session, that every rule you wrote was actually followed &mdash; including the ones no hook could match, and the times a gate failed open.</li>
+          <li>They stack. The gate stops what it can; the receipt tells you what got through.</li>
+        </ul>
+      </div>
+    </section>
+
+    <p class="footnote">Quotes above are from Anthropic&rsquo;s Claude Code hooks documentation and were re-checked word-for-word on 2 October 2026. Hooks are a built-in Claude Code feature and run locally &mdash; this isn&rsquo;t a free-vs-paid or local-vs-cloud distinction, it&rsquo;s prevention-in-flight vs verification-after.</p>
+  </div>
+
+  <footer class="page">
+    <div class="wrap">
+      <a href="/compare">&larr; All comparisons</a> &nbsp;&middot;&nbsp; <a href="/compare/claude-md-doctor">vs claude-md-doctor</a> &nbsp;&middot;&nbsp; <a href="/">RuleReceipt</a>
+    </div>
+  </footer>
+</body>
+</html>
