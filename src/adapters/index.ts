@@ -3,6 +3,7 @@ import { basename } from "node:path";
 import type { TranscriptEvent } from "../types.js";
 import { listAllSessionFiles, readTranscriptFromFile, findSubagentFiles } from "../parsers/transcriptParser.js";
 import { listCodexSessions, parseCodexTranscript } from "./codex.js";
+import { listCopilotSessions, parseCopilotTranscript, copilotFormatIsKnown } from "./copilot.js";
 
 /**
  * A session adapter turns one coding agent's on-disk session log into the
@@ -23,6 +24,12 @@ export interface SessionAdapter {
   listSessions(cwd: string): string[];
   /** Parse one session file into neutral events. */
   parse(sessionFile: string): TranscriptEvent[];
+  /**
+   * EXPERIMENTAL = reader exists but has no real-session + planted + clean
+   * fixtures yet, so it is NOT auto-detected (it would risk an unverified parse
+   * winning "newest session"). It is used only when the user points at a file.
+   */
+  experimental?: boolean;
 }
 
 /**
@@ -48,8 +55,23 @@ export const codexAdapter: SessionAdapter = {
   parse: (sessionFile) => parseCodexTranscript(sessionFile),
 };
 
-/** Every adapter with a verified, tested-buildable parser. */
+/**
+ * GitHub Copilot CLI — EXPERIMENTAL. Reader is ours; the format is per
+ * cli-continues (MIT, pinned SHA — see REUSE.md/NOTICE). No real-session
+ * fixtures yet, so not auto-detected; reachable via `--transcript <events.jsonl>`.
+ */
+export const copilotCliAdapter: SessionAdapter = {
+  tool: "copilot-cli",
+  listSessions: (cwd) => listCopilotSessions(cwd),
+  parse: (sessionFile) => parseCopilotTranscript(sessionFile),
+  experimental: true,
+};
+
+/** Adapters with a verified, tested parser — these auto-detect the newest session. */
 export const ADAPTERS: SessionAdapter[] = [claudeCodeAdapter, codexAdapter];
+
+/** Experimental adapters: reader exists, awaiting real+planted+clean fixtures. */
+export const EXPERIMENTAL_ADAPTERS: SessionAdapter[] = [copilotCliAdapter];
 
 /**
  * Tools deliberately NOT read yet, with the honest reason. Kept as data (not
@@ -61,7 +83,6 @@ export const UNSUPPORTED_TOOLS: { tool: string; reason: string }[] = [
   { tool: "aider", reason: "history is a Markdown transcript (.aider.chat.history.md), not structured events — needs a prose parser, not a field mapping" },
   { tool: "opencode", reason: "stores sessions in a SQLite DB (opencode.db) since v1.2.0 (per-record JSON before) — needs a SQLite reader, version-dependent" },
   { tool: "cursor", reason: "IDE-embedded; chat history lives in undocumented internal state that changes across Cursor versions — real ongoing maintenance, out of scope for this pass" },
-  { tool: "github-copilot", reason: "IDE-embedded; no accessible, stable local session log a third-party CLI can read" },
   { tool: "windsurf", reason: "IDE-embedded; history in undocumented internal state, same as Cursor" },
 ];
 
@@ -142,6 +163,13 @@ export function parseSessionFile(file: string): TranscriptEvent[] {
     const obj = JSON.parse(firstLine) as { type?: unknown };
     if (obj && typeof obj === "object" && (obj.type === "session_meta" || obj.type === "response_item")) {
       return parseCodexTranscript(file);
+    }
+    // Copilot CLI events.jsonl opens with a dotted event type (session.start,
+    // user.message, …). EXPERIMENTAL adapter; confirm it really is a Copilot log
+    // (a known event type somewhere) before using its reader, never on the
+    // dotted-type guess alone.
+    if (obj && typeof obj === "object" && typeof obj.type === "string" && obj.type.includes(".") && copilotFormatIsKnown(file)) {
+      return parseCopilotTranscript(file);
     }
   } catch {
     /* first line is not JSON: treat as a Claude transcript below */

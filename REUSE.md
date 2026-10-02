@@ -90,3 +90,10 @@ only if the size/speed budget holds.
 - Each ported adapter does a **schema fingerprint**: unknown fields/shape ->
   "format newer than tested (last tested: <agent version>)", never a guess.
   "supported" needs real sample + planted + clean fixtures; else "experimental".
+
+## Ported adapters (status)
+- **Copilot CLI** — EXPERIMENTAL (0.1.81). Our reader `src/adapters/copilot.ts`,
+  written from cli-continues' documented format (MIT, pinned `e486cd2`; mnemo MIT).
+  Synthetic planted+clean fixtures pass through the real engine; NOT auto-detected
+  (reachable via `--transcript <events.jsonl>`). Flip to "supported" when real
+  sample sessions + fixtures land. Credit in NOTICE.md.

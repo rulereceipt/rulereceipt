@@ -17,3 +17,16 @@ reader working from a single file rather than the whole repository.
 
 Reading, studying, auditing, and using this code for personal or
 internal purposes remains fully permitted — see LICENSE clauses 2-3.
+
+---
+
+## Third-party format references (credits)
+
+RuleReceipt's agent adapters are our own code. Where an on-disk session FORMAT
+was documented by another MIT-licensed project, we credit it (we read the format,
+we did not copy the code):
+
+- **GitHub Copilot CLI** session format (`~/.copilot/session-state/*/events.jsonl`):
+  documented by **yigitkonur/cli-continues** (MIT), pinned commit
+  `e486cd22a592d89d890cff056624647fbe9cbe80`, which itself reverse-engineered it
+  from **Pilan-AI/mnemo** (MIT). Our reader is `src/adapters/copilot.ts`.
