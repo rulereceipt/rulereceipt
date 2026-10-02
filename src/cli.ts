@@ -330,7 +330,15 @@ async function runCheck(opts: CheckOptions) {
       : "";
   // Kept in human/markdown form for --email and any other reader below, even
   // when stdout is JSON — a manager gets a readable report, not raw JSON.
-  const reportText = markdown ? generateMarkdownReport(results, meta) : generateReport(results, meta);
+  // The raw session text, for A4 "why it broke" context under each Broken verdict.
+  // Best-effort: if it can't be read, the report simply omits the context.
+  let transcriptText: string | undefined;
+  try {
+    if (sessionFilePath) transcriptText = readFileSync(sessionFilePath, "utf-8");
+  } catch {
+    /* unreadable: no A4 context, never a crash */
+  }
+  const reportText = markdown ? generateMarkdownReport(results, meta) : generateReport(results, meta, transcriptText);
   if (json) {
     console.log(generateJsonReport(results, meta, pkg.version, editedRuleFiles));
   } else {

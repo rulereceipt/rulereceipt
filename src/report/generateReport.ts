@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import type { CheckResult } from "../types.js";
+import { breakContext, renderBreakContext } from "../breakContext.js";
 
 /**
  * Where a rule lives, for the report — "~/proj/CLAUDE.md:42", or just the path
@@ -197,7 +198,12 @@ function sharedEvidence(rs: CheckResult[]): string | null {
   return best;
 }
 
-export function generateReport(results: CheckResult[], meta: ReportMeta): string {
+/**
+ * `transcriptText` is the raw session JSONL. When present, each Broken verdict
+ * gets A4 "why it broke" context (the user message before it, whether the rules
+ * file was in context, whether a compaction preceded it) read straight from it.
+ */
+export function generateReport(results: CheckResult[], meta: ReportMeta, transcriptText?: string): string {
   const clean = results.map(sanitize);
   const lines: string[] = [];
   lines.push(`RuleReceipt · ${meta.ruleCount} rules checked`);
@@ -239,6 +245,12 @@ export function generateReport(results: CheckResult[], meta: ReportMeta): string
       // may not say the act did not happen. That distinction shipped for six
       // versions as a PASS on a session that ran `git push -f`.
       if (r.ceiling) lines.push(`  this means: ${r.ceiling}`);
+      // A4: why it broke — the context around a proven break, read from the raw
+      // transcript. Honest by construction: if the rules file was never in
+      // context before the break, it says so rather than implying it was ignored.
+      if (r.status === "FAIL" && transcriptText && r.evidence) {
+        for (const l of renderBreakContext(breakContext(transcriptText, r.evidence))) lines.push(l);
+      }
     }
   }
 
