@@ -31,3 +31,4 @@ we did not copy the code):
   `e486cd22a592d89d890cff056624647fbe9cbe80`, which itself reverse-engineered it
   from **Pilan-AI/mnemo** (MIT). Our reader is `src/adapters/copilot.ts`.
 - **Gemini CLI** session format (`~/.gemini/tmp/<hash>/chats/*.{jsonl,json}`, legacy `~/.gemini/sessions/*.json`): documented by **yigitkonur/cli-continues** (MIT, pinned `e486cd2`; from mnemo MIT). Our reader is `src/adapters/gemini.ts`.
+- **Cursor** agent-transcripts (`~/.cursor/projects/<slug>/agent-transcripts/**/*.jsonl`, Anthropic-API shaped): documented by **yigitkonur/cli-continues** (MIT, pinned `e486cd2`). Our reader `src/adapters/cursor.ts`. (Old `state.vscdb` SQLite path deferred.)

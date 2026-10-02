@@ -98,3 +98,4 @@ only if the size/speed budget holds.
   (reachable via `--transcript <events.jsonl>`). Flip to "supported" when real
   sample sessions + fixtures land. Credit in NOTICE.md.
 - **Gemini CLI** — EXPERIMENTAL (0.1.82). Reader `src/adapters/gemini.ts`, our code from cli-continues format (MIT, pinned `e486cd2`). Node-20-safe (JSON, no sqlite). Synthetic fixtures pass; supported awaits real samples.
+- **Cursor** — EXPERIMENTAL (0.1.83). Reader `src/adapters/cursor.ts`, current agent-transcripts (JSONL, Anthropic blocks), read-only, never opens state.vscdb. Node-20-safe (no sqlite). Old SQLite path deferred (needs sql.js + async + real samples). Synthetic fixtures pass; supported awaits real samples.

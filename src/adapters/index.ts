@@ -5,6 +5,7 @@ import { listAllSessionFiles, readTranscriptFromFile, findSubagentFiles } from "
 import { listCodexSessions, parseCodexTranscript } from "./codex.js";
 import { listCopilotSessions, parseCopilotTranscript, copilotFormatIsKnown } from "./copilot.js";
 import { listGeminiSessions, parseGeminiTranscript, geminiFormatIsKnown } from "./gemini.js";
+import { listCursorSessions, parseCursorTranscript, cursorFormatIsKnown } from "./cursor.js";
 
 /**
  * A session adapter turns one coding agent's on-disk session log into the
@@ -79,8 +80,16 @@ export const geminiCliAdapter: SessionAdapter = {
   experimental: true,
 };
 
+/** Cursor — EXPERIMENTAL. Current agent-transcripts (JSONL, Anthropic-shaped); old SQLite deferred. */
+export const cursorAdapter: SessionAdapter = {
+  tool: "cursor",
+  listSessions: (cwd) => listCursorSessions(cwd),
+  parse: (sessionFile) => parseCursorTranscript(sessionFile),
+  experimental: true,
+};
+
 /** Experimental adapters: reader exists, awaiting real+planted+clean fixtures. */
-export const EXPERIMENTAL_ADAPTERS: SessionAdapter[] = [copilotCliAdapter, geminiCliAdapter];
+export const EXPERIMENTAL_ADAPTERS: SessionAdapter[] = [copilotCliAdapter, geminiCliAdapter, cursorAdapter];
 
 /**
  * Tools deliberately NOT read yet, with the honest reason. Kept as data (not
@@ -89,9 +98,8 @@ export const EXPERIMENTAL_ADAPTERS: SessionAdapter[] = [copilotCliAdapter, gemin
  */
 export const UNSUPPORTED_TOOLS: { tool: string; reason: string }[] = [
   { tool: "aider", reason: "history is a Markdown transcript (.aider.chat.history.md), not structured events — needs a prose parser, not a field mapping" },
-  { tool: "opencode", reason: "stores sessions in a SQLite DB (opencode.db) since v1.2.0 (per-record JSON before) — needs a SQLite reader, version-dependent" },
-  { tool: "cursor", reason: "IDE-embedded; chat history lives in undocumented internal state that changes across Cursor versions — real ongoing maintenance, out of scope for this pass" },
-  { tool: "windsurf", reason: "IDE-embedded; history in undocumented internal state, same as Cursor" },
+  { tool: "opencode", reason: "stores sessions in a SQLite DB (opencode.db) — needs a WASM sqlite reader; planned next" },
+  { tool: "windsurf", reason: "IDE-embedded; history in undocumented internal state, same as old Cursor" },
 ];
 
 export interface LatestSession {
@@ -186,6 +194,9 @@ export function parseSessionFile(file: string): TranscriptEvent[] {
   // records (with their own `content`, unlike Claude's `message.content`).
   // Confirmed by a known-format check so a Claude/other log is never mis-read.
   if (geminiFormatIsKnown(file)) return parseGeminiTranscript(file);
+  // Cursor agent-transcript: a JSONL line `{role, content:[...]}` with no Claude
+  // `message` wrapper and no `type`. Gated the same way.
+  if (cursorFormatIsKnown(file)) return parseCursorTranscript(file);
   return readTranscriptFromFile(file);
 }
 
