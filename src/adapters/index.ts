@@ -4,6 +4,7 @@ import type { TranscriptEvent } from "../types.js";
 import { listAllSessionFiles, readTranscriptFromFile, findSubagentFiles } from "../parsers/transcriptParser.js";
 import { listCodexSessions, parseCodexTranscript } from "./codex.js";
 import { listCopilotSessions, parseCopilotTranscript, copilotFormatIsKnown } from "./copilot.js";
+import { listGeminiSessions, parseGeminiTranscript, geminiFormatIsKnown } from "./gemini.js";
 
 /**
  * A session adapter turns one coding agent's on-disk session log into the
@@ -70,8 +71,16 @@ export const copilotCliAdapter: SessionAdapter = {
 /** Adapters with a verified, tested parser — these auto-detect the newest session. */
 export const ADAPTERS: SessionAdapter[] = [claudeCodeAdapter, codexAdapter];
 
+/** Gemini CLI — EXPERIMENTAL. Our reader; format per cli-continues (MIT, pinned). */
+export const geminiCliAdapter: SessionAdapter = {
+  tool: "gemini-cli",
+  listSessions: (cwd) => listGeminiSessions(cwd),
+  parse: (sessionFile) => parseGeminiTranscript(sessionFile),
+  experimental: true,
+};
+
 /** Experimental adapters: reader exists, awaiting real+planted+clean fixtures. */
-export const EXPERIMENTAL_ADAPTERS: SessionAdapter[] = [copilotCliAdapter];
+export const EXPERIMENTAL_ADAPTERS: SessionAdapter[] = [copilotCliAdapter, geminiCliAdapter];
 
 /**
  * Tools deliberately NOT read yet, with the honest reason. Kept as data (not
@@ -79,7 +88,6 @@ export const EXPERIMENTAL_ADAPTERS: SessionAdapter[] = [copilotCliAdapter];
  * and why, and so adding one later is a visible change here.
  */
 export const UNSUPPORTED_TOOLS: { tool: string; reason: string }[] = [
-  { tool: "gemini-cli", reason: "session-log path is known (~/.gemini/tmp/<hash>/chats/*.json) but the per-line JSON schema is unverified — not parsed, to avoid fabricating events" },
   { tool: "aider", reason: "history is a Markdown transcript (.aider.chat.history.md), not structured events — needs a prose parser, not a field mapping" },
   { tool: "opencode", reason: "stores sessions in a SQLite DB (opencode.db) since v1.2.0 (per-record JSON before) — needs a SQLite reader, version-dependent" },
   { tool: "cursor", reason: "IDE-embedded; chat history lives in undocumented internal state that changes across Cursor versions — real ongoing maintenance, out of scope for this pass" },
@@ -174,6 +182,10 @@ export function parseSessionFile(file: string): TranscriptEvent[] {
   } catch {
     /* first line is not JSON: treat as a Claude transcript below */
   }
+  // Gemini CLI: a `{messages:[...]}` JSON or JSONL of `type:'gemini'|'user'`
+  // records (with their own `content`, unlike Claude's `message.content`).
+  // Confirmed by a known-format check so a Claude/other log is never mis-read.
+  if (geminiFormatIsKnown(file)) return parseGeminiTranscript(file);
   return readTranscriptFromFile(file);
 }
 
