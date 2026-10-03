@@ -372,12 +372,14 @@ export function renderProjectAudit(pa: ProjectAudit, md = false): string {
     out.push("  (none — no CLAUDE.md / AGENTS.md / Cursor / Copilot / Windsurf / Gemini rules on the path)");
   } else {
     for (const g of loaded) {
-      out.push(`  loaded    ${g.format} · ${g.ruleCount} rule${g.ruleCount === 1 ? "" : "s"}  (${g.path})`);
+      // Memory and subfolder rows now come through the load graph itself, so
+      // they are listed here like any other source (no separate memory line).
+      const scoped = g.note ? ` · ${g.note}` : "";
+      out.push(`  loaded    ${g.format} · ${g.ruleCount} rule${g.ruleCount === 1 ? "" : "s"}${scoped}  (${g.path})`);
     }
     for (const g of shadowed) {
       out.push(`  ignored   ${g.format} · ${g.note}  (${g.path})`);
     }
-    if (pa.memoryRules > 0) out.push(`  loaded    Claude memory · ${pa.memoryRules} rule${pa.memoryRules === 1 ? "" : "s"}`);
   }
   out.push("");
 
