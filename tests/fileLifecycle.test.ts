@@ -248,7 +248,7 @@ describe("a shell mutation inside a temp directory is still a temp file", () => 
     // command still failed.
     const real = [
       "cd /tmp && rm -rf loadgap && mkdir -p loadgap/.claude && cd loadgap",
-      "CLI=/Users/shilpa/Desktop/Shilpa/rulereceipt/dist/cli.js",
+      "CLI=/Users/dev/project/dist/cli.js",
       "printf '# Root\\n\\n## 1. Root rule\\n' > .claude/CLAUDE.md",
       "node $CLI check",
     ].join("\n");

@@ -57,7 +57,7 @@ describe("loadMemoryRules", () => {
 
   it("skips user and reference memories (identity and pointers, not rules)", () => {
     const d = memDir(home, ".claude", cwd);
-    writeFileSync(join(d, "who.md"), memFile("user", "Who the user is", "Shilpa is the founder, based in India.", "who"));
+    writeFileSync(join(d, "who.md"), memFile("user", "Who the user is", "The user is the founder of the project.", "who"));
     writeFileSync(join(d, "ref.md"), memFile("reference", "Dashboard", "PostHog dashboard: https://example.com/x", "ref"));
     expect(loadMemoryRules(cwd)).toHaveLength(0);
   });

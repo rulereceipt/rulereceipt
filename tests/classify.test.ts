@@ -408,7 +408,7 @@ DRY_RUN flip rule: Before flipping DRY_RUN=False, you MUST:
 1. Run the Rule 6 pre-flight (restate what changes, what's at risk, what other services
    are affected).
 2. Verify all other services remain DRY_RUN=True (paste evidence).
-3. Wait for Shilpa to say explicit go-ahead — phrases like "verified, go live",
+3. Wait for the user to say explicit go-ahead — phrases like "verified, go live",
    "confirmed, flip it", "make dry run false", or "go live" after a pre-flight count.
 Once all three steps are done, you MAY flip DRY_RUN=False and restart the daemon yourself.`
     );

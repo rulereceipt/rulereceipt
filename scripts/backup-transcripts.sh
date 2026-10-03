@@ -28,9 +28,8 @@ bytes=0
 
 for root in "$HOME"/.claude*/projects; do
   [ -d "$root" ] || continue
-  # Employer sessions are included here deliberately — this is a local backup
-  # on Shilpa's own machine, not a published artefact. Nothing in this script
-  # sends anything anywhere.
+  # This is a local backup on the developer's own machine, not a published
+  # artefact. Nothing in this script sends anything anywhere.
   while IFS= read -r src; do
     rel="${src#"$HOME"/}"
     out="$DEST/$rel"
