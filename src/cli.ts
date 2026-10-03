@@ -235,13 +235,11 @@ async function runCheck(opts: CheckOptions) {
   }
 
   // --transcript is a manual escape hatch for any layout auto-detection
-  // doesn't cover (a real gap found 2026-08-30: a hosted/enterprise Claude
-  // Code variant used ~/.claude-office/ instead of ~/.claude/ — the
-  // multi-root scan in transcriptParser.ts now catches that automatically,
-  // but this flag stays as a fallback for whatever variant shows up next).
-  // Auto-detect the session across every supported tool (Claude Code, Codex),
-  // newest-modified wins — the same rule the Claude reader already applies
-  // across .claude vs .claude-office, now extended across tools. A
+  // doesn't cover (e.g. a hosted/enterprise Claude Code variant writing to a
+  // non-standard home; configure it via RULERECEIPT_CLAUDE_HOMES, or point this
+  // flag straight at the file). Auto-detect the session across every supported
+  // tool (Claude Code, Codex), newest-modified wins — the same rule the Claude
+  // reader applies across every configured home, now extended across tools. A
   // Claude-only machine picks exactly the file and events it always did.
   const latestSession = transcriptOverride ? null : findLatestSession(cwd);
   const sessionFilePath = transcriptOverride ?? latestSession?.file ?? null;

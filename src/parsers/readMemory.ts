@@ -1,7 +1,6 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
-import { homedir } from "node:os";
 import { join, basename } from "node:path";
-import { findClaudeHomeDirNames } from "./transcriptParser.js";
+import { claudeHomes } from "./transcriptParser.js";
 import type { Rule } from "../types.js";
 
 /**
@@ -71,9 +70,8 @@ export function memoryGraphEntry(cwd: string): { path: string; ruleCount: number
   const ruleCount = loadMemoryRules(cwd).length;
   if (ruleCount === 0) return null;
   const encoded = cwd.replace(/\//g, "-");
-  for (const dirName of findClaudeHomeDirNames()) {
-    if (/office/i.test(dirName)) continue; // never office (project rule)
-    const memoryDir = join(homedir(), dirName, "projects", encoded, "memory");
+  for (const base of claudeHomes()) {
+    const memoryDir = join(base, "projects", encoded, "memory");
     try {
       if (statSync(memoryDir).isDirectory()) return { path: memoryDir, ruleCount };
     } catch {
@@ -88,9 +86,8 @@ export function loadMemoryRules(cwd: string): Rule[] {
   const seenIds = new Set<string>();
   const encoded = cwd.replace(/\//g, "-");
 
-  for (const dirName of findClaudeHomeDirNames()) {
-    if (/office/i.test(dirName)) continue; // never office (project rule)
-    const memoryDir = join(homedir(), dirName, "projects", encoded, "memory");
+  for (const base of claudeHomes()) {
+    const memoryDir = join(base, "projects", encoded, "memory");
 
     let files: string[];
     try {

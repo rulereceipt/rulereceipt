@@ -1,6 +1,6 @@
 import { readFileSync, readdirSync, statSync, realpathSync, existsSync } from "node:fs";
 import { homedir } from "node:os";
-import { join, dirname, basename, sep } from "node:path";
+import { join, dirname, basename, sep, isAbsolute } from "node:path";
 import { parseTranscriptText } from "./transcriptLine.js";
 import type { TranscriptEvent } from "../types.js";
 
@@ -19,20 +19,13 @@ import type { TranscriptEvent } from "../types.js";
  * - some assistant entries are API error stubs (isApiErrorMessage: true)
  *   with no real content — skip these.
  *
- * Real gap found 2026-08-30: a hosted/enterprise Claude Code variant on
- * one real machine writes to ~/.claude-office/projects/... instead of
- * ~/.claude/projects/... — same directory-encoding convention, same file
- * format, different root. `rulereceipt check` reported "no session found"
- * on 4 real projects that had extensive real work done, purely because it
- * only ever looked in one root.
- *
- * Hardcoding ".claude-office" specifically would only fix THIS machine's
- * naming — a different org's hosted variant could use any name. Instead,
- * every directory directly under the home dir that starts with ".claude"
- * and has a matching projects/<encoded-cwd> tree is treated as a
- * candidate, and the overall latest file across all of them wins. This
- * generalizes to variants never seen on this machine, at the cost of one
- * extra readdir() of the home directory per check — negligible.
+ * A hosted/enterprise Claude Code variant can write its sessions under a
+ * non-standard home instead of ~/.claude/projects/... — same directory-encoding
+ * convention, same file format, different root. Those homes are searched when
+ * the user names them (CLAUDE_CONFIG_DIR or RULERECEIPT_CLAUDE_HOMES; see
+ * claudeHomes), and the overall latest file across every configured home wins.
+ * Discovery is opt-in rather than guessed from whatever dirs exist on the
+ * machine (see claudeHomes for why).
  */
 
 /**
@@ -97,16 +90,34 @@ function looksLikeProjectRoot(cwd: string): boolean {
   );
 }
 
-/** Absolute paths of every Claude-Code-style home to search, including CLAUDE_CONFIG_DIR. */
-function claudeHomeDirs(): string[] {
-  const dirs = new Set<string>();
-  for (const name of findClaudeHomeDirNames()) dirs.add(join(homedir(), name));
-  const cfg = process.env.CLAUDE_CONFIG_DIR;
-  if (cfg) for (const part of cfg.split(",")) {
-    const p = part.trim();
-    if (p) dirs.add(p);
-  }
-  return [...dirs];
+/**
+ * Absolute paths of every Claude-Code home to search.
+ *
+ * The standard home `~/.claude`, plus `CLAUDE_CONFIG_DIR` (Claude Code's own
+ * override), plus `RULERECEIPT_CLAUDE_HOMES` for anyone running a non-standard
+ * layout — both comma-separated, absolute or relative-to-home.
+ *
+ * It used to glob every `~/.claude*` directory, which swept in whatever extra
+ * homes happened to exist on the machine — including a separate or employer home
+ * the user never meant the tool to read. That also baked one machine's folder
+ * names into the shipped tool. Discovery is now opt-in:
+ * nothing beyond `~/.claude` is read unless the user names it. A hosted or
+ * enterprise variant on a different home is supported by setting
+ * `RULERECEIPT_CLAUDE_HOMES` (or `CLAUDE_CONFIG_DIR`), rather than by guessing.
+ */
+export function claudeHomes(): string[] {
+  const out = new Set<string>();
+  out.add(join(homedir(), ".claude"));
+  const add = (list: string | undefined): void => {
+    if (!list) return;
+    for (const part of list.split(",")) {
+      const p = part.trim();
+      if (p) out.add(isAbsolute(p) ? p : join(homedir(), p));
+    }
+  };
+  add(process.env.CLAUDE_CONFIG_DIR);
+  add(process.env.RULERECEIPT_CLAUDE_HOMES);
+  return [...out];
 }
 
 function listSessionFiles(projectDir: string): string[] {
@@ -129,20 +140,6 @@ function listSessionFiles(projectDir: string): string[] {
     });
 }
 
-/**
- * Also used for the global CLAUDE.md lookup (src/cli.ts) — the same
- * ".claude vs .claude-office" gap applies there too: a hosted/enterprise
- * variant could keep its own global rules file under its own home dir.
- */
-export function findClaudeHomeDirNames(): string[] {
-  try {
-    return readdirSync(homedir(), { withFileTypes: true })
-      .filter((entry) => entry.isDirectory() && entry.name.startsWith(".claude"))
-      .map((entry) => entry.name);
-  } catch {
-    return [];
-  }
-}
 
 /**
  * Every session file that belongs to this project, newest first.
@@ -161,7 +158,7 @@ export function listAllSessionFiles(cwd: string): string[] {
   const files: string[] = [];
   const seen = new Set<string>();
 
-  for (const home of claudeHomeDirs()) {
+  for (const home of claudeHomes()) {
     const projectsDir = join(home, "projects");
     let folders: string[];
     try {

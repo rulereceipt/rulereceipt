@@ -44,38 +44,42 @@ describe("loadMemoryRules", () => {
   });
 
   it("reads a feedback memory as a rule", () => {
-    const d = memDir(home, ".claude-personal", cwd);
+    const d = memDir(home, ".claude", cwd);
     writeFileSync(join(d, "always-branch.md"), memFile("feedback", "Branch before committing", "Always create a branch before committing to `main`.", "branch"));
     expect(loadMemoryRules(cwd).some((r) => /branch before committing/i.test(r.text))).toBe(true);
   });
 
   it("reads a project-type memory as a rule", () => {
-    const d = memDir(home, ".claude-personal", cwd);
+    const d = memDir(home, ".claude", cwd);
     writeFileSync(join(d, "constraint.md"), memFile("project", "DB constraint", "Never DROP the `ledger` table under any circumstances.", "ledger"));
     expect(loadMemoryRules(cwd).some((r) => /never drop/i.test(r.text))).toBe(true);
   });
 
   it("skips user and reference memories (identity and pointers, not rules)", () => {
-    const d = memDir(home, ".claude-personal", cwd);
+    const d = memDir(home, ".claude", cwd);
     writeFileSync(join(d, "who.md"), memFile("user", "Who the user is", "Shilpa is the founder, based in India.", "who"));
     writeFileSync(join(d, "ref.md"), memFile("reference", "Dashboard", "PostHog dashboard: https://example.com/x", "ref"));
     expect(loadMemoryRules(cwd)).toHaveLength(0);
   });
 
   it("skips the MEMORY.md index file", () => {
-    const d = memDir(home, ".claude-personal", cwd);
+    const d = memDir(home, ".claude", cwd);
     writeFileSync(join(d, "MEMORY.md"), "- [Branch rule](always-branch.md) — hook\n");
     expect(loadMemoryRules(cwd)).toHaveLength(0);
   });
 
-  it("never reads an office home dir's memory", () => {
+  it("does not read a non-standard home's memory unless it is configured", () => {
+    // Discovery is opt-in: an employer's .claude-office (or any home that isn't
+    // ~/.claude) is never read unless the user names it via
+    // RULERECEIPT_CLAUDE_HOMES. Here it is not configured, so its memory is
+    // invisible — which for RuleReceipt also keeps employer memory out by default.
     const d = memDir(home, ".claude-office", cwd);
     writeFileSync(join(d, "office.md"), memFile("feedback", "Office rule", "Always deploy through the office pipeline.", "office"));
     expect(loadMemoryRules(cwd)).toHaveLength(0);
   });
 
   it("labels memory rules as project source", () => {
-    const d = memDir(home, ".claude-personal", cwd);
+    const d = memDir(home, ".claude", cwd);
     writeFileSync(join(d, "m.md"), memFile("feedback", "A rule", "Always run `npm test` before pushing.", "test"));
     expect(loadMemoryRules(cwd).every((r) => r.source === "project")).toBe(true);
   });
@@ -84,7 +88,7 @@ describe("loadMemoryRules", () => {
     const proj = mkdtempSync(join(tmpdir(), "rr-mem-proj-"));
     mkdirSync(join(proj, ".git"));
     writeFileSync(join(proj, "CLAUDE.md"), "## Rules\n- file-rule-marker\n");
-    const d = memDir(home, ".claude-personal", proj);
+    const d = memDir(home, ".claude", proj);
     writeFileSync(join(d, "m.md"), memFile("feedback", "Memory rule", "Always surface memory-rule-marker first.", "mm"));
     const rules = loadRules(proj);
     expect(rules.some((r) => /file-rule-marker/.test(r.text) || /file-rule-marker/.test(r.title))).toBe(true);
