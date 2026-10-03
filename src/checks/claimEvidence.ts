@@ -132,7 +132,13 @@ const ACTION_CLAIMS: Array<{ label: string; claim: RegExp; exclude: RegExp; comm
     // having read a source (finding #7, 2026-09-26). "PAGES READ: <n>" and
     // "STATUS: READ IN FULL" are the real provenance forms and still count.
     claim: /\b(?:i|we)(?:'ve|’ve| have| had)?\s+(?:\w+ly\s+|just\s+|already\s+|then\s+|also\s+|now\s+)*read\b|^\s*pages?\s+read\s*:\s*(?:[\d\s,-]+|read\s+in\s+full)|^\s*status\s*:\s*read\s+in\s+full|\bread\s+in\s+full\b|\bconfirmed\s+at\s+source\b/im,
-    exclude: /\b(?:will|going\s+to|need\s+to|should|next|plan\s+to|about\s+to|let\s+me|i'?ll|we'?ll)\s+(?:\w+\s+){0,3}read\b/i,
+    // The future tense makes a read a plan, not a claim. Beyond the explicit
+    // modals, a near-future TIME expression ("in a couple minutes", "shortly")
+    // is the same signal written in present tense: "download it and I read it
+    // in a couple minutes and tell you" is a plan. Found dogfooding 2026-10-03
+    // — it fired on a casual planning message and, via the shared fabricated
+    // state, FAILed three unrelated rules at once (claimEvidenceFutureRead.test).
+    exclude: /\b(?:will|going\s+to|need\s+to|should|next|plan\s+to|about\s+to|let\s+me|i'?ll|we'?ll)\s+(?:\w+\s+){0,3}read\b|\bin\s+(?:a\s+)?(?:couple|few|several)?\s*(?:of\s+)?(?:minutes?|mins?|moments?|seconds?|secs?|hours?|a\s+(?:minute|moment|bit|sec|second|while))\b|\b(?:shortly|momentarily|in\s+a\s+bit)\b/i,
     command: /\b(?:cat|head|tail|less|more|bat|nl|strings|pdftotext|xxd|od)\b/i,
   },
 ];
