@@ -171,6 +171,15 @@ check "not-visible break: shown as Rule not visible + a fix" 'echo "$NV" | grep 
 jbash "git push origin main" > "$PV/thin.jsonl"
 check "thin log: can't-tell stays Broken, exit 1"       '[ "$(rc "$PV" check --transcript thin.jsonl)" = "1" ]'
 
+echo "== health (rules lint: contradictions + duplicates) =="
+PHC="$(newproj phc '## 1. Lockfile on\nAlways pass `--frozen-lockfile` when installing.\n\n## 2. Lockfile off\nNever use `--frozen-lockfile` here.\n')"
+check "health: reports a contradiction"                 'out "$PHC" health | grep -qi "contradiction"'
+check "health: names the conflicting literal"           'out "$PHC" health | grep -q -- "--frozen-lockfile"'
+check "health --strict: exits 1 on a finding"           '[ "$(rc "$PHC" health --strict)" = "1" ]'
+check "health: default exits 0 (advisory)"              '[ "$(rc "$PHC" health)" = "0" ]'
+check "health --json: valid JSON with counts"           'out "$PHC" health --json | node -e "let s=\"\";process.stdin.on(\"data\",d=>s+=d).on(\"end\",()=>{const j=JSON.parse(s);process.exit(j.contradictions>=1?0:1)})"'
+check "health: clean project says none, exits 0"        '[ "$(rc "$PB" health)" = "0" ] && out "$PB" health | grep -qi "No contradictions or duplicate"'
+
 echo "== no stack traces =="
 ALL="$B
 $(out "$PE" check --transcript s.jsonl)

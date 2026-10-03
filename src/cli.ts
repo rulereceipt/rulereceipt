@@ -13,6 +13,7 @@ import { adviseRules } from "./checkability.js";
 import { shadowedAgentsMd } from "./shadowedAgents.js";
 import { auditSessions, renderComplianceReport } from "./report/complianceReport.js";
 import { auditProject, renderProjectAudit } from "./audit.js";
+import { runHealth, renderHealth } from "./health.js";
 import { evaluateSession } from "./evaluate.js";
 import { buildWrongReport, findTarget, reportedLabel } from "./wrong.js";
 import { ghReady, issueTitle, issueCreateArgs, buildMailto, mailtoSubject } from "./wrongSubmit.js";
@@ -1147,6 +1148,24 @@ program
       return;
     }
     console.log(renderProjectAudit(a, Boolean(opts.markdown)));
+  });
+
+program
+  .command("health")
+  .description(
+    "Lint your rules AGAINST EACH OTHER — NO session needed. Finds contradictions (the same command/branch/path required by one rule and forbidden by another, so no session can satisfy both) and duplicate rules (the same rule pasted twice, or copied from global into project). Deterministic and low-false-alarm by design: it only reports conflicts it is certain about. Separate from `audit` (does a rule load, is it checkable) and `check` (judges a session). Advisory: exits 0 unless you pass --strict."
+  )
+  .option("--markdown", "output as markdown, for a report you can send")
+  .option("--json", "output machine-readable JSON (findings + counts)")
+  .option("--strict", "exit 1 when any contradiction or duplicate is found (for CI); default exits 0")
+  .action((opts) => {
+    const report = runHealth(loadRules(process.cwd()));
+    if (opts.json) {
+      console.log(JSON.stringify(report, null, 2));
+    } else {
+      console.log(renderHealth(report, Boolean(opts.markdown)));
+    }
+    if (opts.strict && report.findings.length > 0) process.exitCode = 1;
   });
 
 program
