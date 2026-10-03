@@ -191,3 +191,12 @@ permission controls — a `Read(./.env)`-style **deny** rule (and keeping secret
 of the working tree) stops the read at the platform level, whether or not the command
 names the file. RuleReceipt's job is the receipt: what was asked, what the agent did,
 and where it broke a rule it could be held to.
+
+## Compressed Codex rollouts and real-rollout validation
+
+Codex stores a compacted session as a Zstandard-compressed `rollout-*.jsonl.zst`.
+RuleReceipt now reads those (via `node:zlib` zstd), but that needs **Node 22.15 or
+newer** — on an older Node the compressed files are skipped with a one-line note,
+not read. Codex support as a whole is still **experimental**: it has been verified
+against the documented format and synthetic fixtures, not yet against a real
+end-to-end Codex rollout, so treat Codex verdicts as provisional until that check.

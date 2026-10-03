@@ -1,7 +1,45 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import * as zlib from "node:zlib";
 import type { TranscriptEvent } from "../types.js";
+
+/**
+ * Codex stores rollouts as plain `rollout-*.jsonl` and, once a session is
+ * compacted/paginated, Zstandard-compressed `rollout-*.jsonl.zst`. Reading the
+ * compressed form needs `node:zlib`'s zstd support, added in Node 22.15 / 23.8.
+ * On an older Node it is simply absent — we skip those files with one note
+ * rather than crash. (The package's floor is Node 20.)
+ */
+const zstdDecompressSync: ((buf: Buffer) => Buffer) | undefined =
+  (zlib as unknown as { zstdDecompressSync?: (buf: Buffer) => Buffer }).zstdDecompressSync;
+let warnedNoZstd = false;
+
+/**
+ * Read a rollout file as text, decompressing a `.jsonl.zst` with zstd. Returns
+ * null when the file can't be read — unreadable on disk, or compressed on a Node
+ * without zstd (noted once). Callers treat null as "no events / no cwd", never a
+ * crash.
+ */
+function readRolloutText(filePath: string): string | null {
+  try {
+    if (filePath.endsWith(".zst")) {
+      if (!zstdDecompressSync) {
+        if (!warnedNoZstd) {
+          warnedNoZstd = true;
+          process.stderr.write(
+            "rulereceipt: compressed Codex rollouts (.jsonl.zst) need Node >= 22.15 for zstd; skipping them. Upgrade Node to include them.\n"
+          );
+        }
+        return null;
+      }
+      return zstdDecompressSync(readFileSync(filePath)).toString("utf-8");
+    }
+    return readFileSync(filePath, "utf-8");
+  } catch {
+    return null;
+  }
+}
 
 /**
  * OpenAI Codex CLI session adapter.
@@ -191,12 +229,8 @@ export function parseCodexLine(line: string): TranscriptEvent[] {
 }
 
 export function parseCodexTranscript(filePath: string): TranscriptEvent[] {
-  let raw: string;
-  try {
-    raw = readFileSync(filePath, "utf-8");
-  } catch {
-    return [];
-  }
+  const raw = readRolloutText(filePath);
+  if (raw === null) return [];
   const events: TranscriptEvent[] = [];
   for (const line of raw.split("\n")) {
     if (!line.trim()) continue;
@@ -207,12 +241,8 @@ export function parseCodexTranscript(filePath: string): TranscriptEvent[] {
 
 /** The cwd a rollout file was recorded in, from its first `session_meta` line. */
 function sessionCwd(filePath: string): string | null {
-  let raw: string;
-  try {
-    raw = readFileSync(filePath, "utf-8");
-  } catch {
-    return null;
-  }
+  const raw = readRolloutText(filePath);
+  if (raw === null) return null;
   const firstLine = raw.split("\n", 1)[0];
   if (!firstLine) return null;
   try {
@@ -242,7 +272,7 @@ function collectRolloutFiles(dir: string, out: string[]): void {
   for (const entry of entries) {
     const full = join(dir, entry.name);
     if (entry.isDirectory()) collectRolloutFiles(full, out);
-    else if (entry.isFile() && entry.name.startsWith("rollout-") && entry.name.endsWith(".jsonl")) out.push(full);
+    else if (entry.isFile() && entry.name.startsWith("rollout-") && (entry.name.endsWith(".jsonl") || entry.name.endsWith(".jsonl.zst"))) out.push(full);
   }
 }
 
