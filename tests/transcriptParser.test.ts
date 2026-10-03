@@ -26,10 +26,13 @@ describe("findLatestSessionFile across multiple Claude home directory variants",
   const projectCwd = "/fake/project/path";
   const encoded = projectCwd.replace(/\//g, "-");
   let tempHome: string;
+  let prevExtra: string | undefined;
 
   beforeEach(() => {
     tempHome = mkdtempSync(join(tmpdir(), "rulereceipt-home-test-"));
     homeState.current = tempHome;
+    prevExtra = process.env.RULERECEIPT_CLAUDE_HOMES;
+    delete process.env.RULERECEIPT_CLAUDE_HOMES;
   });
 
   const realHome = homeState.current;
@@ -40,6 +43,8 @@ describe("findLatestSessionFile across multiple Claude home directory variants",
     // rely on the actual home directory) aren't left pointed at a
     // now-deleted temp dir
     homeState.current = realHome;
+    if (prevExtra === undefined) delete process.env.RULERECEIPT_CLAUDE_HOMES;
+    else process.env.RULERECEIPT_CLAUDE_HOMES = prevExtra;
   });
 
   function writeSession(homeDirName: string, sessionName: string, content: string, mtime: Date) {
@@ -60,35 +65,38 @@ describe("findLatestSessionFile across multiple Claude home directory variants",
     expect(findLatestSessionFile(projectCwd)).toBe(filePath);
   });
 
-  // this is the real gap found 2026-08-30: a hosted/office Claude Code
-  // variant writes here instead, and the tool must still find it
-  it("finds a session under ~/.claude-office/projects when .claude has nothing", () => {
+  // Discovery is opt-in: a non-standard home is NOT searched unless the user
+  // names it. The old behaviour globbed every ~/.claude* dir, reading homes the
+  // user never meant it to (including an employer's).
+  it("does NOT find a session under a non-standard home by default", () => {
+    writeSession(".claude-office", "a.jsonl", "{}", new Date());
+    expect(findLatestSessionFile(projectCwd)).toBeNull();
+  });
+
+  it("finds a session under an extra home ONLY when RULERECEIPT_CLAUDE_HOMES names it", () => {
     const filePath = writeSession(".claude-office", "a.jsonl", "{}", new Date());
+    process.env.RULERECEIPT_CLAUDE_HOMES = ".claude-office";
     expect(findLatestSessionFile(projectCwd)).toBe(filePath);
   });
 
-  it("picks the overall most recent session across both locations, not just the first root checked", () => {
+  it("picks the overall most recent across ~/.claude and a configured extra home", () => {
     writeSession(".claude", "older.jsonl", "{}", new Date("2026-01-01"));
-    const newerPath = writeSession(".claude-office", "newer.jsonl", "{}", new Date("2026-06-01"));
+    const newerPath = writeSession(".claude-work", "newer.jsonl", "{}", new Date("2026-06-01"));
+    process.env.RULERECEIPT_CLAUDE_HOMES = ".claude-work";
     expect(findLatestSessionFile(projectCwd)).toBe(newerPath);
   });
 
-  // proves this generalizes beyond the two names seen on the machine this
-  // was found on — a different org's variant could be named anything
-  // starting with ".claude", and this must still find it without a
-  // hardcoded name list
-  it("finds a session under a never-hardcoded .claude-prefixed directory name", () => {
+  // A configured home can be named anything — the name is the user's, not a
+  // guess baked into the tool.
+  it("finds a session under a configured home of any name", () => {
     const filePath = writeSession(".claude-some-other-orgs-variant", "a.jsonl", "{}", new Date());
+    process.env.RULERECEIPT_CLAUDE_HOMES = ".claude-some-other-orgs-variant";
     expect(findLatestSessionFile(projectCwd)).toBe(filePath);
   });
 
-  it("ignores a directory that merely starts with .claude in name but isn't actually one (sanity check)", () => {
-    // ".clauded" starts with ".claude" as a string prefix but is a
-    // realistic near-miss; it should still be picked up since the
-    // implementation matches by prefix, not exact names — this documents
-    // that behavior rather than asserting the opposite
-    const filePath = writeSession(".clauded", "a.jsonl", "{}", new Date());
-    expect(findLatestSessionFile(projectCwd)).toBe(filePath);
+  it("does not search a .claude-prefixed dir that was never configured", () => {
+    writeSession(".clauded", "a.jsonl", "{}", new Date());
+    expect(findLatestSessionFile(projectCwd)).toBeNull();
   });
 });
 

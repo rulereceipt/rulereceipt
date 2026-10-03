@@ -2,7 +2,7 @@ import { homedir } from "node:os";
 import { dirname, join, parse, relative, resolve } from "node:path";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { parseClaudeMd } from "./parsers/readClaudeMd.js";
-import { findClaudeHomeDirNames } from "./parsers/transcriptParser.js";
+import { claudeHomes } from "./parsers/transcriptParser.js";
 import { loadMemoryRules, memoryGraphEntry } from "./parsers/readMemory.js";
 import { resolveImports } from "./parsers/imports.js";
 import type { Rule } from "./types.js";
@@ -340,11 +340,11 @@ function scopedRuleFilesBelow(cwd: string): { path: string; scopeGlob: string }[
 }
 
 /**
- * Global rules come from every .claude*-prefixed home dir found, not just
- * ~/.claude — a hosted/enterprise Claude Code variant can keep its own
- * global CLAUDE.md under its own home dir (e.g. ~/.claude-office/CLAUDE.md).
- * Real gap found 2026-08-30, same root cause as the transcript-lookup fix
- * in transcriptParser.ts: hardcoding one home-dir name misses any variant.
+ * Global rules come from every configured Claude home (see claudeHomes): the
+ * standard ~/.claude, plus any the user names via CLAUDE_CONFIG_DIR or
+ * RULERECEIPT_CLAUDE_HOMES — so a hosted/enterprise variant with its own global
+ * CLAUDE.md is supported when the user points at it, rather than by scanning
+ * whatever ~/.claude* dirs happen to exist on the machine.
  *
  * Also reads ~/.claude/rules/*.md, the documented location for personal
  * rules that apply across every project.
@@ -377,8 +377,7 @@ export function loadRules(cwd: string): Rule[] {
     rules.push(...parsed);
   };
 
-  for (const dirName of findClaudeHomeDirNames()) {
-    const base = join(homedir(), dirName);
+  for (const base of claudeHomes()) {
     read(join(base, "CLAUDE.md"), "global");
     for (const file of markdownFilesIn(join(base, "rules"))) read(file, "global");
   }
@@ -441,8 +440,7 @@ export function describeRuleSources(cwd: string): LoadGraphEntry[] {
 
   // Globals first, so a file reachable both ways keeps its "global" label —
   // mirrors loadRules' dedup order exactly.
-  for (const dirName of findClaudeHomeDirNames()) {
-    const base = join(homedir(), dirName);
+  for (const base of claudeHomes()) {
     if (existsSync(join(base, "CLAUDE.md"))) add({ path: join(base, "CLAUDE.md"), status: "loaded", format: "Claude (global CLAUDE.md)" }, "global");
     for (const file of markdownFilesIn(join(base, "rules"))) add({ path: file, status: "loaded", format: "Claude (global rules)" }, "global");
   }

@@ -119,7 +119,7 @@ export interface LatestSession {
 /**
  * The single most recently modified session across ALL supported tools for
  * this cwd — the same "newest wins" rule the Claude reader already uses across
- * `.claude` vs `.claude-office`, now extended across tools. Returns null only
+ * every configured Claude home, now extended across tools. Returns null only
  * when no supported tool has a session for this project (the caller then asks
  * or reports "no session found").
  */

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Copy Claude Code session transcripts somewhere Claude Code does not manage.
 #
-# Written after a 233 MB transcript disappeared from
-# ~/.claude-personal/projects between 2026-09-16 and 2026-09-20. Nothing here
-# deleted it; it was the largest session on the machine and then it was gone.
+# Written after a 233 MB transcript disappeared from a Claude Code projects
+# directory between 2026-09-16 and 2026-09-20. Nothing here deleted it; it was
+# the largest session on the machine and then it was gone.
 #
 # Two reasons this matters beyond sentiment. The measurement scripts in this
 # repo read these files, so a vanished transcript silently changes a published

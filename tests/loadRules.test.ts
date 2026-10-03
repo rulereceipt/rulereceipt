@@ -16,21 +16,26 @@ vi.mock("node:os", async (importOriginal) => {
   return { ...actual, homedir: () => homeState.current };
 });
 
-describe("loadRules collects global CLAUDE.md from every .claude*-prefixed home dir", () => {
+describe("loadRules reads ~/.claude by default and extra homes only when configured", () => {
   let tempHome: string;
   let projectDir: string;
   const realHome = homeState.current;
+  let prevExtra: string | undefined;
 
   beforeEach(() => {
     tempHome = mkdtempSync(join(tmpdir(), "rulereceipt-loadrules-home-"));
     projectDir = mkdtempSync(join(tmpdir(), "rulereceipt-loadrules-project-"));
     homeState.current = tempHome;
+    prevExtra = process.env.RULERECEIPT_CLAUDE_HOMES;
+    delete process.env.RULERECEIPT_CLAUDE_HOMES;
   });
 
   afterEach(() => {
     rmSync(tempHome, { recursive: true, force: true });
     rmSync(projectDir, { recursive: true, force: true });
     homeState.current = realHome;
+    if (prevExtra === undefined) delete process.env.RULERECEIPT_CLAUDE_HOMES;
+    else process.env.RULERECEIPT_CLAUDE_HOMES = prevExtra;
   });
 
   // marker-text based rather than asserting an exact title, since exact
@@ -56,26 +61,36 @@ describe("loadRules collects global CLAUDE.md from every .claude*-prefixed home 
     expect(hasMarker(loadRules(projectDir), "standard-marker", "global")).toBe(true);
   });
 
-  // the real gap: a hosted/office variant's own global CLAUDE.md must
-  // also be found, not just the standard one
-  it("finds a global CLAUDE.md under a non-standard .claude-office location", () => {
-    writeGlobalClaudeMd(".claude-office", "office-marker");
-    expect(hasMarker(loadRules(projectDir), "office-marker", "global")).toBe(true);
+  // Discovery is opt-in now: a non-standard home (a per-user .claude-personal,
+  // an employer .claude-office, a hosted variant) is NOT read unless the user
+  // names it. The old behaviour globbed every ~/.claude* dir, which baked one
+  // machine's folder names into the tool and read homes the user never meant it
+  // to — including an employer's.
+  it("does NOT read a non-standard home by default", () => {
+    writeGlobalClaudeMd(".claude-work", "work-marker");
+    expect(hasMarker(loadRules(projectDir), "work-marker", "global")).toBe(false);
   });
 
-  it("collects global rules from BOTH locations when both exist, not just one", () => {
+  it("reads an extra home ONLY when RULERECEIPT_CLAUDE_HOMES names it", () => {
+    writeGlobalClaudeMd(".claude-work", "work-marker");
+    process.env.RULERECEIPT_CLAUDE_HOMES = ".claude-work";
+    expect(hasMarker(loadRules(projectDir), "work-marker", "global")).toBe(true);
+  });
+
+  it("collects global rules from ~/.claude AND a configured extra home", () => {
     writeGlobalClaudeMd(".claude", "standard-marker");
-    writeGlobalClaudeMd(".claude-office", "office-marker");
+    writeGlobalClaudeMd(".claude-work", "work-marker");
+    process.env.RULERECEIPT_CLAUDE_HOMES = ".claude-work";
     const rules = loadRules(projectDir);
     expect(hasMarker(rules, "standard-marker", "global")).toBe(true);
-    expect(hasMarker(rules, "office-marker", "global")).toBe(true);
+    expect(hasMarker(rules, "work-marker", "global")).toBe(true);
   });
 
-  it("still finds project-level CLAUDE.md alongside global rules from any home dir", () => {
-    writeGlobalClaudeMd(".claude-office", "office-marker");
+  it("still finds project-level CLAUDE.md alongside the standard global home", () => {
+    writeGlobalClaudeMd(".claude", "standard-marker");
     writeFileSync(join(projectDir, "CLAUDE.md"), "## Rule\n- project-marker\n");
     const rules = loadRules(projectDir);
-    expect(hasMarker(rules, "office-marker", "global")).toBe(true);
+    expect(hasMarker(rules, "standard-marker", "global")).toBe(true);
     expect(hasMarker(rules, "project-marker", "project")).toBe(true);
   });
 
