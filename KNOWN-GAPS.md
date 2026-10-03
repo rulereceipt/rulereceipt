@@ -169,3 +169,25 @@ CLAUDE.local.md shadows a sibling AGENTS.md), but does not yet model a parent
 CLAUDE.md shadowing an AGENTS.md in a child directory. If you keep a CLAUDE.md at
 the repo root and an AGENTS.md in a subfolder, RuleReceipt may still read that
 AGENTS.md. Workaround: don't rely on an AGENTS.md below a CLAUDE.md.
+
+## The guard can only block a read it can see the target of
+
+The PreToolUse guard refuses a command when the command text **names** a protected
+file or branch — `cat .env`, `git push origin main`. It cannot block a read whose
+target is not in the command, because there is nothing to match:
+
+- a recursive search — `grep -r SECRET .`, `rg --files | xargs cat`;
+- a glob or find that opens files by pattern — `find . -name "*.pem" -exec cat {} \;`;
+- a script, Makefile target, or interpreter that opens files by a path it computes
+  at runtime — `python dump.py`, `npm run export`;
+- an archive of a whole directory — `tar czf out.tgz .`, `zip -r out.zip .`.
+
+Each of these can read a file a rule protects without ever spelling its path, so the
+guard sees nothing to deny. This is a limit of command-text matching, not a bug: the
+guard detects and blocks a **named** action, it is not a filesystem sandbox.
+
+For real secrets, do not rely on this guard. Use Claude Code's own sandbox and
+permission controls — a `Read(./.env)`-style **deny** rule (and keeping secrets out
+of the working tree) stops the read at the platform level, whether or not the command
+names the file. RuleReceipt's job is the receipt: what was asked, what the agent did,
+and where it broke a rule it could be held to.
