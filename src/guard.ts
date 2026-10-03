@@ -8,6 +8,7 @@ import { loadOverrides, ruleFingerprint, ratifiedForbids } from "./overrides.js"
 import { commandRunsLiteral } from "./checks/proposedAction.js";
 import { approvalOccurrences, allowListed, approvalCommandShort, approvalScopedBranch } from "./checks/approvalGate.js";
 import { readTranscriptFromFile } from "./parsers/transcriptParser.js";
+import { touchedPaths, ruleWasLoaded } from "./checks/pathScope.js";
 import { execFileSync } from "node:child_process";
 
 /**
@@ -108,8 +109,28 @@ function forbidRules(cwd: string) {
  * is why the guard cannot drift from the report: same checkers, same
  * verdicts, different tense.
  */
+/**
+ * A path-scoped rule (a subfolder CLAUDE.md, or `paths:`/`globs:` frontmatter)
+ * only governs its own subtree. The guard must honour that: enforcing it on an
+ * action OUTSIDE the subtree is a false-block — the live-blocking equivalent of
+ * a false accusation. Found 2026-10-03: subfolder-rule discovery (0.1.88) made
+ * loadRules return those scoped rules, and the guard applied every forbid
+ * globally, so a demo rule scoped to one subtree blocked an edit elsewhere.
+ *
+ * Direction of error, deliberately toward NOT blocking: an unscoped rule always
+ * applies; a scoped rule applies only when the proposed action's touched path is
+ * inside the scope. A Bash command exposes no file path to match, so a scoped
+ * rule never fires on one here — under-enforcing a subtree is safe, a false-block
+ * is not. (`check` already path-scopes via this same machinery.)
+ */
+function inScope(rule: Rule, touched: string[]): boolean {
+  if (!rule.paths || rule.paths.length === 0) return true;
+  return ruleWasLoaded(rule.paths, touched);
+}
+
 function structuredBlocks(cwd: string, event: TranscriptEvent): Block[] {
-  const cls = forbidRules(cwd);
+  const touched = touchedPaths([event]);
+  const cls = forbidRules(cwd).filter((c) => inScope(c.rule, touched));
   const of = (k: string) => cls.filter((c) => c.kind === k) as never;
   const results: CheckResult[] = [
     ...runCodeContentChecks(of("codeContent"), [event]),
@@ -293,7 +314,11 @@ export interface GuardDecision {
  * decide — by the current permission mode — whether to ask or to deny.
  */
 function unapprovedGate(cwd: string, command: string, events: TranscriptEvent[]): { rule: Rule; action: string } | null {
-  const gates = classifyRules(loadRules(cwd)).filter((c) => c.kind === "approvalGate") as Array<{ rule: Rule; actions: string[] }>;
+  // A Bash command exposes no file path, so a path-scoped gate (a subfolder rule)
+  // can't be confirmed in-scope and is not enforced here — same no-false-block
+  // reasoning as structuredBlocks' inScope.
+  const gates = (classifyRules(loadRules(cwd)).filter((c) => c.kind === "approvalGate") as Array<{ rule: Rule; actions: string[] }>)
+    .filter((c) => inScope(c.rule, touchedPaths([{ role: "assistant", kind: "tool_use", toolName: "Bash", input: { command }, timestamp: "" }])));
   for (const { rule, actions } of gates) {
     const proposed: TranscriptEvent = { role: "assistant", kind: "tool_use", toolName: "Bash", input: { command }, timestamp: "", permissionMode: "dontAsk" };
     const occ = approvalOccurrences([...events, proposed], actions as never, { scopedBranch: approvalScopedBranch(rule), currentBranch: gitCurrentBranch(cwd) });
