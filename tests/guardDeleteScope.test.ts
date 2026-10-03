@@ -3,7 +3,6 @@ import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { guardDecision } from "../src/guard.js";
-import type { CheckResult } from "../src/types.js";
 
 /**
  * Guard false alarm, dogfooded 2026-10-02: "never wipe the database without
