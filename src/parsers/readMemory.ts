@@ -60,6 +60,29 @@ function parseMemoryFile(raw: string): MemoryFront {
   return { type, name, description, body };
 }
 
+/**
+ * The memory source for the load graph: the first existing non-office memory
+ * dir for this project, and how many rules load from memory in total. Returns
+ * null when memory contributes no rules. Lets `describeRuleSources` list memory
+ * so the load graph matches what `loadRules` actually checks (memory was
+ * omitted before — a reporting gap found 2026-10-03, not a checking gap).
+ */
+export function memoryGraphEntry(cwd: string): { path: string; ruleCount: number } | null {
+  const ruleCount = loadMemoryRules(cwd).length;
+  if (ruleCount === 0) return null;
+  const encoded = cwd.replace(/\//g, "-");
+  for (const dirName of findClaudeHomeDirNames()) {
+    if (/office/i.test(dirName)) continue; // never office (project rule)
+    const memoryDir = join(homedir(), dirName, "projects", encoded, "memory");
+    try {
+      if (statSync(memoryDir).isDirectory()) return { path: memoryDir, ruleCount };
+    } catch {
+      /* no memory dir under this home: try the next */
+    }
+  }
+  return null;
+}
+
 export function loadMemoryRules(cwd: string): Rule[] {
   const rules: Rule[] = [];
   const seenIds = new Set<string>();

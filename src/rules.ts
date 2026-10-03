@@ -1,9 +1,9 @@
 import { homedir } from "node:os";
-import { dirname, join, parse, resolve } from "node:path";
+import { dirname, join, parse, relative, resolve } from "node:path";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { parseClaudeMd } from "./parsers/readClaudeMd.js";
 import { findClaudeHomeDirNames } from "./parsers/transcriptParser.js";
-import { loadMemoryRules } from "./parsers/readMemory.js";
+import { loadMemoryRules, memoryGraphEntry } from "./parsers/readMemory.js";
 import { resolveImports } from "./parsers/imports.js";
 import type { Rule } from "./types.js";
 
@@ -256,6 +256,90 @@ function findProjectRuleFiles(cwd: string): string[] {
 }
 
 /**
+ * Directories we never descend into when looking for subfolder rules files:
+ * build output, dependencies, VCS internals, RuleReceipt's own state.
+ */
+const SKIP_DESCEND = new Set([
+  "node_modules", ".git", "dist", "build", ".next", "out", "coverage",
+  ".rulereceipt", ".vercel", ".turbo", "vendor", ".cache", "tmp", ".venv",
+  "__pycache__", "target",
+]);
+// Bounded so scanning a large workspace root can never run away.
+const MAX_DESCEND_DEPTH = 8;
+const MAX_DESCEND_DIRS = 3000;
+
+/**
+ * Every directory strictly BELOW cwd, bounded. The up-walk (`projectLevels`)
+ * covers cwd and its ancestors; this covers its descendants.
+ *
+ * Why descend at all: Claude Code loads a subfolder CLAUDE.md/AGENTS.md on
+ * demand the moment the session touches a file in that subtree (surfaced in the
+ * transcript as a `nested_memory` attachment). The up-only walk never saw
+ * these, so running `check` from a parent dir silently missed every subfolder
+ * rules file — proven 2026-10-03 against real `nested_memory` ground truth
+ * (e.g. `costrr/CLAUDE.md`, `Daily _crypto/CLAUDE.md` loaded while cwd was the
+ * parent workspace). Nested git repos are NOT a stop condition here: Claude's
+ * nested_memory loads a nested-repo CLAUDE.md too, so we must find it.
+ */
+function descendantLevels(cwd: string): string[] {
+  const out: string[] = [];
+  // Breadth-first on purpose: a shallow subfolder rules file is the common case
+  // and the one most likely to have been loaded, so when the dir budget runs
+  // out on a large workspace root it is the DEEP dirs that are dropped, never
+  // the shallow siblings. (A depth-first walk with the same budget could dive
+  // into one big subtree and starve a sibling's depth-1 CLAUDE.md — the bug this
+  // replaces, caught 2026-10-03 when costrr/ and rulereceipt/ were missed from a
+  // workspace root.)
+  let queue: { dir: string; depth: number }[] = [{ dir: cwd, depth: 0 }];
+  let budget = MAX_DESCEND_DIRS;
+  while (queue.length > 0 && budget > 0) {
+    const next: { dir: string; depth: number }[] = [];
+    for (const { dir, depth } of queue) {
+      if (budget <= 0) break;
+      let entries: import("node:fs").Dirent[];
+      try {
+        entries = readdirSync(dir, { withFileTypes: true });
+      } catch {
+        continue;
+      }
+      for (const e of entries) {
+        if (budget <= 0) break;
+        if (!e.isDirectory()) continue;
+        if (SKIP_DESCEND.has(e.name) || e.name.startsWith(".")) continue; // dotdirs hold tooling, not project subtrees
+        const full = join(dir, e.name);
+        budget--;
+        out.push(full);
+        if (depth + 1 < MAX_DESCEND_DEPTH) next.push({ dir: full, depth: depth + 1 });
+      }
+    }
+    queue = next;
+  }
+  return out;
+}
+
+/** The glob that scopes a subfolder rules file to its own subtree, relative to cwd. */
+function subtreeGlob(cwd: string, dir: string): string {
+  const rel = relative(cwd, dir).replace(/\\/g, "/");
+  return `${rel}/**`;
+}
+
+/**
+ * Subfolder rules files below cwd, each paired with the subtree glob that
+ * scopes it. A subfolder rule is only applied to a session that actually
+ * touched its subtree (the same path-scope machinery as `paths:` frontmatter),
+ * so discovering them can never manufacture a false accusation against a
+ * session that never worked there.
+ */
+function scopedRuleFilesBelow(cwd: string): { path: string; scopeGlob: string }[] {
+  const out: { path: string; scopeGlob: string }[] = [];
+  for (const dir of descendantLevels(cwd)) {
+    const glob = subtreeGlob(cwd, dir);
+    for (const path of ruleFilesAtLevel(dir)) out.push({ path, scopeGlob: glob });
+  }
+  return out;
+}
+
+/**
  * Global rules come from every .claude*-prefixed home dir found, not just
  * ~/.claude — a hosted/enterprise Claude Code variant can keep its own
  * global CLAUDE.md under its own home dir (e.g. ~/.claude-office/CLAUDE.md).
@@ -279,11 +363,18 @@ export function loadRules(cwd: string): Rule[] {
   // both ways keeps its "global" label. Without this, running the check from
   // inside the home directory reported every global rule twice.
   const seen = new Set<string>();
-  const read = (path: string, source: "global" | "project") => {
+  const read = (path: string, source: "global" | "project", scopeGlob?: string) => {
     const key = resolve(path);
     if (seen.has(key)) return;
     seen.add(key);
-    rules.push(...parseClaudeMd(path, source));
+    let parsed = parseClaudeMd(path, source);
+    // A subfolder rules file is loaded by the agent only when the session works
+    // in its subtree, so it is scoped to that subtree unless the file's own
+    // frontmatter already carries a (narrower) `paths:`.
+    if (scopeGlob) {
+      parsed = parsed.map((r) => (r.paths && r.paths.length > 0 ? r : { ...r, paths: [scopeGlob] }));
+    }
+    rules.push(...parsed);
   };
 
   for (const dirName of findClaudeHomeDirNames()) {
@@ -293,6 +384,8 @@ export function loadRules(cwd: string): Rule[] {
   }
 
   for (const path of findProjectRuleFiles(cwd)) read(path, "project");
+  // Subfolder rules files (below cwd), each scoped to its own subtree.
+  for (const { path, scopeGlob } of scopedRuleFilesBelow(cwd)) read(path, "project", scopeGlob);
 
   // Claude Code memory (feedback/project memories) as a rule source, so a
   // standing correction the user moved into memory is still checked and the
@@ -356,6 +449,33 @@ export function describeRuleSources(cwd: string): LoadGraphEntry[] {
 
   for (const dir of projectLevels(cwd)) {
     for (const src of ruleSourcesAtLevel(dir)) add(src, "project");
+  }
+
+  // Subfolder rules files below cwd: loaded on demand when the session works in
+  // their subtree. Tagged so the graph says WHY they are conditional, matching
+  // the subtree scope `loadRules` applies.
+  for (const dir of descendantLevels(cwd)) {
+    const rel = relative(cwd, dir).replace(/\\/g, "/");
+    for (const src of ruleSourcesAtLevel(dir)) {
+      if (src.status !== "loaded") {
+        add(src, "project");
+        continue;
+      }
+      add(
+        { ...src, note: `subfolder rules — loaded when the agent works in ${rel}/` },
+        "project"
+      );
+    }
+  }
+
+  // Claude Code memory, as its own load-graph row. loadRules already CHECKS
+  // memory rules; listing them here closes the reporting gap where the graph
+  // undercounted what the checker uses (found 2026-10-03). Office homes are
+  // excluded inside the memory loader.
+  const mem = memoryGraphEntry(cwd);
+  if (mem && !seen.has(resolve(mem.path))) {
+    seen.add(resolve(mem.path));
+    entries.push({ path: mem.path, scope: "project", status: "loaded", format: "Claude memory", ruleCount: mem.ruleCount });
   }
 
   return entries;
