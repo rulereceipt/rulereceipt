@@ -14,6 +14,8 @@
 npx rulereceipt
 ```
 
+> **Checking your rules file (stale paths, stale commands, contradictions)?** Use Claude Code's built-in `/doctor prompt-audit`, or agnix. RuleReceipt does something different: it checks what your agent actually did in each session against those rules, with the exact line as proof. Not a linter for your rules file; a receipt for your agent's behaviour.
+
 Runs entirely on your machine. Plain `rulereceipt check` makes zero network
 calls — [Trust, privacy and licensing](#trust-privacy-and-licensing) has the full
 detail, including the three off-by-default opt-ins. Works with Claude Code today
