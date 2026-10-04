@@ -59,6 +59,46 @@ function isProseSandwich(content: string, at: number, pattern: string): boolean 
   return /[a-z]\s$/.test(before) && /^\s[a-z]/.test(after);
 }
 
+/**
+ * Strip comments (always) and, when `dropStrings`, string literals — so a
+ * forbidden token that appears only in a comment ("// never use console.log(")
+ * or inside a string is not read as a real construct. Found by fa-corpus-v2
+ * (2026-10-04): a `console.log(` in a comment produced a false accusation.
+ *
+ * Strings are KEPT for a non-call token, because an import specifier legitimately
+ * lives in quotes (`from "lucide-react"`); they are DROPPED only for a call
+ * pattern, where a token inside a string is not a call. Strings are consumed
+ * before comments so a `//` or `#` inside a string is not mistaken for one, and
+ * `#` is a comment only at a line start or after whitespace (so a TS private
+ * field like `this.#count` survives).
+ */
+function stripCode(src: string, dropStrings: boolean): string {
+  let out = "";
+  let i = 0;
+  const n = src.length;
+  while (i < n) {
+    const c = src[i];
+    if (c === '"' || c === "'" || c === "`") {
+      if (!dropStrings) {
+        out += c; i++;
+        while (i < n && src[i] !== c) { if (src[i] === "\\" && i + 1 < n) { out += src[i] + src[i + 1]; i += 2; continue; } out += src[i]; i++; }
+        if (i < n) { out += src[i]; i++; }
+      } else {
+        const quote = c; i++;
+        while (i < n && src[i] !== quote) { if (src[i] === "\\") i++; i++; }
+        if (i < n) i++;
+        out += " ";
+      }
+      continue;
+    }
+    if (c === "/" && src[i + 1] === "*") { i += 2; while (i < n && !(src[i] === "*" && src[i + 1] === "/")) i++; i += 2; out += " "; continue; }
+    if (c === "/" && src[i + 1] === "/") { while (i < n && src[i] !== "\n") i++; continue; }
+    if (c === "#" && (i === 0 || /\s/.test(src[i - 1]))) { while (i < n && src[i] !== "\n") i++; continue; }
+    out += c; i++;
+  }
+  return out;
+}
+
 function containsCall(content: string, pattern: string): boolean {
   const isCall = pattern.endsWith("(");
   const leadsWithIdentifier = /^[A-Za-z0-9_$]/.test(pattern);
@@ -103,10 +143,14 @@ export function runCodeContentChecks(
   classifications: CodeContentClassification[],
   events: TranscriptEvent[]
 ): CheckResult[] {
-  const editedContents: string[] = [];
+  // Per edited file: the raw content (for the evidence quote), plus comment-free
+  // views. `codeOnly` also drops string literals (used for call patterns, where a
+  // token inside a string isn't a call); `noComments` keeps strings (used for
+  // import/value tokens, whose specifier legitimately lives in quotes).
+  const editedContents: { raw: string; codeOnly: string; noComments: string }[] = [];
   for (const event of events) {
     const content = editedContentFromEvent(event);
-    if (content) editedContents.push(content);
+    if (content) editedContents.push({ raw: content, codeOnly: stripCode(content, true), noComments: stripCode(content, false) });
   }
 
   return classifications.map(({ rule, patterns, polarity, polarityInferred }) => {
@@ -114,9 +158,10 @@ export function runCodeContentChecks(
     let foundContent: string | undefined;
     for (const content of editedContents) {
       for (const pattern of patterns) {
-        if (containsCall(content, pattern)) {
+        const hay = pattern.endsWith("(") ? content.codeOnly : content.noComments;
+        if (containsCall(hay, pattern)) {
           foundPattern = pattern;
-          foundContent = content;
+          foundContent = content.raw;
           break;
         }
       }

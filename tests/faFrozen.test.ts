@@ -61,10 +61,10 @@ describe("false-accusation frozen benchmark (fa-corpus-v1)", () => {
 
 /**
  * fa-corpus-v2 — HARD cases, and we KEEP the ones we fail, so this number is honest.
- * Current known gap: codeContent fires on a token MENTIONED in a comment (not a real
- * call). That one false accusation is pinned here as a baseline; when codeContent learns
- * to ignore comment mentions, drop the expectation to 0. The regression case (0.1.88
- * future-read) must stay at 0 — that one is fixed and must never come back.
+ * It surfaced a real false accusation — codeContent firing on a token MENTIONED in a
+ * comment ("// never use console.log(") — which is now FIXED (codeContent strips
+ * comments/strings before matching). The set keeps that case so the fix can't regress.
+ * The regression case (0.1.88 future-read) must also stay at 0.
  */
 describe("false-accusation frozen benchmark (fa-corpus-v2, hard cases)", () => {
   const V2 = join(__dirname, "fixtures", "fa-corpus-v2");
@@ -84,10 +84,8 @@ describe("false-accusation frozen benchmark (fa-corpus-v2, hard cases)", () => {
     expect(regressionFails, regressionFails.join("\n")).toEqual([]);
   });
 
-  it("pins the known-gap count (1: codeContent fires on a comment mention) — drop to 0 when fixed", () => {
+  it("raises ZERO false accusations on the hard set (the codeContent comment-mention gap is fixed)", () => {
     const all = fails();
-    expect(all.length, `v2 false accusations:\n${all.join("\n")}`).toBe(1);
-    expect(all[0]).toMatch(/comment-mention/);
-    expect(all[0]).toMatch(/console\.log\(/);
+    expect(all.length, `v2 false accusations:\n${all.join("\n")}`).toBe(0);
   });
 });
