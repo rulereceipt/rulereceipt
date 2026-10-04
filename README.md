@@ -440,6 +440,24 @@ npm install -g rulereceipt
 rulereceipt demo
 ```
 
+### As a Claude Code plugin
+
+This repo doubles as a Claude Code plugin marketplace, so you can wire the guard,
+the Stop hook, and the commands in one step instead of editing `.claude/settings.json`
+yourself:
+
+```bash
+claude plugin marketplace add rulereceipt/rulereceipt
+claude plugin install rulereceipt@rulereceipt
+```
+
+It adds a **PreToolUse guard** (refuses a command that breaks a file/branch rule, asks
+before an unapproved push/commit), a **Stop hook** (won't let a session end on a broken
+rule), and `/rulereceipt:check`, `:audit`, `:health`, `:why`. The hooks call the
+`rulereceipt` CLI locally — the guard and checks make zero network calls. **Uninstall
+with `claude plugin uninstall rulereceipt@rulereceipt`** — that removes the hooks for
+you (no `protect --undo` needed; that's only for the manual `protect` wiring).
+
 ### Local dev, from this repo
 
 ```bash
