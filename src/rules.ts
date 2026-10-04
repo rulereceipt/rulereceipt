@@ -63,6 +63,57 @@ export interface RuleSource {
   format: string;
   /** Why a shadowed file is ignored; undefined for loaded files. */
   note?: string;
+  /**
+   * The status is not certain: whether this file loads depends on the user's
+   * Claude Code version and/or `/config` "Project instructions" setting, which we
+   * could not read. Reporting says "may not be loaded", never a flat "not
+   * loaded". Only set on an AGENTS(.md) shadowed by a CLAUDE file when the
+   * setting is undetermined.
+   */
+  uncertain?: boolean;
+}
+
+/**
+ * Claude Code's `/config` → "Project instructions" setting decides whether an
+ * AGENTS.md is read when a CLAUDE.md is also present (added in Claude Code
+ * 2.1.277; https://devops.com/claude-code-adds-agents-md-fallback-cutting-instruction-file-sprawl/):
+ *   - `claude-md-or-agents-md` (default) — CLAUDE.md wins; AGENTS.md only when no CLAUDE.md.
+ *   - `claude-md-and-agents-md`          — loads BOTH (CLAUDE.md first).
+ *   - `claude-md`                        — ignores AGENTS.md entirely.
+ *   - `managed-only`                     — only the org-managed CLAUDE.md + auto memory.
+ * We can only make a definite statement about AGENTS.md if we can read this. It
+ * is an in-app setting and often not on disk, so the usual answer is "unknown",
+ * and we say "may not be loaded" rather than asserting it is shadowed.
+ */
+export type ProjectInstructions = "both" | "claude-only" | "claude-wins" | "managed-only" | "unknown";
+const PI_LITERALS: [string, ProjectInstructions][] = [
+  ["claude-md-and-agents-md", "both"],
+  ["claude-md-or-agents-md", "claude-wins"],
+  ["managed-only", "managed-only"],
+  ["claude-md", "claude-only"],
+];
+export function projectInstructionsSetting(cwd: string): ProjectInstructions {
+  const files = [
+    join(cwd, ".claude", "settings.json"),
+    join(cwd, ".claude", "settings.local.json"),
+    join(homedir(), ".claude", "settings.json"),
+    join(homedir(), ".claude", "settings.local.json"),
+  ];
+  for (const f of files) {
+    let txt: string;
+    try {
+      txt = readFileSync(f, "utf-8");
+    } catch {
+      continue;
+    }
+    // Match the exact quoted value, robust to the setting's key name (which we
+    // do not hardcode). Longest literals first so `claude-md` can't shadow
+    // `claude-md-and-agents-md`.
+    for (const [literal, mode] of PI_LITERALS) {
+      if (txt.includes(`"${literal}"`)) return mode;
+    }
+  }
+  return "unknown";
 }
 
 /**
@@ -72,23 +123,41 @@ export interface RuleSource {
  * (`describeRuleSources`) — so the report can never claim a file was loaded
  * that the checker skipped, or vice versa.
  */
-function ruleSourcesAtLevel(dir: string): RuleSource[] {
+function ruleSourcesAtLevel(dir: string, pi: ProjectInstructions = "unknown"): RuleSource[] {
   const out: RuleSource[] = [];
   const has = (rel: string) => existsSync(join(dir, rel));
-  const loaded = (rel: string, format: string) => {
-    if (has(rel)) out.push({ path: join(dir, rel), status: "loaded", format });
+  const loaded = (rel: string, format: string, note?: string) => {
+    if (has(rel)) out.push({ path: join(dir, rel), status: "loaded", format, note });
   };
   const shadowed = (rel: string, format: string, note: string) => {
     if (has(rel)) out.push({ path: join(dir, rel), status: "shadowed", format, note });
   };
+  // An AGENTS(.md) sitting beside a CLAUDE file: whether it loads depends on the
+  // /config "Project instructions" setting (see projectInstructionsSetting).
+  // Setting-aware, and honest when undetermined — "may not be loaded", never a
+  // flat "not loaded".
+  const agentsBesideClaude = (rel: string, format: string, winner: string) => {
+    if (!has(rel)) return;
+    const path = join(dir, rel);
+    if (pi === "both") {
+      out.push({ path, status: "loaded", format, note: `loaded alongside ${winner}: /config "Project instructions" = claude-md-and-agents-md` });
+    } else if (pi === "claude-only") {
+      out.push({ path, status: "shadowed", format, note: `/config "Project instructions" = claude-md ignores AGENTS.md` });
+    } else if (pi === "managed-only") {
+      out.push({ path, status: "shadowed", format, note: `/config "Project instructions" = managed-only loads only the org CLAUDE.md` });
+    } else if (pi === "claude-wins") {
+      out.push({ path, status: "shadowed", format, note: `${winner} at the same level wins (/config "Project instructions" = claude-md-or-agents-md)` });
+    } else {
+      // unknown: do not assert. It loads iff /config is claude-md-and-agents-md,
+      // which needs Claude Code 2.1.277+. We can't read the version or setting.
+      out.push({ path, status: "shadowed", format, uncertain: true, note: `may not be loaded — depends on your Claude Code version (AGENTS.md needs 2.1.277+) and /config "Project instructions" (set claude-md-and-agents-md to load it beside ${winner})` });
+    }
+  };
 
-  // CLAUDE.md shadows AGENTS.md at the same level: as of 2026-09-19 Claude
-  // Code loads AGENTS.md ONLY when that level has no CLAUDE.md, and silently
-  // ignores it otherwise. `init` separately WARNS about the shadowed file (see
-  // shadowedAgents.ts). Mirrored for the `.claude/` subdir pair.
+  // CLAUDE.md beside AGENTS.md in .claude/: same setting-driven rule.
   if (has(join(".claude", "CLAUDE.md"))) {
     loaded(join(".claude", "CLAUDE.md"), "Claude (.claude/CLAUDE.md)");
-    shadowed(join(".claude", "AGENTS.md"), "AGENTS (.claude/AGENTS.md)", "a CLAUDE.md at the same level wins");
+    agentsBesideClaude(join(".claude", "AGENTS.md"), "AGENTS (.claude/AGENTS.md)", ".claude/CLAUDE.md");
   } else {
     loaded(join(".claude", "AGENTS.md"), "AGENTS (.claude/AGENTS.md)");
   }
@@ -113,8 +182,8 @@ function ruleSourcesAtLevel(dir: string): RuleSource[] {
   if (hasClaudeLocal) loaded("CLAUDE.local.md", "Claude (CLAUDE.local.md)");
   if (hasClaudeMd || hasClaudeLocal) {
     const winner = hasClaudeMd ? "CLAUDE.md" : "CLAUDE.local.md";
-    shadowed("AGENTS.md", "AGENTS.md", `a ${winner} at the same level wins`);
-    shadowed("AGENT.md", "AGENT.md", `a ${winner} at the same level wins`);
+    agentsBesideClaude("AGENTS.md", "AGENTS.md", winner);
+    agentsBesideClaude("AGENT.md", "AGENT.md", winner);
   } else {
     loaded("AGENTS.md", "AGENTS.md");
     loaded("AGENT.md", "AGENT.md");
@@ -206,8 +275,8 @@ function applyImports(out: RuleSource[]): RuleSource[] {
 }
 
 /** Every rules file at one directory level that the agent actually loads. */
-function ruleFilesAtLevel(dir: string): string[] {
-  return ruleSourcesAtLevel(dir).filter((s) => s.status === "loaded").map((s) => s.path);
+function ruleFilesAtLevel(dir: string, pi: ProjectInstructions): string[] {
+  return ruleSourcesAtLevel(dir, pi).filter((s) => s.status === "loaded").map((s) => s.path);
 }
 
 /**
@@ -251,8 +320,8 @@ function projectLevels(cwd: string): string[] {
   return levels;
 }
 
-function findProjectRuleFiles(cwd: string): string[] {
-  return projectLevels(cwd).flatMap((dir) => ruleFilesAtLevel(dir));
+function findProjectRuleFiles(cwd: string, pi: ProjectInstructions): string[] {
+  return projectLevels(cwd).flatMap((dir) => ruleFilesAtLevel(dir, pi));
 }
 
 /**
@@ -330,11 +399,11 @@ function subtreeGlob(cwd: string, dir: string): string {
  * so discovering them can never manufacture a false accusation against a
  * session that never worked there.
  */
-function scopedRuleFilesBelow(cwd: string): { path: string; scopeGlob: string }[] {
+function scopedRuleFilesBelow(cwd: string, pi: ProjectInstructions): { path: string; scopeGlob: string }[] {
   const out: { path: string; scopeGlob: string }[] = [];
   for (const dir of descendantLevels(cwd)) {
     const glob = subtreeGlob(cwd, dir);
-    for (const path of ruleFilesAtLevel(dir)) out.push({ path, scopeGlob: glob });
+    for (const path of ruleFilesAtLevel(dir, pi)) out.push({ path, scopeGlob: glob });
   }
   return out;
 }
@@ -382,9 +451,10 @@ export function loadRules(cwd: string): Rule[] {
     for (const file of markdownFilesIn(join(base, "rules"))) read(file, "global");
   }
 
-  for (const path of findProjectRuleFiles(cwd)) read(path, "project");
+  const pi = projectInstructionsSetting(cwd);
+  for (const path of findProjectRuleFiles(cwd, pi)) read(path, "project");
   // Subfolder rules files (below cwd), each scoped to its own subtree.
-  for (const { path, scopeGlob } of scopedRuleFilesBelow(cwd)) read(path, "project", scopeGlob);
+  for (const { path, scopeGlob } of scopedRuleFilesBelow(cwd, pi)) read(path, "project", scopeGlob);
 
   // Claude Code memory (feedback/project memories) as a rule source, so a
   // standing correction the user moved into memory is still checked and the
@@ -403,6 +473,8 @@ export interface LoadGraphEntry {
   format: string;
   /** Why a shadowed file is ignored; undefined for loaded files. */
   note?: string;
+  /** The status is not certain (depends on Claude Code version / config). See RuleSource.uncertain. */
+  uncertain?: boolean;
   /**
    * How many rules the file parses to. For a loaded file this is what the
    * checker uses; for a shadowed file it is how many rules are being IGNORED,
@@ -435,8 +507,9 @@ export function describeRuleSources(cwd: string): LoadGraphEntry[] {
     } catch {
       /* unreadable: reported with count 0 rather than dropped */
     }
-    entries.push({ path: src.path, scope, status: src.status, format: src.format, note: src.note, ruleCount });
+    entries.push({ path: src.path, scope, status: src.status, format: src.format, note: src.note, uncertain: src.uncertain, ruleCount });
   };
+  const pi = projectInstructionsSetting(cwd);
 
   // Globals first, so a file reachable both ways keeps its "global" label —
   // mirrors loadRules' dedup order exactly.
@@ -446,7 +519,7 @@ export function describeRuleSources(cwd: string): LoadGraphEntry[] {
   }
 
   for (const dir of projectLevels(cwd)) {
-    for (const src of ruleSourcesAtLevel(dir)) add(src, "project");
+    for (const src of ruleSourcesAtLevel(dir, pi)) add(src, "project");
   }
 
   // Subfolder rules files below cwd: loaded on demand when the session works in
@@ -454,7 +527,7 @@ export function describeRuleSources(cwd: string): LoadGraphEntry[] {
   // the subtree scope `loadRules` applies.
   for (const dir of descendantLevels(cwd)) {
     const rel = relative(cwd, dir).replace(/\\/g, "/");
-    for (const src of ruleSourcesAtLevel(dir)) {
+    for (const src of ruleSourcesAtLevel(dir, pi)) {
       if (src.status !== "loaded") {
         add(src, "project");
         continue;

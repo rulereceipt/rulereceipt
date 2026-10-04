@@ -162,13 +162,21 @@ don't.
 
 ## Rules-file precedence across directory levels (2.1.277)
 
-Claude Code 2.1.277 reads AGENTS.md only when there is no CLAUDE.md,
-`.claude/CLAUDE.md` or CLAUDE.local.md in the working directory **or above** it.
-RuleReceipt applies that shadow rule at the **same level** (a CLAUDE.md or
-CLAUDE.local.md shadows a sibling AGENTS.md), but does not yet model a parent
-CLAUDE.md shadowing an AGENTS.md in a child directory. If you keep a CLAUDE.md at
-the repo root and an AGENTS.md in a subfolder, RuleReceipt may still read that
-AGENTS.md. Workaround: don't rely on an AGENTS.md below a CLAUDE.md.
+Whether Claude Code reads an AGENTS.md beside a CLAUDE.md depends on the
+`/config` → "Project instructions" setting (added in 2.1.277):
+`claude-md-or-agents-md` (default — CLAUDE.md wins), `claude-md-and-agents-md`
+(loads **both**), `claude-md` (ignores AGENTS.md), `managed-only` (org CLAUDE.md
+only). RuleReceipt reads this setting when it is written to a `settings.json`
+it can see; **when it can't read the version or the setting, it says an
+AGENTS.md "may not be loaded" rather than asserting it is — it never states a
+flat "not loaded" it cannot back.** Set `claude-md-and-agents-md` and RuleReceipt
+will load the AGENTS.md beside your CLAUDE.md.
+
+Two things still not modelled: (1) the setting is often an in-app value not on
+disk, so the usual answer is the hedged "may not be loaded"; (2) a parent
+CLAUDE.md shadowing an AGENTS.md in a **child** directory across levels (we apply
+the same-level rule only). Workaround if you rely on an AGENTS.md: set the
+`claude-md-and-agents-md` config so it loads unambiguously.
 
 ## The guard can only block a read it can see the target of
 
