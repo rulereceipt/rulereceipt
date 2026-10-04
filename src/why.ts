@@ -30,6 +30,8 @@ export interface WhyRule {
   location: string;
   loaded: boolean;
   loadNote?: string;
+  /** Loading can't be stated for sure (Claude Code version / config unknown) — say "may not be loaded". */
+  loadUncertain?: boolean;
   pathScoped?: string;
   checkable: boolean;
   kind: string;
@@ -120,6 +122,7 @@ function ruleFacts(cwd: string, rule: Rule, graph: ReturnType<typeof describeRul
     location: locationOf(rule),
     loaded: src ? src.status === "loaded" : true,
     loadNote: src?.note,
+    loadUncertain: src?.uncertain,
     pathScoped: rule.paths ? rule.paths.join(", ") : undefined,
     checkable,
     kind: cls.kind,
@@ -202,7 +205,13 @@ export function renderWhy(r: WhyResult): string {
   out.push(`Rule ${w.id} — ${w.title}`);
   out.push(`  at ${w.location}  (${w.source})`);
   out.push("");
-  out.push(w.loaded ? `  ✓ loaded — the agent reads this file` : `  ✗ NOT loaded — ${w.loadNote ?? "the agent never sees this file"}`);
+  out.push(
+    w.loaded
+      ? `  ✓ loaded — the agent reads this file`
+      : w.loadUncertain
+        ? `  ? may not be loaded — ${w.loadNote ?? "depends on your Claude Code version and /config settings"}`
+        : `  ✗ NOT loaded — ${w.loadNote ?? "the agent never sees this file"}`
+  );
   if (w.pathScoped) out.push(`  • path-scoped: only loads when the session touches ${w.pathScoped}`);
   if (w.named) out.push(w.named.exists ? `  ✓ names a ${w.named.kind} that exists: ${w.named.name}` : `  ✗ names a ${w.named.kind} that does NOT exist here: ${w.named.name}`);
   out.push(w.checkable
@@ -260,7 +269,8 @@ export function renderAllWhy(all: WhyAll): string {
   const out: string[] = [];
   for (const w of all.rules) {
     let mark = "  ✓"; let note = w.checkable ? `checkable (${w.kind})` : "needs your judgment";
-    if (!w.loaded) { mark = "  ✗"; note = `NOT loaded — ${w.loadNote ?? "the agent never sees this file"}`; }
+    if (!w.loaded && w.loadUncertain) { mark = "  ?"; note = `may not be loaded — ${w.loadNote ?? "depends on your Claude Code version and /config settings"}`; }
+    else if (!w.loaded) { mark = "  ✗"; note = `NOT loaded — ${w.loadNote ?? "the agent never sees this file"}`; }
     else if (w.named && !w.named.exists) { mark = "  ✗"; note = `names a ${w.named.kind} that does not exist: ${w.named.name}`; }
     else if (w.brokenCount > 0) { mark = "  ✗"; note = `broken ${w.brokenCount}× (last: ${w.brokenDates[0]})`; }
     out.push(`${mark} ${w.id.padEnd(6)} ${w.title.replace(/\s+/g, " ").slice(0, 60)}`);

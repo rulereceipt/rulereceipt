@@ -241,6 +241,17 @@ function buildDiagnostics(cwd: string, graph: LoadGraphEntry[], a: RulesAudit, r
   // A shadowed file is present but the agent ignores it — the single most
   // confusing "why isn't my rule firing?" case, so it leads.
   for (const s of shadowed) {
+    if (s.uncertain) {
+      // We can't confirm the Claude Code version / config, so we never assert
+      // "not loaded" — only "may not be loaded".
+      const n = s.ruleCount > 0 ? ` — its ${s.ruleCount} rule${s.ruleCount === 1 ? "" : "s"} may not apply` : "";
+      diags.push({
+        id: "shadowed-file",
+        severity: "warn",
+        message: `${short(s.path)} may not be loaded (${s.note})${n}.`,
+      });
+      continue;
+    }
     const ignored = s.ruleCount > 0 ? ` — ${s.ruleCount} rule${s.ruleCount === 1 ? "" : "s"} not applied` : "";
     diags.push({
       id: "shadowed-file",
@@ -378,7 +389,9 @@ export function renderProjectAudit(pa: ProjectAudit, md = false): string {
       out.push(`  loaded    ${g.format} · ${g.ruleCount} rule${g.ruleCount === 1 ? "" : "s"}${scoped}  (${g.path})`);
     }
     for (const g of shadowed) {
-      out.push(`  ignored   ${g.format} · ${g.note}  (${g.path})`);
+      // "maybe" (not "ignored") when we can't confirm it loads — never assert.
+      const label = g.uncertain ? "maybe " : "ignored";
+      out.push(`  ${label}   ${g.format} · ${g.note}  (${g.path})`);
     }
   }
   out.push("");
