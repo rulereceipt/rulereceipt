@@ -208,3 +208,15 @@ newer** — on an older Node the compressed files are skipped with a one-line no
 not read. Codex support as a whole is still **experimental**: it has been verified
 against the documented format and synthetic fixtures, not yet against a real
 end-to-end Codex rollout, so treat Codex verdicts as provisional until that check.
+
+## Opaque commands the guard cannot read
+
+The guard reads the command text. It now sees through leading redirections
+(`>/tmp/x git push origin main`), env prefixes, `git -C`, `sh -c`/`bash -lc`,
+heredocs, chains and `eval "…"`. It still cannot read a command whose dangerous
+part is **encoded or computed at runtime** — a base64 blob piped to a shell
+(`… | base64 -d | sh`), or a target injected by `xargs`/a variable it can't
+resolve. Those are a limit of static command-text matching, not a bug; for them,
+rely on Claude Code's own sandbox/permissions (same reasoning as the "reads it
+can't see the target of" gap above). Our guard-bypass test suite pins both the
+cases we catch and these known-opaque ones, so a regression in either is noticed.

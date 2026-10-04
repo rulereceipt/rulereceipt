@@ -80,8 +80,29 @@ function isHeredocOpener(before: string, afterDelim: string): boolean {
 export function segments(command: string): string[] {
   return unwrapShellWrappers(withoutHeredocs(command))
     .split(/\n|&&|\|\||[;|]/)
-    .map((s) => s.trim())
+    .map((s) => stripLeadingRedirections(s.trim()))
     .filter((s) => s.length > 0);
+}
+
+/**
+ * Removes redirection operators and their targets ONLY from the START of a
+ * segment, before the command verb — `>/tmp/x git push …`, `2>/dev/null git
+ * push …`. A LEADING redirect is a real bypass: the push runs, but the redirect
+ * token sat where a checker expects the command, so the push was invisible
+ * (guard-bypass suite, 2026-10-04).
+ *
+ * A TRAILING redirect is left intact on purpose — `echo x > secrets.txt` IS a
+ * mutation of secrets.txt, and fileLifecycle must still see it. So only the
+ * leading run of redirects is stripped, never one that follows the command.
+ */
+export function stripLeadingRedirections(segment: string): string {
+  let s = segment.trim();
+  for (;;) {
+    const m = s.match(/^(?:&>>?|[0-9]*>>?|[0-9]*<)\s*(?:&[0-9-]+|[^\s;|&<>]+)?\s*/);
+    if (!m || m[0].length === 0) break;
+    s = s.slice(m[0].length);
+  }
+  return s.trim();
 }
 
 /**
