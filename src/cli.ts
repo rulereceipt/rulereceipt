@@ -25,6 +25,7 @@ import { observeSessions, renderNoRules, draftRulesFromHistory } from "./session
 import { listSessionRows, renderSessionList } from "./listSessions.js";
 import { runSelfTestChecks, renderSelfTest } from "./selftest.js";
 import { planProtect, applyProtect, undoProtect, PROTECT_HOOK_SNIPPET } from "./protect.js";
+import { replayGuard, renderReplay } from "./replay.js";
 import { cardSvg, renderCardShare, type CardData } from "./card.js";
 import { createInterface } from "node:readline";
 import { loadOverrides, saveOverride, clearOverride, staleOverrides, ruleFingerprint, OVERRIDES_PATH } from "./overrides.js";
@@ -1460,9 +1461,14 @@ program
     "Wire RuleReceipt's enforcement into Claude Code: a PreToolUse guard (refuses a command that breaks a file/branch rule; asks before an unapproved push/commit) and a Stop hook (won't let a session end on a broken rule). Shows exactly what it will add to .claude/settings.json and asks first. Undo anytime with --undo (restores the file byte-for-byte)."
   )
   .option("--undo", "remove what protect added, restoring .claude/settings.json byte-for-byte")
+  .option("--replay", "shadow: run the current guard + rules against your recent sessions and show what it WOULD have blocked — changes nothing")
   .option("--yes", "skip the confirmation prompt (for scripts)")
-  .action(async (opts: { undo?: boolean; yes?: boolean }) => {
+  .action(async (opts: { undo?: boolean; replay?: boolean; yes?: boolean }) => {
     const cwd = process.cwd();
+    if (opts.replay) {
+      console.log(renderReplay(replayGuard(cwd)));
+      return;
+    }
     if (opts.undo) {
       const r = undoProtect(cwd);
       console.log(r.message);
