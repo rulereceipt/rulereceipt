@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>RuleReceipt — Accuracy</title>
-<meta name="description" content="How often RuleReceipt accuses wrongly, and how often it catches a real violation — measured on 559 real rules files and a hand-labelled detection set, with the method open so you can rerun it." />
+<meta name="description" content="How often RuleReceipt accuses wrongly, and how often it catches a real violation — measured on 559 real rules files and a hand-labelled detection set. The method is open; a committed, reproducible benchmark (fa-corpus-v1) is coming." />
 <link rel="canonical" href="https://rulereceipt.dev/accuracy" />
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23FAFAF7'/%3E%3Cpath d='M9 8h14v17l-3-2-3 2-3-2-3 2-2-2z' fill='none' stroke='%2317191C' stroke-width='1.6'/%3E%3Cpath d='M12 14h8M12 18h6' stroke='%2317805F' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E" />
 <meta property="og:type" content="website" />
@@ -66,7 +66,7 @@
       <div class="card">
         <div class="num good">0.8%</div>
         <div class="label">False-accusation ceiling</div>
-        <div class="sub">Share of reports carrying any FAIL across 559 real rules files run over 10 real sessions (5,590 reports). An upper bound — see the note below.</div>
+        <div class="sub">Share of reports carrying any FAIL across 559 real rules files run over 10 real sessions (5,590 reports). An upper bound — and, honestly, measured on the maintainer's own local sessions, not yet publicly reproducible (see the note below). A committed, redacted public benchmark is coming.</div>
       </div>
       <div class="card">
         <div class="num good">11 / 11</div>
@@ -78,6 +78,7 @@
     <h2>What the false-accusation number means</h2>
     <p>Take 559 rules files people actually published, and 10 real coding sessions. Run every file against every session — 5,590 reports — and count how many carry even one FAIL. That is <strong>0.8%</strong>.</p>
     <p>It is a <strong>ceiling</strong>, not an error rate, and deliberately so: those rules belong to other people's projects and the sessions don't, so almost every FAIL there is spurious <em>by construction</em>. The real false-accusation rate on your own rules and your own sessions is lower. We report the ceiling because it is the number we can measure honestly and that only moves when the tool's readiness to accuse changes — it went from about one report in six, early on, to 0.8% today.</p>
+    <p><strong>An honest caveat about reproducibility.</strong> The <em>method</em> is open — the script (<code>scripts/false-accusation-rate.ts</code>) is in the repo. But the <em>inputs</em> are not: those 559 rules files are other people's and aren't committed, and the 10 sessions are the maintainer's own private history. So today you can read the method but you cannot reproduce <em>this exact 0.8%</em> yourself, and the set shifts as the maintainer's own sessions change. We're fixing that with a <strong>committed, versioned, redacted benchmark (<code>fa-corpus-v1</code>)</strong>: once it lands, this figure will be stated as "FA on <code>fa-corpus-v1</code>," reproducible by anyone, changing only when the checkers change — and we will not publish a new number until it is measured on that frozen set.</p>
 
     <h2>What the detection number means</h2>
     <p>Precision alone can be gamed by never accusing anything. So there is a second set: hand-labelled sessions that genuinely break a rule (a push to <code>main</code>, an edit to <code>.env</code>, a <code>console.log</code> written into a file, a "tests pass" claim contradicted by a failing run, a forbidden import) — alongside near-misses that must <em>not</em> fire (a push to a feature branch, editing <code>.env.example</code>, a command that only mentions <code>git push</code>). It is a sanity check across the checkers, not a real-world detection rate. Every violation is caught; every near-miss stays quiet.</p>
