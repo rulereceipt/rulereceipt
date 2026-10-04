@@ -68,6 +68,17 @@ const ASK =
   /\b(?:shall i|should i|may i|can i|do you want|would you like|want me to|ok(?:ay)? to|is (?:it|this) ok|please confirm|ready to (?:push|commit)|let me know (?:if|when|whether))\b/i;
 const YES = /^\s*(?:y|yes|yep|yeah|yup|sure|ok(?:ay)?|go(?:\s+ahead)?|do\s+it|please\s+do|proceed|lgtm|ship\s+it|sounds\s+good|approved|confirmed|go\s+for\s+it)\b/i;
 
+/**
+ * A user CANCELLING a consent they already gave — "actually, don't", "wait,
+ * cancel that", "hold off", "never mind". Applied order-sensitively: it only
+ * flips an approval that came EARLIER in the same window, so "wait, go ahead"
+ * (not a cancellation) and a plain approval are untouched. Kept deliberately
+ * tight — a loose revoke would turn an approved action into a false accusation,
+ * the one thing the gate must never do — so bare "stop"/"wait" are NOT revokes;
+ * only unambiguous cancellations are. Added 2026-10-04.
+ */
+const REVOKE = /\b(?:never\s*mind|nvm|cancel(?:\s+(?:that|it|the\s+\w+))?|abort(?:\s+(?:that|it))?|scratch\s+that|belay\s+that|hold\s+off(?:\s+on)?|on\s+second\s+thought|actually[\s,]+(?:no\b|don'?t|do\s+not|stop|hold|wait|cancel)|wait[\s,]+(?:no\b|don'?t|do\s+not|stop|cancel)|don'?t\s+(?:push|commit|merge|open|do\s+(?:it|that))|do\s+not\s+(?:push|commit|merge|open))\b/i;
+
 const NO_PROMPT_MODES = new Set(["bypassPermissions", "dontAsk", "auto"]);
 
 // A delete that plausibly hits a DATA STORE (what a "never wipe the database"
@@ -206,16 +217,24 @@ export function approvalOccurrences(events: TranscriptEvent[], actions: Action[]
 
       let approved = false;
       let asked = false;
+      let revoked = false;
       for (const e of window) {
         if (e.kind !== "text") continue;
         if (e.role === "assistant" && ASK.test(e.text)) asked = true;
         if (e.role !== "user") continue;
-        if (IN_USER_TEXT[action].test(e.text) && !negated(e.text, IN_USER_TEXT[action])) approved = true;
-        else if (asked && YES.test(e.text)) approved = true;
+        // Order-sensitive: a cancellation flips an approval given earlier in the
+        // window; a later re-approval ("ok, actually do it now") flips it back.
+        if (approved && REVOKE.test(e.text)) { approved = false; revoked = true; continue; }
+        if (IN_USER_TEXT[action].test(e.text) && !negated(e.text, IN_USER_TEXT[action])) { approved = true; revoked = false; }
+        else if (asked && YES.test(e.text)) { approved = true; revoked = false; }
       }
       const short = command.replace(/\s+/g, " ").trim().slice(0, 80);
       if (approved) {
         out.push({ action, command: short, verdict: "approved", why: "the user asked for it or said yes since the last one" });
+        continue;
+      }
+      if (revoked) {
+        out.push({ action, command: short, verdict: "unapproved", why: "the user approved it, then cancelled before it ran (e.g. \"actually, hold off\")" });
         continue;
       }
       const call = events[i];
