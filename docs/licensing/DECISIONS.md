@@ -50,3 +50,14 @@ Scanned the FULL history with `git log -S` for "OpenAI/Anthropic Rider", "Dickle
 "coding_agent_session_search", "cross_agent_session_resumer", "destructive_command_guard",
 "trufflehog", "secrets-patterns-db": **0 occurrences** in history, **0** in `src/`. No tainted
 code has ever been committed.
+
+## GuardFall corpus — clean-room, knowledge-only (2026-10-04)
+GuardFall is the adversarial guard-bypass corpus in **samvallad33/vestige**, which is
+**AGPL-3.0-only**. We treat it as **knowledge-only**: we may read its *category names* and
+the *classes of bypass* it describes (redirection-first, `git -C`, `eval`, pipe-to-
+interpreter, env/VAR= prefixes, `sh`/`bash -c` nesting, heredocs, etc.), but we **do NOT
+copy any of its cases, data, fixtures, or code into this repository — not even into
+tests**. Our own bypass/adversarial tests are written from scratch against those
+categories, with our own commands and expectations, and credited as inspiration only.
+Same rule as the vestige/Operator Lite entry: AGPL copyleft, so reimplement ideas, never
+copy text. No GuardFall string, case, or file may appear in `git log` for this repo.
