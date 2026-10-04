@@ -58,3 +58,36 @@ describe("false-accusation frozen benchmark (fa-corpus-v1)", () => {
     expect(fails, `false accusations on near-misses:\n${fails.join("\n")}`).toEqual([]);
   });
 });
+
+/**
+ * fa-corpus-v2 — HARD cases, and we KEEP the ones we fail, so this number is honest.
+ * Current known gap: codeContent fires on a token MENTIONED in a comment (not a real
+ * call). That one false accusation is pinned here as a baseline; when codeContent learns
+ * to ignore comment mentions, drop the expectation to 0. The regression case (0.1.88
+ * future-read) must stay at 0 — that one is fixed and must never come back.
+ */
+describe("false-accusation frozen benchmark (fa-corpus-v2, hard cases)", () => {
+  const V2 = join(__dirname, "fixtures", "fa-corpus-v2");
+  const ruleFiles = readdirSync(join(V2, "rules")).filter((f) => f.endsWith(".md")).sort();
+  const sessionFiles = readdirSync(join(V2, "sessions")).filter((f) => f.endsWith(".jsonl")).sort();
+  const sessions = sessionFiles.map((f) => readTranscriptFromFile(join(V2, "sessions", f)));
+  const fails = (): string[] => {
+    const out: string[] = [];
+    for (const rf of ruleFiles) for (let i = 0; i < sessions.length; i++)
+      for (const r of check(join(V2, "rules", rf), sessions[i]))
+        if (r.status === "FAIL") out.push(`${rf} x ${sessionFiles[i]}: ${r.evidence.slice(0, 80)}`);
+    return out;
+  };
+
+  it("never false-accuses on the 0.1.88 future-read regression case", () => {
+    const regressionFails = fails().filter((f) => f.includes("regression-future-read"));
+    expect(regressionFails, regressionFails.join("\n")).toEqual([]);
+  });
+
+  it("pins the known-gap count (1: codeContent fires on a comment mention) — drop to 0 when fixed", () => {
+    const all = fails();
+    expect(all.length, `v2 false accusations:\n${all.join("\n")}`).toBe(1);
+    expect(all[0]).toMatch(/comment-mention/);
+    expect(all[0]).toMatch(/console\.log\(/);
+  });
+});

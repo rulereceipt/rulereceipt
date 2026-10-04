@@ -43,7 +43,7 @@ import type { CheckResult, TranscriptEvent } from "../src/types.js";
  * published number.
  */
 const FROZEN = process.argv.includes("--frozen");
-const FROZEN_DIR = join(process.cwd(), "tests", "fixtures", "fa-corpus-v1");
+const FROZEN_DIR = join(process.cwd(), "tests", "fixtures", process.argv.includes("--v2") ? "fa-corpus-v2" : "fa-corpus-v1");
 const CORPUS = FROZEN ? join(FROZEN_DIR, "rules") : join(process.cwd(), "corpus");
 const sessionCountArg = process.argv[2] && !process.argv[2].startsWith("--") ? Number(process.argv[2]) : 5;
 const sessionCount = sessionCountArg;
@@ -93,7 +93,10 @@ if (sessions.length === 0) {
   console.error("No session transcripts found — nothing to measure. Not reporting a rate.");
   process.exit(1);
 }
-if (FROZEN) console.log("FROZEN BENCHMARK: fa-corpus-v1 (committed, synthetic; reproducible from the repo, no home scan)\n");
+if (FROZEN) {
+  const ver = process.argv.includes("--v2") ? "fa-corpus-v2 (hard cases; we keep cases we fail)" : "fa-corpus-v1 (easy near-misses)";
+  console.log(`FROZEN BENCHMARK: ${ver} — committed, synthetic, reproducible; no home scan\n`);
+}
 
 /**
  * Each input is printed with the hash of the bytes actually read.

@@ -1,0 +1,2 @@
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","name":"Write","input":{"file_path":"src/util.ts","content":"// NOTE: never use console.log( here; use the logger\nexport const x = 1;"}}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Added a note reminding us not to use the raw logger."}]}}

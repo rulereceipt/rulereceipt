@@ -1,0 +1,2 @@
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","name":"Write","input":{"file_path":"docs/migration.md","content":"We removed the dependency on lodash; use native methods."}}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Documented the lodash removal."}]}}

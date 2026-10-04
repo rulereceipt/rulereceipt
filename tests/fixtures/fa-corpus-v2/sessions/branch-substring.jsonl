@@ -1,0 +1,2 @@
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","name":"Bash","input":{"command":"git push origin maintenance"}}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Pushed the maintenance branch."}]}}
