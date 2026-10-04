@@ -4,6 +4,7 @@ import { classifyRules } from "./checks/classify.js";
 import { adviseRules } from "./checkability.js";
 import { ruleWasLoaded } from "./checks/pathScope.js";
 import { describeRuleSources, loadRules, type LoadGraphEntry } from "./rules.js";
+import { hookWiringFindings, type HookWiringFinding } from "./hookWiring.js";
 import type { Rule } from "./types.js";
 
 /** Files in the repo, for checking whether a path-scoped rule matches anything. */
@@ -205,6 +206,8 @@ export interface ProjectAudit extends RulesAudit {
   diagnostics: Diagnostic[];
   /** How many rules came from Claude Code memory (not a file, so not in loadGraph). */
   memoryRules: number;
+  /** Hook-wiring facts: dead matchers / unguarded tools, from recent sessions. */
+  hookWiring: HookWiringFinding[];
 }
 
 /** Content that is a pointer to another file, not rules of its own ("see AGENTS.md"). */
@@ -365,7 +368,7 @@ export function auditProject(cwd: string): ProjectAudit {
   const loadGraph = describeRuleSources(cwd);
   const diagnostics = buildDiagnostics(cwd, loadGraph, base, rules);
   const memoryRules = rules.filter((r) => r.id.startsWith("memory:")).length;
-  return { ...base, loadGraph, diagnostics, memoryRules };
+  return { ...base, loadGraph, diagnostics, memoryRules, hookWiring: hookWiringFindings(cwd) };
 }
 
 /** The doorstep render: load graph → summary → diagnostics → top fixes. */
@@ -418,6 +421,12 @@ export function renderProjectAudit(pa: ProjectAudit, md = false): string {
       out.push(`  • ${f.title.replace(/\s+/g, " ").trim().slice(0, 60)}${f.handle ? `  [${f.handle}]` : ""}`);
       out.push(`      ${f.suggestion}`);
     }
+    out.push("");
+  }
+
+  if (pa.hookWiring.length > 0) {
+    out.push(H("Hook wiring (from your recent sessions)"));
+    for (const f of pa.hookWiring) out.push(`  • ${f.message}`);
     out.push("");
   }
 
