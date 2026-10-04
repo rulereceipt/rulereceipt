@@ -180,6 +180,18 @@ check "health: default exits 0 (advisory)"              '[ "$(rc "$PHC" health)"
 check "health --json: valid JSON with counts"           'out "$PHC" health --json | node -e "let s=\"\";process.stdin.on(\"data\",d=>s+=d).on(\"end\",()=>{const j=JSON.parse(s);process.exit(j.contradictions>=1?0:1)})"'
 check "health: clean project says none, exits 0"        '[ "$(rc "$PB" health)" = "0" ] && out "$PB" health | grep -qi "No contradictions or duplicate"'
 
+echo "== doctor --capabilities (capability matrix) =="
+check "doctor --capabilities: lists claude-code"        'out "$PB" doctor --capabilities | grep -qi "claude-code"'
+check "doctor --capabilities: codex shown in testing"   'out "$PB" doctor --capabilities | grep -qi "codex" && out "$PB" doctor --capabilities | grep -qi "in testing"'
+check "doctor --capabilities: states guard limits"      'out "$PB" doctor --capabilities | grep -qi "CANNOT catch"'
+check "doctor --capabilities: exits 0"                  '[ "$(rc "$PB" doctor --capabilities)" = "0" ]'
+check "doctor --capabilities --json: valid JSON"        'out "$PB" doctor --capabilities --json | node -e "let s=\"\";process.stdin.on(\"data\",d=>s+=d).on(\"end\",()=>{const j=JSON.parse(s);process.exit(Array.isArray(j.agents)&&j.guardLimits.length>0?0:1)})"'
+
+echo "== protect --replay (shadow; changes nothing) =="
+check "protect --replay: prints SHADOW banner"          'out "$PB" protect --replay | grep -qi "SHADOW"'
+check "protect --replay: exits 0"                        '[ "$(rc "$PB" protect --replay)" = "0" ]'
+check "protect --replay: writes no settings file"       'rc "$PB" protect --replay >/dev/null; [ ! -f "$PB/.claude/settings.json" ]'
+
 echo "== no stack traces =="
 ALL="$B
 $(out "$PE" check --transcript s.jsonl)
