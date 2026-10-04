@@ -72,6 +72,21 @@ only** — no code, paths, or rule text (add rule names to the copy-text with
 
 Published and live on npm, actively developed.
 
+### Agent session support
+
+Which agents' session transcripts RuleReceipt can check (rule *files* —
+CLAUDE.md, AGENTS.md, Cursor, Copilot, Windsurf, Gemini, `.agents/rules`,
+memory — are read far more broadly; this table is about reading a *session*):
+
+| Agent | Session support | Notes |
+| :- | :- | :- |
+| Claude Code | **Supported** | incl. hosted/enterprise homes you configure via `RULERECEIPT_CLAUDE_HOMES` / `CLAUDE_CONFIG_DIR` |
+| OpenAI Codex CLI | **Supported** | reads `rollout-*.jsonl` and compressed `rollout-*.jsonl.zst` (zst needs Node ≥ 22.15); verified on the documented format + fixtures, not yet a real end-to-end rollout |
+| Copilot CLI, Gemini CLI, Cursor, OpenCode | **Experimental** | reachable with `--transcript`; mapped from documented formats, synthetic fixtures only |
+| Cline, Antigravity, Aider, Windsurf | Not yet | — |
+
+Auto-detection picks the newest session across supported tools.
+
 ## How it works
 
 1. Reads your rules and extracts individual ones — from CLAUDE.md / AGENTS.md,

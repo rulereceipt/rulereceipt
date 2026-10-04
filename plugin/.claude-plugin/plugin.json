@@ -10,5 +10,12 @@
   },
   "homepage": "https://rulereceipt.dev",
   "repository": "https://github.com/rulereceipt/rulereceipt",
-  "keywords": ["rules", "audit", "compliance", "guard", "claude-code", "agents"]
+  "keywords": [
+    "rules",
+    "audit",
+    "compliance",
+    "guard",
+    "claude-code",
+    "agents"
+  ]
 }
