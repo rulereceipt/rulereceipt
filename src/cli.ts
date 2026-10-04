@@ -26,6 +26,7 @@ import { listSessionRows, renderSessionList } from "./listSessions.js";
 import { runSelfTestChecks, renderSelfTest } from "./selftest.js";
 import { planProtect, applyProtect, undoProtect, PROTECT_HOOK_SNIPPET } from "./protect.js";
 import { replayGuard, renderReplay } from "./replay.js";
+import { capabilityReport, renderCapabilities } from "./capabilities.js";
 import { cardSvg, renderCardShare, type CardData } from "./card.js";
 import { createInterface } from "node:readline";
 import { loadOverrides, saveOverride, clearOverride, staleOverrides, ruleFingerprint, OVERRIDES_PATH } from "./overrides.js";
@@ -987,9 +988,16 @@ program
 
 program
   .command("doctor")
-  .description("List every Claude Code hook and VS Code auto-task on this machine/project, flag anything suspicious")
-  .action(() => {
+  .description("List every Claude Code hook and VS Code auto-task on this machine/project, flag anything suspicious. With --capabilities, print the capability matrix instead: which agents can be read, what each check inspects, and what the guard cannot catch.")
+  .option("--capabilities", "show the capability matrix (agents, checks, guard limits) instead of the hook/task scan")
+  .option("--json", "with --capabilities, output machine-readable JSON")
+  .action((opts: { capabilities?: boolean; json?: boolean }) => {
     try {
+      if (opts.capabilities) {
+        const report = capabilityReport();
+        console.log(opts.json ? JSON.stringify(report, null, 2) : renderCapabilities(report));
+        return;
+      }
       runDoctorCommand();
     } catch (err) {
       console.error("Something went wrong:", err instanceof Error ? err.message : err);
