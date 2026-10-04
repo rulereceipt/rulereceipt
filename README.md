@@ -19,7 +19,7 @@ npx rulereceipt
 Runs entirely on your machine. Plain `rulereceipt check` makes zero network
 calls — [Trust, privacy and licensing](#trust-privacy-and-licensing) has the full
 detail, including the three off-by-default opt-ins. Works with Claude Code today
-(OpenAI Codex CLI supported); reads rules from CLAUDE.md, AGENTS.md, Cursor
+(OpenAI Codex CLI in testing); reads rules from CLAUDE.md, AGENTS.md, Cursor
 (`.cursor/rules`), GitHub Copilot, Windsurf, Gemini (`GEMINI.md`), Google's
 `.agents/rules`, and Claude Code memory. [Accuracy](https://rulereceipt.dev/accuracy)
 · [Known gaps](KNOWN-GAPS.md) · Source-available, not OSI — see [LICENSE](LICENSE).
@@ -81,7 +81,7 @@ memory — are read far more broadly; this table is about reading a *session*):
 | Agent | Session support | Notes |
 | :- | :- | :- |
 | Claude Code | **Supported** | incl. hosted/enterprise homes you configure via `RULERECEIPT_CLAUDE_HOMES` / `CLAUDE_CONFIG_DIR` |
-| OpenAI Codex CLI | **Supported** | reads `rollout-*.jsonl` and compressed `rollout-*.jsonl.zst` (zst needs Node ≥ 22.15); verified on the documented format + fixtures, not yet a real end-to-end rollout |
+| OpenAI Codex CLI | **In testing** | reads `rollout-*.jsonl` and compressed `rollout-*.jsonl.zst` (zst needs Node ≥ 22.15); verified on the documented format + fixtures, **not yet validated on a real end-to-end rollout** |
 | Copilot CLI, Gemini CLI, Cursor, OpenCode | **Experimental** | reachable with `--transcript`; mapped from documented formats, synthetic fixtures only |
 | Cline, Antigravity, Aider, Windsurf | Not yet | — |
 
@@ -94,7 +94,7 @@ Auto-detection picks the newest session across supported tools.
    current project directory and your global rules file.
 2. Reads your most recent agent session transcript — Claude Code today
    (including hosted/enterprise variants under a different directory), and
-   OpenAI Codex CLI (supported); newest session across tools wins.
+   OpenAI Codex CLI (in testing); newest session across tools wins.
 3. Routes each rule to the narrowest check that can actually answer it:
    - **Structured checks** read what the session really did — an actual
      git command's branch argument, actual file edits, actual file
@@ -461,7 +461,13 @@ This repo doubles as a Claude Code plugin marketplace, so you can wire the guard
 the Stop hook, and the commands in one step instead of editing `.claude/settings.json`
 yourself:
 
+**Prerequisite:** install the CLI first — `npm i -g rulereceipt`. The plugin's hooks
+call the installed `rulereceipt`; if it isn't on your `PATH` they **fail open** with a
+one-line message (`install: npm i -g rulereceipt`) and let the action through — they
+never silently download anything.
+
 ```bash
+npm i -g rulereceipt            # prerequisite
 claude plugin marketplace add rulereceipt/rulereceipt
 claude plugin install rulereceipt@rulereceipt
 ```

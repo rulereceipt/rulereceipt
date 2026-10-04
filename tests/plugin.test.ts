@@ -37,6 +37,20 @@ describe("Claude Code plugin + marketplace manifest", () => {
     expect(h.PreToolUse[0].matcher).toBeUndefined();
   });
 
+  it("hooks FAIL OPEN when rulereceipt isn't installed — never a silent auto-download", () => {
+    const h = readJson("plugin/hooks/hooks.json").hooks;
+    for (const event of ["PreToolUse", "Stop"]) {
+      const cmd = h[event][0].hooks[0].command as string;
+      // Must NOT auto-install/download (npx --yes / -y fetches from the network).
+      expect(cmd, event).not.toMatch(/npx\s+(--yes|-y)\b/);
+      expect(cmd, event).not.toMatch(/\bnpx\b/); // no npx at all -> no accidental fetch
+      // Must gate on the CLI being present and fail open with an install hint.
+      expect(cmd, event).toMatch(/command -v rulereceipt/);
+      expect(cmd, event).toMatch(/npm i -g rulereceipt/);
+      expect(cmd, event).toMatch(/exit 0/);
+    }
+  });
+
   it("ships the four commands", () => {
     for (const c of ["check", "audit", "health", "why"]) {
       expect(existsSync(join(root, "plugin", "commands", `${c}.md`)), c).toBe(true);

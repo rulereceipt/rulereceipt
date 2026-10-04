@@ -2,7 +2,7 @@
   "name": "rulereceipt",
   "displayName": "RuleReceipt",
   "version": "0.1.90",
-  "description": "Check whether your agent followed your CLAUDE.md / AGENTS.md rules. Installs a PreToolUse guard (refuses a command that breaks a file/branch rule, asks before an unapproved push/commit) and a Stop hook (won't let a session end on a broken rule or an unbacked 'done'), plus commands to check/audit/health/why. Runs the rulereceipt CLI locally.",
+  "description": "Check whether your agent followed your CLAUDE.md / AGENTS.md rules. Installs a PreToolUse guard (refuses a command that breaks a file/branch rule, asks before an unapproved push/commit) and a Stop hook (won't let a session end on a broken rule or an unbacked 'done'), plus commands to check/audit/health/why. PREREQUISITE: the rulereceipt CLI must be installed (npm i -g rulereceipt); the hooks fail OPEN with a one-line install message if it isn't — they never auto-download it. Runs locally; the guard and checks make zero network calls.",
   "author": {
     "name": "RuleReceipt",
     "email": "hello@rulereceipt.dev",

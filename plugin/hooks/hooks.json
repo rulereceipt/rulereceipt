@@ -3,14 +3,14 @@
     "PreToolUse": [
       {
         "hooks": [
-          { "type": "command", "command": "npx --yes rulereceipt guard" }
+          { "type": "command", "command": "if command -v rulereceipt >/dev/null 2>&1; then rulereceipt guard; else echo 'RuleReceipt not installed — guard inactive. Install: npm i -g rulereceipt' >&2; exit 0; fi" }
         ]
       }
     ],
     "Stop": [
       {
         "hooks": [
-          { "type": "command", "command": "npx --yes rulereceipt hook" }
+          { "type": "command", "command": "if command -v rulereceipt >/dev/null 2>&1; then rulereceipt hook; else echo 'RuleReceipt not installed — Stop hook inactive. Install: npm i -g rulereceipt' >&2; exit 0; fi" }
         ]
       }
     ]
