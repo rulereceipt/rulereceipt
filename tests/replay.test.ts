@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
+import { mkdtempSync, writeFileSync, mkdirSync, rmSync, existsSync } from "node:fs";
 import { tmpdir, homedir } from "node:os";
 import { join } from "node:path";
 import { replayGuard } from "../src/replay.js";
@@ -55,6 +55,6 @@ describe("protect --replay (shadow)", () => {
     writeSession("s3.jsonl", [bash("git push origin main", 0)]);
     replayGuard(dir);
     // the guard-replay must not create .claude/settings.json
-    expect(() => require("node:fs").statSync(join(dir, ".claude", "settings.json"))).toThrow();
+    expect(existsSync(join(dir, ".claude", "settings.json"))).toBe(false);
   });
 });
