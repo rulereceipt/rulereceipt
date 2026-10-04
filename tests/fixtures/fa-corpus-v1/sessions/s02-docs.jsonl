@@ -1,0 +1,3 @@
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","name":"Edit","input":{"file_path":"README.md","old_string":"x","new_string":"y"}}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","name":"Write","input":{"file_path":".env.example","content":"API_KEY=your-key-here"}}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Updated the docs and the example env template."}]}}

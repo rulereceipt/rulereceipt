@@ -34,8 +34,19 @@ import { runFileLifecycleChecks } from "../src/checks/fileLifecycle.js";
 import { runClaimEvidenceChecks } from "../src/checks/claimEvidence.js";
 import type { CheckResult, TranscriptEvent } from "../src/types.js";
 
-const CORPUS = join(process.cwd(), "corpus");
-const sessionCount = Number(process.argv[2] ?? 5);
+/**
+ * --frozen: run the committed, versioned, synthetic benchmark
+ * (tests/fixtures/fa-corpus-v1) instead of the maintainer's local corpus +
+ * largest real sessions. This is the number that only moves when the CHECKERS
+ * change — it reads no home directory, so it is reproducible by anyone from the
+ * repo alone. The non-frozen mode stays a local spot-check only, NOT the
+ * published number.
+ */
+const FROZEN = process.argv.includes("--frozen");
+const FROZEN_DIR = join(process.cwd(), "tests", "fixtures", "fa-corpus-v1");
+const CORPUS = FROZEN ? join(FROZEN_DIR, "rules") : join(process.cwd(), "corpus");
+const sessionCountArg = process.argv[2] && !process.argv[2].startsWith("--") ? Number(process.argv[2]) : 5;
+const sessionCount = sessionCountArg;
 
 /** The N largest transcripts under any ~/.claude* projects dir; size then path. */
 function pinnedSessions(n: number): string[] {
@@ -75,11 +86,14 @@ function check(rulesFilePath: string, events: TranscriptEvent[]): CheckResult[] 
   ];
 }
 
-const sessions = pinnedSessions(sessionCount);
+const sessions = FROZEN
+  ? readdirSync(join(FROZEN_DIR, "sessions")).filter((f) => f.endsWith(".jsonl")).sort().map((f) => join(FROZEN_DIR, "sessions", f))
+  : pinnedSessions(sessionCount);
 if (sessions.length === 0) {
   console.error("No session transcripts found — nothing to measure. Not reporting a rate.");
   process.exit(1);
 }
+if (FROZEN) console.log("FROZEN BENCHMARK: fa-corpus-v1 (committed, synthetic; reproducible from the repo, no home scan)\n");
 
 /**
  * Each input is printed with the hash of the bytes actually read.
@@ -95,7 +109,7 @@ if (sessions.length === 0) {
  * only when these lines match, and a changed hash on an unchanged filename
  * means the input moved, not the tool.
  */
-console.log(`Sessions (largest ${sessions.length}, deterministic order):`);
+console.log(`Sessions (${FROZEN ? "frozen set" : "largest " + sessions.length}, deterministic order):`);
 for (const s of sessions) {
   const bytes = readFileSync(s);
   const sha = createHash("sha256").update(bytes).digest("hex").slice(0, 12);
