@@ -52,3 +52,6 @@ BRANCH-REPORT.md
 DECISIONS.md
 marketing/
 .claude/worktrees/
+
+# Local wrong-verdict reports and saved regression fixtures (redacted session data — keep local)
+.rulereceipt/

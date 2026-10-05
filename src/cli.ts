@@ -16,6 +16,7 @@ import { auditProject, renderProjectAudit } from "./audit.js";
 import { runHealth, renderHealth } from "./health.js";
 import { evaluateSession } from "./evaluate.js";
 import { buildWrongReport, findTarget, reportedLabel } from "./wrong.js";
+import { saveFixture, replayFixtures, renderAccuracy } from "./accuracy.js";
 import { ghReady, issueTitle, issueCreateArgs, buildMailto, mailtoSubject } from "./wrongSubmit.js";
 import { spawnSync } from "node:child_process";
 import { detectSelfEditedRuleFiles } from "./checks/selfEditedRules.js";
@@ -987,6 +988,17 @@ program
   });
 
 program
+  .command("accuracy")
+  .description(
+    "Replay every reported-wrong case you saved with `wrong --save` through the CURRENT build, and show — per check — how many we've since fixed vs still get wrong. The field-sourced counterpart to the frozen fa-corpus. Local only; reads .rulereceipt/fixtures/, sends nothing."
+  )
+  .option("--json", "output machine-readable JSON")
+  .action(async (opts: { json?: boolean }) => {
+    const report = await replayFixtures(process.cwd());
+    console.log(opts.json ? JSON.stringify(report, null, 2) : renderAccuracy(report));
+  });
+
+program
   .command("doctor")
   .description("List every Claude Code hook and VS Code auto-task on this machine/project, flag anything suspicious. With --capabilities, print the capability matrix instead: which agents can be read, what each check inspects, and what the guard cannot catch.")
   .option("--capabilities", "show the capability matrix (agents, checks, guard limits) instead of the hook/task scan")
@@ -1224,7 +1236,8 @@ program
   .option("--no-context", "leave out the session lines around the evidence")
   .option("--submit", "after showing the report, offer to open a PUBLIC GitHub issue (asks first; needs gh)")
   .option("--email", "print a mailto: to send the report privately to the maintainer")
-  .action(async (ruleArg: string, opts: { transcript?: string; out?: string; context?: boolean; submit?: boolean; email?: boolean }) => {
+  .option("--save", "also save a REDACTED local fixture under .rulereceipt/fixtures/ — a permanent regression case replayed by `rulereceipt accuracy` (stays local, nothing sent)")
+  .action(async (ruleArg: string, opts: { transcript?: string; out?: string; context?: boolean; submit?: boolean; email?: boolean; save?: boolean }) => {
     const cwd = process.cwd();
     const rules = loadRules(cwd);
     if (rules.length === 0) {
@@ -1264,6 +1277,11 @@ program
     writeFileSync(outPath, report.markdown);
     console.log(report.markdown);
     console.log(`\nSaved to ${outPath}. Nothing was sent.`);
+
+    if (opts.save) {
+      const fx = saveFixture({ cwd, version: pkg.version, rule: target.rule, result: target.result, events });
+      console.log(`Saved a redacted regression fixture to ${fx}. Replay it anytime with:  rulereceipt accuracy`);
+    }
 
     const reported = reportedLabel(target.result);
 
