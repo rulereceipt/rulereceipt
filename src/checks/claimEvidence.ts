@@ -57,8 +57,13 @@ const SUCCESS_CLAIM =
 // `getting`/`means`/`goal` added 2026-09-26: "Getting tests passing is the
 // last step" and "All tests passing means the refactor is complete" are goal
 // framings, not a report that the tests currently pass (finding #5).
+// The contraction arm matches "n't" preceded by a word char via a lookbehind,
+// NOT `\w+n't`: the greedy `\w+` backtracks quadratically on a long word with no
+// "n't" in it (ReDoS \u2014 40s on a 200k-char token, found 2026-10-05 by probing the
+// pipeline on a large session). The lookbehind is linear and matches the same
+// contractions (don't, isn't, can't, \u2026).
 const NOT_A_CLAIM =
-  /(?:\b(?:if|unless|once|when|after|before|until|should|would|will|going to|i'?ll|let'?s|need to|make sure|ensure|hope|expect|check (?:if|whether)|verify (?:that|if)|not|cannot|getting|means|goal|fail(?:s|ing|ed)?|red|broken)\b|\w+n['\u2019]t\b)/i;
+  /(?:\b(?:if|unless|once|when|after|before|until|should|would|will|going to|i'?ll|let'?s|need to|make sure|ensure|hope|expect|check (?:if|whether)|verify (?:that|if)|not|cannot|getting|means|goal|fail(?:s|ing|ed)?|red|broken)\b|(?<=\w)n['\u2019]t\b)/i;
 
 /**
  * Actions the session can claim to have performed, and the command that
@@ -388,7 +393,13 @@ export function runClaimEvidenceChecks(
     // tests pass is not the session misreporting its own work.
     if (event.kind !== "text" || event.role !== "assistant") continue;
 
-    for (const sentence of sentences(event.text)) {
+    for (const rawSentence of sentences(event.text)) {
+      // Defense-in-depth against ReDoS on untrusted transcript text: a real
+      // success/action claim lives in a short sentence. A pathologically long
+      // "sentence" (a giant unpunctuated blob) is never a claim, so cap what the
+      // claim regexes see — any latent super-linear pattern then runs on bounded
+      // input. Added with the NOT_A_CLAIM fix, 2026-10-05.
+      const sentence = rawSentence.length > 4000 ? rawSentence.slice(0, 4000) : rawSentence;
       // An action claimed with no matching call anywhere before it. Checked
       // against what had been seen AT THE MOMENT of the claim: a push that
       // happens afterwards does not make an earlier statement true.
