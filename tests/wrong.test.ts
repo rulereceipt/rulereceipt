@@ -20,6 +20,28 @@ describe("redact", () => {
     expect(out).not.toMatch(/sk-abcdef|ghp_abc|a\.b@corp|\/home\/dev|hunter22x/);
     expect(out).toContain("~/app");
   });
+
+  it("masks provider tokens with distinctive prefixes (gitleaks/secretlint formats)", () => {
+    const cases: [string, RegExp][] = [
+      [("AIza"+"SyA1234567890123456789012345678901234"), /AIzaSy/],
+      [("ya29."+"a0AfH6SMByExampleToken1234567890"), /ya29\.a0/],
+      [("glpat-"+"ABCDEFghij1234567890"), /glpat-ABC/],
+      [("npm_"+"abcdefghijklmnopqrstuvwxyz0123456789"), /npm_abcd/],
+      [("SG."+"abcdefghijklmnopqrstuv.abcdefghijklmnopqrstuvwxyz0123456789012"), /SG\.abcdef/],
+      [("https://hooks.slack.com/services/"+"T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX"), /hooks\.slack\.com\/services\/T0/],
+      [("https://discord.com/api/webhooks/"+"123456789012345678/abcDEF_ghi-jkl"), /discord\.com\/api\/webhooks\/1234/],
+    ];
+    for (const [secret, leak] of cases) {
+      const out = redact(`here it is: ${secret} end`);
+      expect(out, `should mask: ${secret}`).not.toMatch(leak);
+      expect(out).toContain("<redacted");
+    }
+  });
+
+  it("does not mask ordinary text", () => {
+    const out = redact("git push origin feature/login && npm test -- --run");
+    expect(out).toBe("git push origin feature/login && npm test -- --run");
+  });
 });
 
 describe("reportedLabel matches the issue template options", () => {
