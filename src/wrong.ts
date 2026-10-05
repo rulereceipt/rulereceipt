@@ -32,7 +32,11 @@ const SECRET_PATTERNS: Array<[RegExp, string]> = [
   // Private key blocks and passwords inside URLs go FIRST — before the email
   // rule, which would otherwise partially rewrite a user:pass@host authority.
   [/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g, "<redacted-private-key>"],
-  [/([a-zA-Z][a-zA-Z0-9+.-]*:\/\/[^\s:/@]+:)[^\s:/@]+(@)/g, "$1<redacted>$2"],
+  // Scheme capped at 30 chars (every real URL scheme is short): without the cap,
+  // the `*` backtracks quadratically on long NON-URL text — redact() ran ~280ms
+  // on a 20k-char string and `wrong` on a large session could stall (found by a
+  // suite timeout, 2026-10-05). The cap makes it linear without changing matches.
+  [/([a-zA-Z][a-zA-Z0-9+.-]{0,30}:\/\/[^\s:/@]+:)[^\s:/@]+(@)/g, "$1<redacted>$2"],
   [/\bsk-[A-Za-z0-9_-]{16,}/g, "<redacted-key>"],
   [/\b(?:ghp|gho|ghu|ghs|github_pat)_[A-Za-z0-9_]{16,}/g, "<redacted-token>"],
   [/\bxox[abprs]-[A-Za-z0-9-]{10,}/g, "<redacted-token>"],
