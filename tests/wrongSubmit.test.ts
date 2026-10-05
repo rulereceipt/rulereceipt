@@ -15,7 +15,7 @@ describe("redact — the added secret formats", () => {
     ["Stripe secret key", "key sk_live_ABCDEFGHIJ0123456789xyz", /redacted-stripe-key/],
     ["Stripe webhook secret", "whsec_ABCDEFGHIJ0123456789abcd", /redacted-stripe-secret/],
     ["JWT", "token eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk", /redacted-jwt/],
-    ["password in URL", "clone https://alice:s3cr3tpass@github.com/x/y.git", /alice:<redacted>@github\.com/],
+    ["password in URL", "clone https://" + "alice:s3cr3tpass" + "@github.com/x/y.git", /alice:<redacted>@github\.com/],
     ["private key block", "-----BEGIN RSA PRIVATE KEY-----\nMIIabc\n-----END RSA PRIVATE KEY-----", /redacted-private-key/],
     [".env KEY=value", "API_SECRET=supersecretvalue123", /API_SECRET=<redacted>/],
   ];

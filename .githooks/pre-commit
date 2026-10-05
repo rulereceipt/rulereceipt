@@ -1,0 +1,16 @@
+#!/bin/sh
+# RuleReceipt pre-commit: block a commit that stages a secret-shaped literal.
+# Installed into .git/hooks/pre-commit by scripts/install-git-hooks.mjs (runs on
+# `npm install`). Fails OPEN if secretlint isn't installed yet (fresh clone).
+# Build fake tokens in tests at runtime (split strings) — see CLAUDE.md.
+bin="./node_modules/.bin/secretlint"
+[ -x "$bin" ] || { echo "pre-commit: secretlint not installed — skipping secret scan (run npm install)" >&2; exit 0; }
+files=$(git diff --cached --name-only --diff-filter=ACM)
+[ -z "$files" ] && exit 0
+printf '%s\n' "$files" | xargs "$bin" --maskSecrets
+status=$?
+if [ "$status" -ne 0 ]; then
+  echo "pre-commit BLOCKED: secretlint found a secret-shaped string in a staged file." >&2
+  echo "If it is test data, build it at runtime from split strings (see CLAUDE.md)." >&2
+fi
+exit "$status"
