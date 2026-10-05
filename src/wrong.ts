@@ -40,6 +40,16 @@ const SECRET_PATTERNS: Array<[RegExp, string]> = [
   [/\b(?:sk|pk|rk)_(?:live|test)_[A-Za-z0-9]{16,}/g, "<redacted-stripe-key>"],
   [/\bwhsec_[A-Za-z0-9]{16,}/g, "<redacted-stripe-secret>"],
   [/\bAKIA[0-9A-Z]{16}\b/g, "<redacted-aws-key>"],
+  // High-signal provider tokens with distinctive prefixes (formats are public
+  // token specs, same set gitleaks/secretlint key on — knowledge, not their code).
+  // Over-masking is the safe direction for a report a user may share.
+  [/\bAIza[0-9A-Za-z_-]{35,}\b/g, "<redacted-google-key>"],
+  [/\bya29\.[0-9A-Za-z_-]{20,}/g, "<redacted-google-oauth>"],
+  [/\bglpat-[0-9A-Za-z_-]{20}\b/g, "<redacted-gitlab-token>"],
+  [/\bnpm_[A-Za-z0-9]{36}\b/g, "<redacted-npm-token>"],
+  [/\bSG\.[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{16,}\b/g, "<redacted-sendgrid-key>"],
+  [/https:\/\/hooks\.slack\.com\/services\/T[A-Za-z0-9_/]+/g, "<redacted-slack-webhook>"],
+  [/https:\/\/(?:canary\.|ptb\.)?discord(?:app)?\.com\/api\/webhooks\/[0-9]+\/[A-Za-z0-9_-]+/g, "<redacted-discord-webhook>"],
   // JSON Web Tokens: header.payload.signature, each base64url.
   [/\beyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/g, "<redacted-jwt>"],
   // The value excludes a leading "<" so this never re-clobbers a more specific
