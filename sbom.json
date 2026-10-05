@@ -3,7 +3,7 @@
   "specVersion": "1.5",
   "version": 1,
   "metadata": {
-    "timestamp": "2026-10-05T04:37:25.822Z",
+    "timestamp": "2026-10-05T04:44:06.673Z",
     "component": {
       "type": "application",
       "name": "rulereceipt",
@@ -21,8 +21,8 @@
     {
       "type": "library",
       "name": "@anthropic-ai/sdk",
-      "version": "0.126.0",
-      "purl": "pkg:npm/@anthropic-ai/sdk@0.126.0",
+      "version": "0.131.0",
+      "purl": "pkg:npm/@anthropic-ai/sdk@0.131.0",
       "licenses": [
         {
           "license": {
