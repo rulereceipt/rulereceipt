@@ -20,9 +20,18 @@ import type { CodeContentClassification } from "./classify.js";
  * that only writes matching code via NotebookEdit could under-report,
  * which fails toward UNCLEAR/PASS, not a fabricated FAIL.
  */
+// Documentation/prose files are not "committed code": a code-construct rule
+// (e.g. no `console.log(` calls) must not fire on a .md/.txt/.rst that MENTIONS
+// the construct in prose. Found 2026-10-05 by an adversarial false-accusation
+// probe: writing "Avoid console.log( in production." to docs/readme.md FAILed.
+// NotebookEdit's .ipynb is code, so it is deliberately not in this set.
+const DOC_FILE = /\.(?:md|markdown|mdx|txt|text|rst|adoc|asciidoc|org)$/i;
+
 function editedContentFromEvent(event: TranscriptEvent): string | null {
   if (event.kind !== "tool_use") return null;
-  const input = event.input as { content?: unknown; new_string?: unknown; new_source?: unknown };
+  const input = event.input as { content?: unknown; new_string?: unknown; new_source?: unknown; file_path?: unknown; notebook_path?: unknown };
+  const path = typeof input?.file_path === "string" ? input.file_path : typeof input?.notebook_path === "string" ? input.notebook_path : "";
+  if (DOC_FILE.test(path)) return null; // prose doc, not code
   if (event.toolName === "Write" && typeof input?.content === "string") return input.content;
   if (event.toolName === "Edit" && typeof input?.new_string === "string") return input.new_string;
   if (event.toolName === "NotebookEdit" && typeof input?.new_source === "string") return input.new_source;
