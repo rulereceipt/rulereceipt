@@ -44,6 +44,17 @@ describe("codeContent ignores matches inside comments/strings", () => {
     expect(statusOf(RULE, "// no console.log( please\nconsole.log(value);\n")).toBe("FAIL");
   });
 
+  // Prose in a documentation file is not "committed code" — a mention there is not a call.
+  it("does NOT fire on a prose mention in a .md documentation file", () => {
+    const cls = codeRule(RULE);
+    if (cls.kind !== "codeContent") throw new Error("expected codeContent");
+    const docWrite: TranscriptEvent = { role: "assistant", kind: "tool_use", toolName: "Write", input: { file_path: "docs/readme.md", content: "Avoid console.log( in production." }, timestamp: "t" };
+    expect(runCodeContentChecks([cls], [docWrite])[0].status).not.toBe("FAIL");
+  });
+  it("STILL fires on a real call in a .ts code file (docs skip is path-scoped)", () => {
+    expect(statusOf(RULE, "export function f(){ console.log(x); }")).toBe("FAIL");
+  });
+
   // Imports live in quoted strings — must NOT be stripped away for a token rule.
   it("STILL matches an import specifier inside quotes (strings kept for non-call tokens)", () => {
     const cls = codeRule("Never import `lucide-react`.");

@@ -1,0 +1,3 @@
+{"type":"user","message":{"role":"user","content":"document the logging policy"}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","name":"Write","input":{"file_path":"docs/logging.md","content":"# Logging policy\n\nAvoid leaving a console.log( call in production code. Use the logger instead.\n"}}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Documented the logging policy."}]}}
