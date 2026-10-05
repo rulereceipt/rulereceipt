@@ -192,6 +192,18 @@ check "protect --replay: prints SHADOW banner"          'out "$PB" protect --rep
 check "protect --replay: exits 0"                        '[ "$(rc "$PB" protect --replay)" = "0" ]'
 check "protect --replay: writes no settings file"       'rc "$PB" protect --replay >/dev/null; [ ! -f "$PB/.claude/settings.json" ]'
 
+echo "== accuracy (reported-wrong fixtures replay) =="
+check "accuracy: no fixtures says so, exits 0"          '[ "$(rc "$PB" accuracy)" = "0" ] && out "$PB" accuracy | grep -qi "No saved fixtures"'
+
+echo "== git-guard + protect --git (pre-push branch rule) =="
+PGIT="$(newproj pgit '## Branch\nNever push to the `main` branch directly.\n')"
+mkdir -p "$PGIT/.git/hooks"
+check "git-guard: blocks a push to main (exit 1)"       'printf "refs/heads/main %040d refs/heads/main %040d\n" 1 0 | (cd "$PGIT" && "$RR" git-guard >/dev/null 2>&1); [ $? -eq 1 ]'
+check "git-guard: allows a push to a feature branch"    'printf "refs/heads/feature/x %040d refs/heads/feature/x %040d\n" 1 0 | (cd "$PGIT" && "$RR" git-guard >/dev/null 2>&1); [ $? -eq 0 ]'
+check "protect --git: installs an executable pre-push"  '(cd "$PGIT" && "$RR" protect --git --yes >/dev/null 2>&1); [ -x "$PGIT/.git/hooks/pre-push" ]'
+check "protect --git: hook calls rulereceipt git-guard" 'grep -q "rulereceipt git-guard" "$PGIT/.git/hooks/pre-push"'
+check "protect --git --undo: removes the hook"          '(cd "$PGIT" && "$RR" protect --git --undo >/dev/null 2>&1); [ ! -e "$PGIT/.git/hooks/pre-push" ]'
+
 echo "== no stack traces =="
 ALL="$B
 $(out "$PE" check --transcript s.jsonl)
