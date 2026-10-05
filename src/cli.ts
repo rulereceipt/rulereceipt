@@ -27,6 +27,8 @@ import { listSessionRows, renderSessionList } from "./listSessions.js";
 import { runSelfTestChecks, renderSelfTest } from "./selftest.js";
 import { planProtect, applyProtect, undoProtect, PROTECT_HOOK_SNIPPET } from "./protect.js";
 import { replayGuard, renderReplay } from "./replay.js";
+import { planGitProtect, applyGitProtect, undoGitProtect, evaluateGitPush, PRE_PUSH_SCRIPT } from "./gitProtect.js";
+const GIT_GUARD_LINE = "rulereceipt git-guard || exit 1";
 import { capabilityReport, renderCapabilities } from "./capabilities.js";
 import { cardSvg, renderCardShare, type CardData } from "./card.js";
 import { createInterface } from "node:readline";
@@ -988,6 +990,20 @@ program
   });
 
 program
+  .command("git-guard")
+  .description("run as a git pre-push hook — refuse a push that breaks a branch rule (push refs on stdin). Installed by `protect --git`. Override one push with `git push --no-verify`.")
+  .action(async () => {
+    let stdin = "";
+    if (!process.stdin.isTTY) {
+      process.stdin.setEncoding("utf8");
+      for await (const chunk of process.stdin) stdin += chunk;
+    }
+    const { block, messages } = evaluateGitPush(process.cwd(), stdin);
+    for (const m of messages) console.error(m);
+    if (block) process.exitCode = 1;
+  });
+
+program
   .command("accuracy")
   .description(
     "Replay every reported-wrong case you saved with `wrong --save` through the CURRENT build, and show — per check — how many we've since fixed vs still get wrong. The field-sourced counterpart to the frozen fa-corpus. Local only; reads .rulereceipt/fixtures/, sends nothing."
@@ -1487,12 +1503,51 @@ program
     "Wire RuleReceipt's enforcement into Claude Code: a PreToolUse guard (refuses a command that breaks a file/branch rule; asks before an unapproved push/commit) and a Stop hook (won't let a session end on a broken rule). Shows exactly what it will add to .claude/settings.json and asks first. Undo anytime with --undo (restores the file byte-for-byte)."
   )
   .option("--undo", "remove what protect added, restoring .claude/settings.json byte-for-byte")
+  .option("--git", "install a git pre-push hook that refuses a push breaking a branch rule (catches pushes made outside Claude Code); --git --undo removes it")
   .option("--replay", "shadow: run the current guard + rules against your recent sessions and show what it WOULD have blocked — changes nothing")
   .option("--yes", "skip the confirmation prompt (for scripts)")
-  .action(async (opts: { undo?: boolean; replay?: boolean; yes?: boolean }) => {
+  .action(async (opts: { undo?: boolean; git?: boolean; replay?: boolean; yes?: boolean }) => {
     const cwd = process.cwd();
     if (opts.replay) {
       console.log(renderReplay(replayGuard(cwd)));
+      return;
+    }
+    if (opts.git) {
+      if (opts.undo) {
+        const r = undoGitProtect(cwd);
+        console.log(r.message);
+        if (!r.ok) process.exitCode = 1;
+        return;
+      }
+      const gplan = planGitProtect(cwd);
+      if (gplan.notAGitRepo) {
+        console.log("No .git here — run this inside a git repository. (git init first, if you meant to.)");
+        process.exitCode = 1;
+        return;
+      }
+      if (gplan.foreignHook) {
+        console.log(`A pre-push hook already exists at ${gplan.hookPath} that RuleReceipt did not write.`);
+        console.log("protect will NOT overwrite it. To enable the guard, add this line to that hook:\n");
+        console.log(`    ${GIT_GUARD_LINE}`);
+        process.exitCode = 1;
+        return;
+      }
+      if (gplan.alreadyProtected) {
+        console.log(`Already protected — the RuleReceipt pre-push hook is in ${gplan.hookPath}. Nothing to add.`);
+        return;
+      }
+      console.log(`protect --git will write ${gplan.hookPath}:\n`);
+      console.log(PRE_PUSH_SCRIPT.split("\n").map((l) => `    ${l}`).join("\n"));
+      console.log("It blocks only a push a branch rule forbids; override one push with `git push --no-verify`. Undo: rulereceipt protect --git --undo");
+      if (!opts.yes) {
+        const ok = await confirmYesNo("\nInstall this pre-push hook? [y/N] ");
+        if (!ok) {
+          console.log("No changes made.");
+          return;
+        }
+      }
+      applyGitProtect(cwd, gplan);
+      console.log(`\nDone — wrote ${gplan.hookPath}. It runs on every \`git push\` from this repo.`);
       return;
     }
     if (opts.undo) {
