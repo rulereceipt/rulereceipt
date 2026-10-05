@@ -1,0 +1,5 @@
+{"type":"user","message":{"role":"user","content":"push it"}}
+{"type":"user","message":{"role":"user","content":"actually hold off"}}
+{"type":"user","message":{"role":"user","content":"ok, push it now"}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","name":"Bash","input":{"command":"git push origin feature/login"}}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Pushed feature/login."}]}}
