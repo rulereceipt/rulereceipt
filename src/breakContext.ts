@@ -49,9 +49,14 @@ export interface BreakContext {
 
 // A rules file being injected into context. Covers the literal injected header
 // ("Contents of .../CLAUDE.md (project instructions"), the "checked into" variant,
-// and the structural claudeMd attachment (escaped or not inside a JSONL line).
+// the structural claudeMd attachment, the modern `instructions` attachment whose
+// files[].path names a rules file, and a `nested_memory` attachment (the memory
+// graph) — each escaped or not inside a JSONL line. The instructions + nested
+// forms were added 2026-10-05: without them a session whose rules loaded via an
+// attachment (not the old header) read as "not in context", wrongly downgrading
+// a real break to "rule not visible".
 const RULES_INJECTION =
-  /Contents of [^\n"]*(?:CLAUDE|AGENTS|GEMINI|AGENT)[^\n"]*\.md \(project instructions|project instructions, checked into|\\?"(?:claudeMd|type\\?":\\?"claudeMd)\\?"|\\?"type\\?":\s*\\?"claudeMd/;
+  /Contents of [^\n"]*(?:CLAUDE|AGENTS|GEMINI|AGENT)[^\n"]*\.md \(project instructions|project instructions, checked into|\\?"(?:claudeMd|type\\?":\\?"claudeMd)\\?"|\\?"type\\?":\s*\\?"claudeMd|\\?"type\\?":\s*\\?"instructions\\?"[\s\S]*?(?:CLAUDE|AGENTS|GEMINI|AGENT)[^"\\]*\.md|\\?"type\\?":\s*\\?"nested_memory\\?"/;
 
 const COMPACTION = /"isCompactSummary"\s*:\s*true/;
 
@@ -60,7 +65,7 @@ const COMPACTION = /"isCompactSummary"\s*:\s*true/;
 // rules-file block, or a compaction. If none of this appears, the log is too
 // thin to conclude the rules file was absent (vs simply not recorded).
 const CONTEXT_MACHINERY =
-  /<system-reminder>|\\?"claudeMd\\?"|"type"\s*:\s*"(?:instructions|attachment|system)"|project instructions|Contents of [^\n"]*\.md|"isCompactSummary"\s*:\s*true/i;
+  /<system-reminder>|\\?"claudeMd\\?"|"type"\s*:\s*"(?:instructions|nested_memory|attachment|system)"|project instructions|Contents of [^\n"]*\.md|"isCompactSummary"\s*:\s*true/i;
 
 /** Longest-first distinctive fragments of the evidence to find the break line by. */
 function needles(evidence: string): string[] {
