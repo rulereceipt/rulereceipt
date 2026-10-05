@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+import { join, delimiter } from "node:path";
 import { ADAPTERS, EXPERIMENTAL_ADAPTERS, UNSUPPORTED_TOOLS } from "./adapters/index.js";
 
 /**
@@ -62,14 +64,50 @@ export const GUARD_LIMITS: string[] = [
   "anything outside a PreToolUse tool call — it guards tool calls, it does not make the model obey",
 ];
 
+/**
+ * Companion tools that do a DIFFERENT, complementary job — surfaced so a user
+ * isn't told to pick. agnix lints the rules FILE (quality, structure, conflicts);
+ * RuleReceipt checks the agent's BEHAVIOUR against it. They sit on either side of
+ * the same problem, so doctor names agnix whether or not it's installed, and says
+ * when it found it on your PATH.
+ */
+export interface Companion {
+  name: string;
+  installed: boolean;
+  note: string;
+}
+
+function onPath(bin: string): boolean {
+  const dirs = (process.env.PATH ?? "").split(delimiter).filter(Boolean);
+  for (const d of dirs) {
+    try {
+      if (existsSync(join(d, bin)) || existsSync(join(d, `${bin}.exe`)) || existsSync(join(d, `${bin}.cmd`))) return true;
+    } catch {
+      /* unreadable PATH entry: skip */
+    }
+  }
+  return false;
+}
+
+export function companions(): Companion[] {
+  return [
+    {
+      name: "agnix",
+      installed: onPath("agnix"),
+      note: "lints your rules FILE (structure, quality, conflicting lines). RuleReceipt checks what the agent actually DID with it — complementary, use both.",
+    },
+  ];
+}
+
 export interface CapabilityReport {
   agents: AgentCapability[];
   methods: typeof CHECK_METHODS;
   guardLimits: string[];
+  companions: Companion[];
 }
 
 export function capabilityReport(): CapabilityReport {
-  return { agents: agentCapabilities(), methods: CHECK_METHODS, guardLimits: GUARD_LIMITS };
+  return { agents: agentCapabilities(), methods: CHECK_METHODS, guardLimits: GUARD_LIMITS, companions: companions() };
 }
 
 export function renderCapabilities(r: CapabilityReport): string {
@@ -83,5 +121,10 @@ export function renderCapabilities(r: CapabilityReport): string {
   out.push("");
   out.push("What it CANNOT catch (by design — it detects and reports, it does not force the model to obey):");
   for (const l of r.guardLimits) out.push(`  • ${l}`);
+  if (r.companions.length > 0) {
+    out.push("");
+    out.push("Companion tools (different job, use alongside):");
+    for (const c of r.companions) out.push(`  • ${c.name}${c.installed ? " (found on your PATH)" : ""} — ${c.note}`);
+  }
   return out.join("\n");
 }

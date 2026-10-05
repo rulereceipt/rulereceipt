@@ -220,3 +220,22 @@ resolve. Those are a limit of static command-text matching, not a bug; for them,
 rely on Claude Code's own sandbox/permissions (same reasoning as the "reads it
 can't see the target of" gap above). Our guard-bypass test suite pins both the
 cases we catch and these known-opaque ones, so a regression in either is noticed.
+
+## Why the shell parser is regex-based, not tree-sitter
+
+The command parser (segments / leadingCommand / stripLeadingRedirections in
+shellCommand.ts) is deliberately a focused set of regexes, not a full shell
+grammar via tree-sitter-bash. We evaluated the swap and chose not to:
+
+- The regex parser passes the whole adversarial bypass suite (tests/guardBypass):
+  leading/trailing redirections, env prefixes, `git -C`, `sh -c`/`bash -lc`,
+  heredocs, chains, `eval "…"`. The cases it can't catch (a base64-encoded command
+  piped to a shell, a target injected by xargs) are opaque to ANY static parser —
+  tree-sitter wouldn't catch them either (see the opaque-commands section above).
+- tree-sitter-bash is a NATIVE dependency. It would add build/install friction to
+  a CLI whose whole appeal is a zero-friction `npx rulereceipt`, and native builds
+  are exactly what breaks on a user's machine.
+
+So the cost is real and the marginal catch is ~zero on the cases that matter. If
+that ever changes — a concrete bypass the regex parser provably can't handle but a
+grammar can — this decision gets revisited with that benchmark as the evidence.
