@@ -205,7 +205,7 @@ and where it broke a rule it could be held to.
 Codex stores a compacted session as a Zstandard-compressed `rollout-*.jsonl.zst`.
 RuleReceipt now reads those (via `node:zlib` zstd), but that needs **Node 22.15 or
 newer** — on an older Node the compressed files are skipped with a one-line note,
-not read. Codex support as a whole is still **experimental**: it has been verified
+not read. Codex support as a whole is still **in testing**: it has been verified
 against the documented format and synthetic fixtures, not yet against a real
 end-to-end Codex rollout, so treat Codex verdicts as provisional until that check.
 

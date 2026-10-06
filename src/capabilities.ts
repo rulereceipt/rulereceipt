@@ -26,7 +26,7 @@ export interface AgentCapability {
 const UNVALIDATED = new Set<string>(["codex"]);
 const NOTES: Record<string, string> = {
   "claude-code": "full support — parsed and validated end-to-end",
-  codex: "in testing — parser exists, not yet validated on a real personal rollout (.jsonl.zst not yet read; see KNOWN-GAPS)",
+  codex: "in testing — reads rollout-*.jsonl and compressed .jsonl.zst (zst needs Node 22.15+), not yet validated on a real end-to-end rollout",
 };
 
 export function agentCapabilities(): AgentCapability[] {
