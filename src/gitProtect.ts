@@ -35,9 +35,10 @@ exit 0
 /** Resolve the hooks directory, following a `.git` file (worktree/submodule) when present. */
 export function gitHooksDir(cwd: string): string | null {
   const dotGit = join(cwd, ".git");
-  if (!existsSync(dotGit)) return null;
   let gitDir = dotGit;
   try {
+    // Act-then-handle (no existsSync pre-check): statSync throws if .git is
+    // absent, which the catch turns into null — avoids a check-then-use race.
     if (statSync(dotGit).isFile()) {
       const m = readFileSync(dotGit, "utf-8").match(/gitdir:\s*(.+)\s*/);
       if (!m) return null;

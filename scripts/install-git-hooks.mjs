@@ -14,8 +14,9 @@ import { join, isAbsolute, resolve, dirname } from "node:path";
 
 try {
   const dotGit = join(process.cwd(), ".git");
-  if (!existsSync(dotGit)) process.exit(0);
   let gitDir = dotGit;
+  // Act-then-handle: statSync throws (caught below) if there is no .git — a
+  // tarball install or non-repo — avoiding an existsSync-then-stat race.
   if (statSync(dotGit).isFile()) {
     const m = readFileSync(dotGit, "utf-8").match(/gitdir:\s*(.+)\s*/);
     if (!m) process.exit(0);
