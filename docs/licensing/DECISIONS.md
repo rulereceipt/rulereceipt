@@ -61,3 +61,19 @@ tests**. Our own bypass/adversarial tests are written from scratch against those
 categories, with our own commands and expectations, and credited as inspiration only.
 Same rule as the vestige/Operator Lite entry: AGPL copyleft, so reimplement ideas, never
 copy text. No GuardFall string, case, or file may appear in `git log` for this repo.
+
+## Reference forks — unmodified copies kept for licence/continuity (2026-10-06)
+We keep unmodified forks of three upstream tools purely as reference/continuity
+copies. **No code from these is copied into RuleReceipt** (same knowledge-only
+stance as the entries above). Exact pinned state at time of record:
+
+| fork (rulereceipt/) | upstream | licence | pinned HEAD |
+|---------------------|----------|---------|-------------|
+| agnix    | agent-sh/agnix       | Apache-2.0 | d094c05acd13 |
+| rulesync | dyoshikawa/rulesync  | MIT        | bdee6b3538ad |
+| deja-vu  | vshulcz/deja-vu      | MIT        | aeb70455a0ff |
+
+Each fork's GitHub description is set to "Unmodified reference copy of <upstream>
+(licence <X>), kept for licence/continuity" so there is no ambiguity that we
+claim authorship. Release artefacts + LICENSE files to be archived in the private
+data repo (TODO — needs the private-repo location; see end-of-day report).
