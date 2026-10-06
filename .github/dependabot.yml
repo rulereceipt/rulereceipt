@@ -41,6 +41,11 @@ updates:
       dev-dependencies:
         dependency-type: development
         update-types: [minor, patch]
+      # Batch production minor/patch bumps into one weekly PR too, so the whole
+      # week's safe updates land as a single review and a single release.
+      production-dependencies:
+        dependency-type: production
+        update-types: [minor, patch]
     commit-message:
       prefix: "deps"
       prefix-development: "deps-dev"
@@ -54,5 +59,11 @@ updates:
       interval: weekly
       day: monday
       time: "07:00"
+    groups:
+      # One PR for all action bumps per week, not one per sub-action — the
+      # codeql-action init/analyze/upload-sarif trio arrived as three separate
+      # PRs (#34-36) without this.
+      actions:
+        patterns: ["*"]
     commit-message:
       prefix: "ci"
