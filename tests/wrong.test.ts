@@ -22,18 +22,21 @@ describe("redact", () => {
   });
 
   it("masks provider tokens with distinctive prefixes (gitleaks/secretlint formats)", () => {
-    const cases: [string, RegExp][] = [
-      [("AIza"+"SyA1234567890123456789012345678901234"), /AIzaSy/],
-      [("ya29."+"a0AfH6SMByExampleToken1234567890"), /ya29\.a0/],
-      [("glpat-"+"ABCDEFghij1234567890"), /glpat-ABC/],
-      [("npm_"+"abcdefghijklmnopqrstuvwxyz0123456789"), /npm_abcd/],
-      [("SG."+"abcdefghijklmnopqrstuv.abcdefghijklmnopqrstuvwxyz0123456789012"), /SG\.abcdef/],
-      [("https://hooks.slack.com/services/"+"T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX"), /hooks\.slack\.com\/services\/T0/],
-      [("https://discord.com/api/webhooks/"+"123456789012345678/abcDEF_ghi-jkl"), /discord\.com\/api\/webhooks\/1234/],
+    // [token, distinctive fragment that must be gone after redaction]. Plain
+    // substring checks, not regexes — a leak check needs containment, not a
+    // pattern, and an unanchored regex here just trips CodeQL for no benefit.
+    const cases: [string, string][] = [
+      [("AIza"+"SyA1234567890123456789012345678901234"), "AIzaSy"],
+      [("ya29."+"a0AfH6SMByExampleToken1234567890"), "ya29.a0"],
+      [("glpat-"+"ABCDEFghij1234567890"), "glpat-ABC"],
+      [("npm_"+"abcdefghijklmnopqrstuvwxyz0123456789"), "npm_abcd"],
+      [("SG."+"abcdefghijklmnopqrstuv.abcdefghijklmnopqrstuvwxyz0123456789012"), "SG.abcdef"],
+      [("https://hooks.slack.com/services/"+"T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX"), "hooks.slack.com/services/T0"],
+      [("https://discord.com/api/webhooks/"+"123456789012345678/abcDEF_ghi-jkl"), "discord.com/api/webhooks/1234"],
     ];
     for (const [secret, leak] of cases) {
       const out = redact(`here it is: ${secret} end`);
-      expect(out, `should mask: ${secret}`).not.toMatch(leak);
+      expect(out, `should mask: ${secret}`).not.toContain(leak);
       expect(out).toContain("<redacted");
     }
   });

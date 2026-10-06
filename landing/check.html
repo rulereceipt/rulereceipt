@@ -200,7 +200,9 @@
   // Single HTML-escaper for the whole module. There were two (a `function esc`
   // and a `const esc`), which is a SyntaxError in a module and silently broke
   // every interactive part of this page — fixed 2026-09-29.
-  const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  // Escapes for both text and ATTRIBUTE context (quotes included), so values
+  // interpolated into `href="..."` can't break out of the attribute.
+  const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 
   const EXAMPLE = `# Engineering rules
 
