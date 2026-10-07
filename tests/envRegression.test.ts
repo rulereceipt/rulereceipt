@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { join } from "node:path";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
-import { homedir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { evaluateSession } from "../src/evaluate.js";
 import { loadRules } from "../src/rules.js";
 import { parseSessionFile } from "../src/adapters/index.js";
@@ -59,5 +59,32 @@ describe(".env edit is Broken", () => {
     const env = results.find((r) => r.ruleTitle.includes(".env"));
     expect(env?.status).toBe("FAIL");
     expect(env?.evidence).toContain(".env");
+  });
+
+  it("an edit OUTSIDE the project (/tmp) is can't-tell, said honestly — never 'never written', never Broken", async () => {
+    // A temp project dir is under /var|/tmp, so isProjectPath treats its .env as
+    // a throwaway — not a violation, but the evidence must SAY the file was
+    // edited outside the project, not claim it was never touched.
+    const tmp = mkdtempSync(join(tmpdir(), "rr-outside-"));
+    try {
+      mkdirSync(join(tmp, ".git"));
+      writeFileSync(join(tmp, "CLAUDE.md"), "- Never edit `.env`.\n");
+      const f = join(tmp, "s.jsonl");
+      writeFileSync(
+        f,
+        [
+          JSON.stringify({ type: "user", cwd: tmp, timestamp: "t", message: { role: "user", content: "x" } }),
+          JSON.stringify({ type: "assistant", cwd: tmp, timestamp: "t", message: { role: "assistant", content: [{ type: "tool_use", id: "a", name: "Edit", input: { file_path: join(tmp, ".env"), old_string: "X=1", new_string: "X=2" } }] } }),
+          JSON.stringify({ type: "user", cwd: tmp, timestamp: "t", message: { role: "user", content: [{ type: "tool_result", tool_use_id: "a", content: "ok" }] } }),
+        ].join("\n") + "\n"
+      );
+      const { results } = await evaluateSession(tmp, loadRules(tmp), parseSessionFile(f), false, stub);
+      const env = results.find((r) => r.ruleTitle.includes(".env"));
+      expect(env?.status).not.toBe("FAIL");
+      expect(env?.evidence).toMatch(/outside the project/i);
+      expect(env?.evidence).not.toMatch(/never written/i);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
   });
 });

@@ -87,8 +87,21 @@ function mutatesPathInBash(rawCommand: string, filePath: string): boolean {
   return false;
 }
 
-function findMutation(events: TranscriptEvent[], filePath: string): string | null {
+interface MutationResult {
+  /** The mutation that counts (the file was edited inside the project). */
+  mutation: string | null;
+  /**
+   * The forbidden file WAS edited, but at a throwaway path outside the project
+   * (a /tmp or /var scratch dir), so it is not counted as a violation. Recorded
+   * separately so the report can say that honestly ("edited outside the project,
+   * not checked") instead of the misleading "never written to".
+   */
+  outsideProject: string | null;
+}
+
+function findMutation(events: TranscriptEvent[], filePath: string): MutationResult {
   const normalized = filePath.replace(/^\.\//, "");
+  let outsideProject: string | null = null;
   for (const event of events) {
     if (event.kind !== "tool_use") continue;
 
@@ -96,14 +109,18 @@ function findMutation(events: TranscriptEvent[], filePath: string): string | nul
       const input = event.input as { file_path?: unknown };
       if (typeof input?.file_path === "string") {
         const actual = input.file_path.replace(/^\.\//, "");
+        const matches = actual === normalized || actual.endsWith(`/${normalized}`);
+        if (!matches) continue;
         // A throwaway copy is not the project's file. A rule saying
         // "CHANGELOG.md is release-only" fired on a scratchpad CHANGELOG.md
         // written during a probe and deleted minutes later — the basename
-        // matched and nothing else was checked.
-        if (!isProjectPath(actual)) continue;
-        if (actual === normalized || actual.endsWith(`/${normalized}`)) {
-          return `${event.toolName} on ${input.file_path}`;
+        // matched and nothing else was checked. But say so, rather than claim
+        // the file was never touched: it WAS, just somewhere we don't govern.
+        if (!isProjectPath(actual)) {
+          if (!outsideProject) outsideProject = input.file_path;
+          continue;
         }
+        return { mutation: `${event.toolName} on ${input.file_path}`, outsideProject };
       }
       continue;
     }
@@ -119,12 +136,15 @@ function findMutation(events: TranscriptEvent[], filePath: string): string | nul
         // does `cd /tmp` on its first line and writes `.claude/CLAUDE.md`
         // three lines later. A shortened one-line fixture passed while the
         // real command kept failing.
-        if (CD_INTO_TEMP.test(input.command)) continue;
-        return input.command;
+        if (CD_INTO_TEMP.test(input.command)) {
+          if (!outsideProject) outsideProject = input.command;
+          continue;
+        }
+        return { mutation: input.command, outsideProject };
       }
     }
   }
-  return null;
+  return { mutation: null, outsideProject };
 }
 
 export function runFileLifecycleChecks(
@@ -132,11 +152,27 @@ export function runFileLifecycleChecks(
   events: TranscriptEvent[]
 ): CheckResult[] {
   return classifications.map(({ rule, filePath, polarity, polarityInferred }) => {
-    const mutation = findMutation(events, filePath);
+    const { mutation, outsideProject } = findMutation(events, filePath);
 
     if (polarity === "forbid") {
       if (mutation) {
         return violation(rule, polarity, `"${filePath}" was actually modified: ${mutation.slice(0, 160)}`, { method: "file_events", polarityInferred });
+      }
+      // The forbidden file WAS edited, but at a throwaway path outside the
+      // project (a /tmp or /var scratch dir). Never a FAIL — but do NOT claim it
+      // was never written: it was, somewhere we don't govern. Can't-tell, said
+      // honestly, so the user can judge whether that path actually mattered.
+      if (outsideProject) {
+        return {
+          ruleId: rule.id,
+          ruleTitle: rule.title,
+          ruleSource: rule.source,
+          status: "UNCLEAR" as const,
+          outcome: "not_applicable" as const,
+          method: "file_events" as const,
+          ceiling: "the edit was to a path outside the project folder, which the project's rules do not govern",
+          evidence: `"${filePath}" was edited at ${outsideProject.slice(0, 160)}, outside the project folder (a /tmp or scratch path), so it was not checked`,
+        };
       }
         // Trigger evaluated and absent: the rule never applied. Not
         // "followed" — that word claims something the check cannot show.
