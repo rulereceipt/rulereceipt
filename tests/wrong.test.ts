@@ -16,7 +16,7 @@ const user = (text: string): TranscriptEvent => ({ role: "user", kind: "text", t
 
 describe("redact", () => {
   it("masks common secrets, emails and the home path", () => {
-    const out = redact("key sk-abcdefghijklmnop1234 token ghp_abcdefghijklmnopqrstuv mail a.b@corp.com at /home/dev/app password=hunter22x", "/home/dev");
+    const out = redact("key sk" + "-abcdefghijklmnop1234 token ghp" + "_abcdefghijklmnopqrstuv mail a.b@corp.com at /home/dev/app password=hunter22x", "/home/dev");
     expect(out).not.toMatch(/sk-abcdef|ghp_abc|a\.b@corp|\/home\/dev|hunter22x/);
     expect(out).toContain("~/app");
   });

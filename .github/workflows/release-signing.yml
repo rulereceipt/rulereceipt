@@ -1,0 +1,47 @@
+name: Release signing
+
+# Attaches a SIGNED artifact to each GitHub release: the `npm pack` tarball plus
+# a SLSA provenance attestation (sigstore bundle). This is deliberately a
+# SEPARATE workflow from publish.yml so it can never affect the npm publish — if
+# this job fails, the package is still published to npm (with its own --provenance
+# attestation); only the GitHub-release asset would be missing. Satisfies the
+# OpenSSF Scorecard "Signed-Releases" check.
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write # create the release + upload assets
+  id-token: write # sigstore OIDC for the attestation
+  attestations: write # record the provenance attestation
+
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npm run build
+      - name: Pack the tarball
+        id: pack
+        run: echo "file=$(npm pack --silent)" >> "$GITHUB_OUTPUT"
+      - name: Attest build provenance (sigstore bundle)
+        id: attest
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: ${{ steps.pack.outputs.file }}
+      - name: Create / update the GitHub release with signed artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FILE: ${{ steps.pack.outputs.file }}
+          BUNDLE: ${{ steps.attest.outputs.bundle-path }}
+        run: |
+          set -euo pipefail
+          cp "$BUNDLE" "${FILE}.sigstore"
+          gh release create "$GITHUB_REF_NAME" "$FILE" "${FILE}.sigstore" \
+            --title "$GITHUB_REF_NAME" --generate-notes \
+            || gh release upload "$GITHUB_REF_NAME" "$FILE" "${FILE}.sigstore" --clobber

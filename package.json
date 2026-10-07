@@ -67,6 +67,7 @@
     "@types/node": "^26.4.0",
     "@types/nodemailer": "^8.0.1",
     "eslint": "^10.9.1",
+    "fast-check": "^4.10.2",
     "secretlint": "^13.0.7",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0",
