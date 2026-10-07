@@ -1,6 +1,6 @@
 {
   "name": "rulereceipt",
-  "version": "0.1.93",
+  "version": "0.1.94",
   "description": "Did your agent push without asking? Say tests pass when none ran? RuleReceipt shows you, with the exact line as proof. Checks a Claude Code session (Codex in testing; other agents experimental) against your CLAUDE.md / AGENTS.md rules; also reads Cursor, Copilot and Windsurf rules files.",
   "repository": {
     "type": "git",
