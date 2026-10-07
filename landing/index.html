@@ -260,11 +260,11 @@
   .signup-note { margin-top: 12px; font-size: 0.82rem; color: var(--paper-dim); min-height: 1.2em; }
   .signup-note.ok { color: var(--cyan); }
   .signup-note.err { color: var(--red); }
-  .install[data-copy], footer .cmd-repeat[data-copy] {
+  .install[data-copy], .conf[data-copy], footer .cmd-repeat[data-copy] {
     cursor: pointer;
     transition: border-color 0.15s, background 0.15s;
   }
-  .install[data-copy]:hover, footer .cmd-repeat[data-copy]:hover { border-color: var(--amber); }
+  .install[data-copy]:hover, .conf[data-copy]:hover, footer .cmd-repeat[data-copy]:hover { border-color: var(--amber); }
   footer .cmd-repeat[data-copy] { display: inline-block; border: 1px solid transparent; border-radius: 8px; padding: 4px 8px; }
   footer .cmd-repeat[data-copy]:hover { background: var(--panel); }
 
@@ -924,7 +924,7 @@
       </div>
 
       <p style="color:var(--paper-dim); font-size:0.92rem; margin:18px 0 6px;">Add this to <code>.claude/settings.json</code> &mdash; you add it, not us:</p>
-      <div class="conf">{
+      <div class="conf" data-copy="{&#10;  &quot;hooks&quot;: {&#10;    &quot;Stop&quot;: [&#10;      { &quot;hooks&quot;: [ { &quot;type&quot;: &quot;command&quot;, &quot;command&quot;: &quot;npx rulereceipt hook&quot; } ] }&#10;    ]&#10;  }&#10;}" data-loc="hooks-config" role="button" tabindex="0" title="Click to copy">{
   <span class="k">"hooks"</span>: {
     <span class="k">"Stop"</span>: [
       { <span class="k">"hooks"</span>: [ { <span class="k">"type"</span>: "command", <span class="k">"command"</span>: "npx rulereceipt hook" } ] }
@@ -1272,10 +1272,14 @@
       navigator.clipboard.writeText(text).catch(function () {});
       if (window.posthog) posthog.capture('copy_install_command', { location: el.getAttribute('data-loc') });
       var target = el.querySelector('.cmd, .fp-val') || el;
-      var original = target.textContent;
+      // When the whole element is the target and it has child markup (the conf
+      // block's syntax-highlight spans), restore innerHTML so the highlighting
+      // isn't flattened by the textContent swap.
+      var swapHtml = target === el && el.children.length > 0;
+      var original = swapHtml ? target.innerHTML : target.textContent;
       target.textContent = 'copied!';
       clearTimeout(el._copyTimer);
-      el._copyTimer = setTimeout(function () { target.textContent = original; }, 1400);
+      el._copyTimer = setTimeout(function () { if (swapHtml) { target.innerHTML = original; } else { target.textContent = original; } }, 1400);
     }
     el.addEventListener('click', doCopy);
     el.addEventListener('keydown', function (e) {
