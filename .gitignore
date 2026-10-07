@@ -55,3 +55,6 @@ marketing/
 
 # Local wrong-verdict reports and saved regression fixtures (redacted session data — keep local)
 .rulereceipt/
+
+# ephemeral: planted failures from scripts/gate-selftest.sh
+tests/_gate_selftest/

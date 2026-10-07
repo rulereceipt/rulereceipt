@@ -143,6 +143,14 @@ console.log(`Reports carrying at least one FAIL: ${withFail}  (${((withFail / re
 console.log(`Total FAIL verdicts: ${failVerdicts}`);
 console.log(`Distinct FAIL texts: ${texts.size}`);
 
+// In FROZEN mode this is a GATE, not a report: the frozen corpus is synthetic
+// and known-clean, so any report carrying a FAIL is a regression. Fail by EXIT
+// CODE (never require a caller to grep this output) — 2026-10-07.
+if (FROZEN && withFail > 0) {
+  console.error(`\nGATE FAILED: frozen corpus must have 0 reports carrying a FAIL; got ${withFail} of ${reports}.`);
+  process.exit(1);
+}
+
 const showAll = process.argv.includes("--all");
 const top = [...texts.entries()].sort((a, b) => b[1] - a[1]).slice(0, showAll ? Infinity : 8);
 if (top.length > 0) {
