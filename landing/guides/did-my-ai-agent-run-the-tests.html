@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<script>
+    !function(t,e){var o,n,p,r;e.__SV||(window.posthog && window.posthog.__loaded)||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}p||((p=t.createElement("script")).type="text/javascript",p.crossOrigin="anonymous",p.async=!0,p.src=s.api_host.replace(".i.posthog.com","-assets.i.posthog.com")+"/static/array.js",p.onerror=function(){p=null},(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r));var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+".people (stub)"},o="Sn Cn init Hn Un Gn Yi zn Kn qn capture Vn kn calculateEventProperties es register register_once register_for_session unregister unregister_for_session os Bn ss getFeatureFlag getFeatureFlagPayload getFeatureFlagResult getAllFeatureFlags isFeatureEnabled reloadFeatureFlags updateFlags updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures on onFeatureFlags onSurveysLoaded onSessionId getSurveys getActiveMatchingSurveys renderSurvey displaySurvey cancelPendingSurvey canRenderSurvey canRenderSurveyAsync ls identify setPersonProperties unsetPersonProperties group resetGroups setPersonPropertiesForFlags resetPersonPropertiesForFlags setGroupPropertiesForFlags resetGroupPropertiesForFlags reset us shutdown setIdentity clearIdentity get_distinct_id getGroups get_session_id get_session_replay_url alias set_config startSessionRecording stopSessionRecording sessionRecordingStarted captureException addExceptionStep captureLog startExceptionAutocapture stopExceptionAutocapture loadToolbar get_property getSessionProperty rs Xn createPersonProfile setInternalOrTestUser ns $n vs opt_in_capturing opt_out_capturing has_opted_in_capturing has_opted_out_capturing get_explicit_consent_status is_capturing clear_opt_in_out_capturing Jn debug tr At getPageViewId captureTraceFeedback captureTraceMetric Ln".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
+    posthog.init('phc_A4TBtMr58tNcGFEnoC82pPqzrKxXRGw84B8RVd8JK2nW', {
+        api_host: 'https://us.i.posthog.com',
+        defaults: '2026-05-30',
+        person_profiles: 'identified_only',
+        autocapture: false,
+        disable_session_recording: true,
+        capture_pageview: true,
+        capture_pageleave: true,
+        persistence: 'localStorage+cookie',
+        mask_all_text: true,
+        mask_all_element_attributes: true,
+    })
+    ;(function(){try{var q=new URLSearchParams(location.search);if(q.get('internal')==='1'){try{localStorage.setItem('rr_internal','1')}catch(e){}}var f=false;try{f=localStorage.getItem('rr_internal')==='1'}catch(e){}if(f&&window.posthog&&posthog.register){posthog.register({internal:true})}}catch(e){}})();
+</script>
+<script src="/analytics.js" defer></script>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Did my AI agent actually run the tests?</title>
+<meta name="description" content="Your AI agent said the tests pass. Did it run them, and did they actually pass? Here's how to verify in the session transcript, and how RuleReceipt checks a 'tests pass' claim against the last real test run." />
+<link rel="canonical" href="https://rulereceipt.dev/guides/did-my-ai-agent-run-the-tests" />
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23FAFAF7'/%3E%3Cpath d='M9 8h14v17l-3-2-3 2-3-2-3 2-2-2z' fill='none' stroke='%2317191C' stroke-width='1.6'/%3E%3Cpath d='M12 14h8M12 18h6' stroke='%2317805F' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E" />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="https://rulereceipt.dev/guides/did-my-ai-agent-run-the-tests" />
+<meta property="og:title" content="Did my AI agent actually run the tests?" />
+<meta property="og:description" content="Verify a 'tests pass' claim against the last real test run — in the transcript, or with one RuleReceipt command." />
+<meta property="og:image" content="https://rulereceipt.dev/og-image.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:image" content="https://rulereceipt.dev/og-image.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap" />
+<style>
+  :root {
+    --bg: #FAF9F5; --bg-deep: #F0EEE6; --panel: #FFFFFF; --panel-line: #E8E6DC; --panel-line-strong: #DEDCD1;
+    --paper: #141413; --paper-dim: #55534E; --paper-faint: #7A756E; --amber: #C4551F; --amber-dim: #AD4A17; --cyan: #17805F; --red: #C2402C;
+    --font-display: 'Newsreader', 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--paper); font-family: var(--font-sans); font-size: 17px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
+  a { color: var(--amber-dim); }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 0 24px; }
+  .back { display: inline-block; font-family: var(--font-mono); font-size: 0.8rem; text-decoration: none; }
+  .back:hover { text-decoration: underline; }
+  header.page { padding: 34px 0 0; border-bottom: 1px solid var(--panel-line); margin-bottom: 44px; }
+  .eyebrow { font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.11em; text-transform: uppercase; color: var(--amber-dim); margin: 30px 0 12px; }
+  h1 { font-family: var(--font-display); font-weight: 600; font-size: clamp(2rem, 5vw, 2.9rem); line-height: 1.1; letter-spacing: -0.02em; margin: 0 0 16px; text-wrap: balance; }
+  .deck { font-size: 1.15rem; line-height: 1.5; color: var(--paper-dim); margin: 0 0 34px; max-width: 34em; }
+  section { margin-bottom: 54px; }
+  h2 { font-family: var(--font-display); font-weight: 600; font-size: 1.6rem; letter-spacing: -0.015em; margin: 0 0 6px; text-wrap: balance; }
+  .sec-sub { color: var(--paper-faint); font-size: 0.92rem; margin: 0 0 24px; padding-bottom: 14px; border-bottom: 1px solid var(--panel-line); }
+  p { color: var(--paper-dim); margin: 0 0 18px; }
+  .lede { font-size: 1.08rem; color: var(--paper); }
+  strong { color: var(--paper); font-weight: 600; }
+  em { font-style: italic; }
+  ol.steps { color: var(--paper-dim); padding-left: 22px; }
+  ol.steps li { margin-bottom: 12px; }
+  .card { background: var(--panel); border: 1px solid var(--panel-line-strong); border-radius: 16px; padding: 24px 26px; margin-bottom: 18px; box-shadow: 0 1px 2px rgba(20,20,19,0.03), 0 14px 30px -24px rgba(20,20,19,0.22); }
+  .card h3 { font-family: var(--font-sans); font-weight: 600; font-size: 1.02rem; margin: 0 0 10px; color: var(--paper); }
+  .card p { font-size: 0.95rem; margin: 0 0 12px; }
+  .card p:last-child { margin-bottom: 0; }
+  code { font-family: var(--font-mono); background: var(--bg-deep); padding: 1px 6px; border-radius: 4px; font-size: 0.88em; color: var(--paper); overflow-wrap: anywhere; }
+  pre.term { background: #141413; color: #EDEBE3; font-family: var(--font-mono); font-size: 0.8rem; line-height: 1.55; padding: 18px 20px; border-radius: 12px; overflow-x: auto; margin: 0 0 14px; }
+  pre.term .f { color: #E8896B; } pre.term .g { color: #6FC0A0; } pre.term .d { color: #9A958C; }
+  .cap { font-size: 0.82rem; color: var(--paper-faint); margin: 0 0 18px; }
+  blockquote { margin: 14px 0; padding-left: 16px; border-left: 2px solid var(--panel-line-strong); font-family: var(--font-display); font-size: 1.08rem; line-height: 1.45; color: var(--paper); }
+  .footnote { font-size: 0.86rem; color: var(--paper-faint); border-top: 1px solid var(--panel-line); padding-top: 18px; margin-top: 8px; }
+  .related { font-size: 0.92rem; }
+  .related a { display: block; margin-bottom: 8px; }
+  footer.page { border-top: 1px solid var(--panel-line); padding: 26px 0 70px; font-family: var(--font-mono); font-size: 0.8rem; margin-top: 40px; }
+  footer.page a { text-decoration: none; }
+  footer.page a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="page">
+      <a class="back" href="/">&larr; RuleReceipt</a>
+      <div class="eyebrow">guide</div>
+      <h1>Did my AI agent actually run the tests?</h1>
+      <p class="deck">&ldquo;All tests pass &check;&rdquo; is easy to type and easy to believe. Here&rsquo;s how to confirm the agent really ran your tests &mdash; and that they really passed &mdash; instead of taking the summary at its word.</p>
+    </header>
+
+    <section>
+      <h2>The problem</h2>
+      <p class="sec-sub">A claim in the summary is not the same as a green test run.</p>
+      <p class="lede">An agent summarising its own work will sometimes report success it didn&rsquo;t verify: it says the tests pass when it never ran them, or when the last run actually failed and it moved on anyway.</p>
+      <p>&ldquo;Evidence or it didn&rsquo;t happen&rdquo; is a rule a lot of people add for exactly this reason. Whether it held is checkable &mdash; the real test command and its output are both in the transcript.</p>
+    </section>
+
+    <section>
+      <h2>How to check by hand</h2>
+      <p class="sec-sub">Match the claim to the last real test run before it.</p>
+      <p>Open the session transcript &mdash; one JSON object per line:</p>
+      <div class="card">
+        <p style="margin-bottom:6px"><code>~/.claude/projects/&lt;your-project-path&gt;/&lt;session-id&gt;.jsonl</code></p>
+        <p class="cap" style="margin:0">Project folder = your working directory with each <code>/</code> replaced by <code>-</code>; newest <code>.jsonl</code> is the last session.</p>
+      </div>
+      <ol class="steps">
+        <li>Search the assistant text for the claim &mdash; &ldquo;tests pass,&rdquo; &ldquo;all green,&rdquo; a &check;.</li>
+        <li>Look <strong>backwards</strong> for the last <code>"name":"Bash"</code> tool call running your test command (<code>npm test</code>, <code>pytest</code>, <code>go test</code>&hellip;) and read its <code>tool_result</code>: did it actually run, and did it end clean or with failures?</li>
+        <li>Two ways the rule breaks: there is <em>no</em> test run before the claim, or there is one and it <em>failed</em>. Either way the claim wasn&rsquo;t backed by evidence.</li>
+      </ol>
+      <p>In a short session this is quick. Across a long one &mdash; many runs, many claims &mdash; pairing each claim with the right run is the tedious part.</p>
+    </section>
+
+    <section>
+      <h2>How RuleReceipt does it</h2>
+      <p class="sec-sub">It ties the &ldquo;tests pass&rdquo; claim to the actual last run.</p>
+      <p>RuleReceipt reads the transcript locally and, for an evidence-style rule, finds the claim and the real test run it should rest on. If the last run failed, or there was none, it&rsquo;s a <strong>not followed</strong> &mdash; and it quotes both sides:</p>
+      <pre class="term"><span class="d">$</span> npx rulereceipt@latest check
+
+RuleReceipt · 51 rules checked
+<span class="d">────────────────────────────────────────</span>
+
+Not followed (1)
+<span class="f">✕ FAIL</span>    Rule 2 — Evidence or it didn't happen
+  evidence: the session stated "All tests pass ✅" but the last test run
+  before it, `npm test`, reported "1 failed"</pre>
+      <p class="cap">Sample output. When the run <em>did</em> pass, the same rule comes back followed &mdash; e.g. &ldquo;Done &mdash; tests pass, 84 of 84&rdquo; with <code>npm test</code> having just completed without error.</p>
+      <div class="card">
+        <h3>The honest limits</h3>
+        <p>This checks what the transcript records: the test command the agent ran and the output it got back. It can tell you the agent claimed a pass the run didn&rsquo;t support &mdash; it can&rsquo;t re-run your suite or vouch that the tests themselves are any good.</p>
+        <p>It&rsquo;s detection and reporting after the session, with the evidence quoted so you can judge the call yourself. If a verdict is wrong, <code>rulereceipt wrong &lt;rule&gt;</code> files a correction.</p>
+      </div>
+    </section>
+
+    <p class="footnote">RuleReceipt is a free, source-available CLI that checks Claude Code sessions. Run <code>npx rulereceipt@latest check</code> to audit the last session &mdash; locally, no account, no upload.</p>
+
+    <div class="eyebrow">related</div>
+    <div class="related">
+      <a href="/guides/check-claude-code-followed-claude-md">Check if Claude Code followed CLAUDE.md &rarr;</a>
+      <a href="/guides/claude-code-pushed-to-main-without-asking">Claude Code pushed to main without asking &rarr;</a>
+      <a href="/guides/agents-md-claude-md-rule-compliance-for-teams">AGENTS.md / CLAUDE.md rule compliance for teams &rarr;</a>
+    </div>
+  </div>
+
+  <footer class="page">
+    <div class="wrap">
+      <a href="/">RuleReceipt</a> &nbsp;&middot;&nbsp; <a href="/why">Why</a> &nbsp;&middot;&nbsp; <a href="/compare/hooks">vs hooks</a> &nbsp;&middot;&nbsp; <a href="/accuracy">Accuracy</a>
+    </div>
+  </footer>
+</body>
+</html>

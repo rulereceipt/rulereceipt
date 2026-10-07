@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+<script>
+    !function(t,e){var o,n,p,r;e.__SV||(window.posthog && window.posthog.__loaded)||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}p||((p=t.createElement("script")).type="text/javascript",p.crossOrigin="anonymous",p.async=!0,p.src=s.api_host.replace(".i.posthog.com","-assets.i.posthog.com")+"/static/array.js",p.onerror=function(){p=null},(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r));var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+".people (stub)"},o="Sn Cn init Hn Un Gn Yi zn Kn qn capture Vn kn calculateEventProperties es register register_once register_for_session unregister unregister_for_session os Bn ss getFeatureFlag getFeatureFlagPayload getFeatureFlagResult getAllFeatureFlags isFeatureEnabled reloadFeatureFlags updateFlags updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures on onFeatureFlags onSurveysLoaded onSessionId getSurveys getActiveMatchingSurveys renderSurvey displaySurvey cancelPendingSurvey canRenderSurvey canRenderSurveyAsync ls identify setPersonProperties unsetPersonProperties group resetGroups setPersonPropertiesForFlags resetPersonPropertiesForFlags setGroupPropertiesForFlags resetGroupPropertiesForFlags reset us shutdown setIdentity clearIdentity get_distinct_id getGroups get_session_id get_session_replay_url alias set_config startSessionRecording stopSessionRecording sessionRecordingStarted captureException addExceptionStep captureLog startExceptionAutocapture stopExceptionAutocapture loadToolbar get_property getSessionProperty rs Xn createPersonProfile setInternalOrTestUser ns $n vs opt_in_capturing opt_out_capturing has_opted_in_capturing has_opted_out_capturing get_explicit_consent_status is_capturing clear_opt_in_out_capturing Jn debug tr At getPageViewId captureTraceFeedback captureTraceMetric Ln".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
+    posthog.init('phc_A4TBtMr58tNcGFEnoC82pPqzrKxXRGw84B8RVd8JK2nW', {
+        api_host: 'https://us.i.posthog.com',
+        defaults: '2026-05-30',
+        person_profiles: 'identified_only',
+        autocapture: false,
+        disable_session_recording: true,
+        capture_pageview: true,
+        capture_pageleave: true,
+        persistence: 'localStorage+cookie',
+        mask_all_text: true,
+        mask_all_element_attributes: true,
+    })
+    ;(function(){try{var q=new URLSearchParams(location.search);if(q.get('internal')==='1'){try{localStorage.setItem('rr_internal','1')}catch(e){}}var f=false;try{f=localStorage.getItem('rr_internal')==='1'}catch(e){}if(f&&window.posthog&&posthog.register){posthog.register({internal:true})}}catch(e){}})();
+</script>
+<script src="/analytics.js" defer></script>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Check if Claude Code followed CLAUDE.md</title>
+<meta name="description" content="A session ends and you're not sure Claude Code actually followed your CLAUDE.md rules. Here's how to check by hand in the transcript, and how RuleReceipt does it rule by rule with the quoted line as evidence." />
+<link rel="canonical" href="https://rulereceipt.dev/guides/check-claude-code-followed-claude-md" />
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23FAFAF7'/%3E%3Cpath d='M9 8h14v17l-3-2-3 2-3-2-3 2-2-2z' fill='none' stroke='%2317191C' stroke-width='1.6'/%3E%3Cpath d='M12 14h8M12 18h6' stroke='%2317805F' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E" />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="https://rulereceipt.dev/guides/check-claude-code-followed-claude-md" />
+<meta property="og:title" content="Check if Claude Code followed CLAUDE.md" />
+<meta property="og:description" content="How to verify, after a session, that Claude Code actually followed your CLAUDE.md — by hand in the transcript, or rule by rule with RuleReceipt." />
+<meta property="og:image" content="https://rulereceipt.dev/og-image.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:image" content="https://rulereceipt.dev/og-image.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap" />
+<style>
+  :root {
+    --bg: #FAF9F5; --bg-deep: #F0EEE6; --panel: #FFFFFF; --panel-line: #E8E6DC; --panel-line-strong: #DEDCD1;
+    --paper: #141413; --paper-dim: #55534E; --paper-faint: #7A756E; --amber: #C4551F; --amber-dim: #AD4A17; --cyan: #17805F; --red: #C2402C;
+    --font-display: 'Newsreader', 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--paper); font-family: var(--font-sans); font-size: 17px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
+  a { color: var(--amber-dim); }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 0 24px; }
+  .back { display: inline-block; font-family: var(--font-mono); font-size: 0.8rem; text-decoration: none; }
+  .back:hover { text-decoration: underline; }
+  header.page { padding: 34px 0 0; border-bottom: 1px solid var(--panel-line); margin-bottom: 44px; }
+  .eyebrow { font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.11em; text-transform: uppercase; color: var(--amber-dim); margin: 30px 0 12px; }
+  h1 { font-family: var(--font-display); font-weight: 600; font-size: clamp(2rem, 5vw, 2.9rem); line-height: 1.1; letter-spacing: -0.02em; margin: 0 0 16px; text-wrap: balance; }
+  .deck { font-size: 1.15rem; line-height: 1.5; color: var(--paper-dim); margin: 0 0 34px; max-width: 34em; }
+  section { margin-bottom: 54px; }
+  h2 { font-family: var(--font-display); font-weight: 600; font-size: 1.6rem; letter-spacing: -0.015em; margin: 0 0 6px; text-wrap: balance; }
+  .sec-sub { color: var(--paper-faint); font-size: 0.92rem; margin: 0 0 24px; padding-bottom: 14px; border-bottom: 1px solid var(--panel-line); }
+  p { color: var(--paper-dim); margin: 0 0 18px; }
+  .lede { font-size: 1.08rem; color: var(--paper); }
+  strong { color: var(--paper); font-weight: 600; }
+  em { font-style: italic; }
+  ol.steps { color: var(--paper-dim); padding-left: 22px; }
+  ol.steps li { margin-bottom: 12px; }
+  .card { background: var(--panel); border: 1px solid var(--panel-line-strong); border-radius: 16px; padding: 24px 26px; margin-bottom: 18px; box-shadow: 0 1px 2px rgba(20,20,19,0.03), 0 14px 30px -24px rgba(20,20,19,0.22); }
+  .card h3 { font-family: var(--font-sans); font-weight: 600; font-size: 1.02rem; margin: 0 0 10px; color: var(--paper); }
+  .card p { font-size: 0.95rem; margin: 0 0 12px; }
+  .card p:last-child { margin-bottom: 0; }
+  code { font-family: var(--font-mono); background: var(--bg-deep); padding: 1px 6px; border-radius: 4px; font-size: 0.88em; color: var(--paper); overflow-wrap: anywhere; }
+  pre.term { background: #141413; color: #EDEBE3; font-family: var(--font-mono); font-size: 0.8rem; line-height: 1.55; padding: 18px 20px; border-radius: 12px; overflow-x: auto; margin: 0 0 14px; }
+  pre.term .f { color: #E8896B; } pre.term .g { color: #6FC0A0; } pre.term .d { color: #9A958C; }
+  .cap { font-size: 0.82rem; color: var(--paper-faint); margin: 0 0 18px; }
+  blockquote { margin: 14px 0; padding-left: 16px; border-left: 2px solid var(--panel-line-strong); font-family: var(--font-display); font-size: 1.08rem; line-height: 1.45; color: var(--paper); }
+  .footnote { font-size: 0.86rem; color: var(--paper-faint); border-top: 1px solid var(--panel-line); padding-top: 18px; margin-top: 8px; }
+  .related { font-size: 0.92rem; }
+  .related a { display: block; margin-bottom: 8px; }
+  footer.page { border-top: 1px solid var(--panel-line); padding: 26px 0 70px; font-family: var(--font-mono); font-size: 0.8rem; margin-top: 40px; }
+  footer.page a { text-decoration: none; }
+  footer.page a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="page">
+      <a class="back" href="/">&larr; RuleReceipt</a>
+      <div class="eyebrow">guide</div>
+      <h1>Check if Claude Code followed CLAUDE.md</h1>
+      <p class="deck">You wrote rules in <code>CLAUDE.md</code>. The session ran, a lot happened, and now you&rsquo;re not sure the agent actually followed them. Here&rsquo;s how to check &mdash; by hand first, then with one command.</p>
+    </header>
+
+    <section>
+      <h2>The problem</h2>
+      <p class="sec-sub">&ldquo;It said it was done. Did it do what I told it to?&rdquo;</p>
+      <p class="lede">A CLAUDE.md (or AGENTS.md) file is a set of standing instructions: don&rsquo;t push to main without asking, always run the tests, update the changelog, never commit a secret. The agent reads them, but nothing automatically confirms afterwards that each one was honoured.</p>
+      <p>Most of the time you find out the slow way &mdash; a surprise commit on main, a &ldquo;tests pass&rdquo; that wasn&rsquo;t true, a changelog that never got the entry. The transcript has the answer; it&rsquo;s just buried in thousands of lines of JSON.</p>
+    </section>
+
+    <section>
+      <h2>How to check by hand</h2>
+      <p class="sec-sub">Everything you need is in the session transcript on your own disk.</p>
+      <p>Claude Code writes every session to a JSON Lines file &mdash; one JSON object per line &mdash; here:</p>
+      <div class="card">
+        <p style="margin-bottom:6px"><code>~/.claude/projects/&lt;your-project-path&gt;/&lt;session-id&gt;.jsonl</code></p>
+        <p class="cap" style="margin:0">The project folder is your working directory with every <code>/</code> turned into <code>-</code>. The newest <code>.jsonl</code> in it is your last session. (Codex: <code>~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl</code>.)</p>
+      </div>
+      <p>To check a rule by hand, open that file and read it against what you wrote down. For &ldquo;never push to main without asking,&rdquo; for example:</p>
+      <ol class="steps">
+        <li>Find the tool calls: lines with <code>"type":"tool_use"</code> and <code>"name":"Bash"</code>. Look at each <code>command</code> for <code>git push</code>.</li>
+        <li>For any push to <code>main</code>, scroll back and read the <strong>user</strong> messages before it &mdash; did you actually approve it, or did the agent decide on its own?</li>
+        <li>For &ldquo;always run the tests,&rdquo; search the same tool calls for your test command, and check it ran <em>before</em> any &ldquo;tests pass&rdquo; claim in the assistant text.</li>
+      </ol>
+      <p>This works. It&rsquo;s also slow, and it&rsquo;s easy to miss the one line that matters in a long session &mdash; which is the whole reason the tool below exists.</p>
+    </section>
+
+    <section>
+      <h2>How RuleReceipt does it</h2>
+      <p class="sec-sub">One command, rule by rule, with the quoted line as evidence.</p>
+      <p>RuleReceipt reads the same transcript and goes through your CLAUDE.md / AGENTS.md one rule at a time. It runs locally &mdash; the transcript never leaves your machine &mdash; and needs no setup:</p>
+      <pre class="term"><span class="d">$</span> npx rulereceipt@latest check
+
+RuleReceipt · 51 rules checked
+<span class="d">────────────────────────────────────────</span>
+
+Not followed (2)
+<span class="f">✕ FAIL</span>    Rule 1 — Never push to `main`
+  evidence: a git command actually targeted the "main" branch: git push origin main
+<span class="f">✕ FAIL</span>    Rule 2 — Evidence or it didn't happen
+  evidence: the session stated "All tests pass ✅" but the last test run
+  before it, `npm test`, reported "1 failed"</pre>
+      <p class="cap">Sample output. Each finding names the rule, the verdict, and the exact line from the session it&rsquo;s based on.</p>
+      <div class="card">
+        <h3>What it does &mdash; and what it doesn&rsquo;t</h3>
+        <p>Every rule comes back as <strong>followed</strong>, <strong>not followed</strong>, <strong>didn&rsquo;t apply</strong>, or <strong>can&rsquo;t tell</strong> &mdash; each with the quoted evidence, so you can judge it yourself rather than trust a label.</p>
+        <p>Being honest about the ceiling: this is detection and reporting, <em>after</em> the session. It does not make the model obey, and it can&rsquo;t un-run a command. There is one narrow exception &mdash; an optional guard hook that blocks a small, specific set of file and branch actions before they run. That&rsquo;s a deliberately limited guard, not general enforcement.</p>
+        <p>If a verdict is wrong, <code>rulereceipt wrong &lt;rule&gt;</code> builds a pre-filled, secret-masked report so the check itself can be corrected.</p>
+      </div>
+    </section>
+
+    <p class="footnote">RuleReceipt is a free, source-available CLI that checks Claude Code sessions. It also reads AGENTS.md, and the rules files used by Cursor, Copilot and Windsurf. Run it with <code>npx rulereceipt@latest check</code> &mdash; no account, no upload.</p>
+
+    <div class="eyebrow">related</div>
+    <div class="related">
+      <a href="/guides/claude-code-pushed-to-main-without-asking">Claude Code pushed to main without asking &rarr;</a>
+      <a href="/guides/did-my-ai-agent-run-the-tests">Did my AI agent actually run the tests? &rarr;</a>
+      <a href="/guides/agents-md-claude-md-rule-compliance-for-teams">AGENTS.md / CLAUDE.md rule compliance for teams &rarr;</a>
+    </div>
+  </div>
+
+  <footer class="page">
+    <div class="wrap">
+      <a href="/">RuleReceipt</a> &nbsp;&middot;&nbsp; <a href="/why">Why</a> &nbsp;&middot;&nbsp; <a href="/compare/hooks">vs hooks</a> &nbsp;&middot;&nbsp; <a href="/accuracy">Accuracy</a>
+    </div>
+  </footer>
+</body>
+</html>
