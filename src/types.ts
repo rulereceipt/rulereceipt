@@ -20,6 +20,13 @@ export interface Rule {
    */
   sourcePath?: string;
   sourceLine?: number;
+  /**
+   * Other files that carry this EXACT same rule text (same scope). Identical
+   * rule text across files is one rule, counted once, but the report names every
+   * file it was found in so "where is this rule?" has a complete answer. Set by
+   * loadRules' text-dedup. Added 2026-10-07.
+   */
+  alsoSources?: { sourcePath?: string; sourceLine?: number }[];
 }
 
 export interface TranscriptTextEvent {
@@ -207,6 +214,8 @@ export interface CheckResult {
    */
   sourcePath?: string;
   sourceLine?: number;
+  /** Other files carrying this same rule text (see Rule.alsoSources). */
+  alsoSources?: { sourcePath?: string; sourceLine?: number }[];
 }
 
 /**

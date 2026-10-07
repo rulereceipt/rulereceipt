@@ -51,7 +51,7 @@ export const claudeCodeAdapter: SessionAdapter = {
   },
 };
 
-/** OpenAI Codex CLI — format verified, parsing tolerant. See adapters/codex.ts. */
+/** OpenAI Codex CLI — SUPPORTED, validated on a real 0.160.1 rollout (2026-10-07). See adapters/codex.ts. */
 export const codexAdapter: SessionAdapter = {
   tool: "codex",
   listSessions: (cwd) => listCodexSessions(cwd),

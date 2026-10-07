@@ -13,11 +13,11 @@ describe("capability matrix", () => {
     expect(cc?.validated).toBe(true);
   });
 
-  it("marks codex readable but NOT yet validated (in testing), consistent with README/KNOWN-GAPS", () => {
+  it("marks codex supported and validated (tested on 0.160.1), consistent with README/KNOWN-GAPS", () => {
     const cx = r.agents.find((a) => a.tool === "codex");
     expect(cx?.read).toBe("full");
-    expect(cx?.validated).toBe(false);
-    expect(cx?.note).toMatch(/in testing/i);
+    expect(cx?.validated).toBe(true);
+    expect(cx?.note).toMatch(/0\.160\.1/);
   });
 
   it("states guard limits (never empty — the honesty is the point)", () => {

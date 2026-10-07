@@ -236,12 +236,26 @@ async function runCheck(opts: CheckOptions) {
   // wherever this command happens to be invoked — otherwise a Codex rollout from
   // ~/Desktop/foo gets checked against the current folder's CLAUDE.md. Falls back
   // to the current directory when the session cwd is unknown or not present here.
+  // Resolve the session and its TOOL first — rule loading is tool-aware (Codex
+  // reads the AGENTS.md chain + ~/.codex/AGENTS.md, never CLAUDE.md or ~/.claude),
+  // and for --transcript it keys off the session's own project cwd, not the
+  // folder this command happens to run in.
   let cwd = process.cwd();
+  const latestSession = transcriptOverride ? null : findLatestSession(cwd);
+  let agentTool = "claude-code";
   if (transcriptOverride) {
-    const sessionProjectDir = codexSessionCwd(transcriptOverride) ?? sessionCwdOf(transcriptOverride);
-    if (sessionProjectDir && existsSync(sessionProjectDir)) cwd = sessionProjectDir;
+    const codexCwd = codexSessionCwd(transcriptOverride);
+    if (codexCwd !== null) {
+      agentTool = "codex";
+      if (existsSync(codexCwd)) cwd = codexCwd;
+    } else {
+      const claudeCwd = sessionCwdOf(transcriptOverride);
+      if (claudeCwd && existsSync(claudeCwd)) cwd = claudeCwd;
+    }
+  } else if (latestSession) {
+    agentTool = latestSession.adapter.tool;
   }
-  const rules = loadRules(cwd);
+  const rules = loadRules(cwd, agentTool);
 
   if (rules.length === 0) {
     console.log(
@@ -258,7 +272,7 @@ async function runCheck(opts: CheckOptions) {
   // tool (Claude Code, Codex), newest-modified wins — the same rule the Claude
   // reader applies across every configured home, now extended across tools. A
   // Claude-only machine picks exactly the file and events it always did.
-  const latestSession = transcriptOverride ? null : findLatestSession(cwd);
+  // (latestSession + agentTool were resolved above, for tool-aware rule loading.)
   const sessionFilePath = transcriptOverride ?? latestSession?.file ?? null;
   if (!sessionFilePath) {
     console.log(
