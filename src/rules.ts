@@ -123,18 +123,30 @@ export function projectInstructionsSetting(cwd: string): ProjectInstructions {
  * (`describeRuleSources`) — so the report can never claim a file was loaded
  * that the checker skipped, or vice versa.
  */
-function ruleSourcesAtLevel(dir: string, pi: ProjectInstructions = "unknown", isCodex = false): RuleSource[] {
+function ruleSourcesAtLevel(dir: string, pi: ProjectInstructions = "unknown", agentTool = "claude-code"): RuleSource[] {
   const out: RuleSource[] = [];
   const has = (rel: string) => existsSync(join(dir, rel));
+  const pushAgentsChain = () => {
+    if (has("AGENTS.md")) out.push({ path: join(dir, "AGENTS.md"), status: "loaded", format: "AGENTS.md" });
+    if (has("AGENT.md")) out.push({ path: join(dir, "AGENT.md"), status: "loaded", format: "AGENT.md" });
+    if (has("AGENTS.local.md")) out.push({ path: join(dir, "AGENTS.local.md"), status: "loaded", format: "AGENTS (AGENTS.local.md)" });
+  };
 
   // Codex reads the AGENTS.md family ONLY — never CLAUDE.md, .cursor, Copilot,
   // Windsurf, Gemini or ~/.claude. Checking a Codex session against a file Codex
   // never opens is a false accusation, so for a Codex session we load just the
   // AGENTS chain at this level (verified against a real 0.160.1 rollout).
-  if (isCodex) {
-    if (has("AGENTS.md")) out.push({ path: join(dir, "AGENTS.md"), status: "loaded", format: "AGENTS.md" });
-    if (has("AGENT.md")) out.push({ path: join(dir, "AGENT.md"), status: "loaded", format: "AGENT.md" });
-    if (has("AGENTS.local.md")) out.push({ path: join(dir, "AGENTS.local.md"), status: "loaded", format: "AGENTS (AGENTS.local.md)" });
+  if (agentTool === "codex") {
+    pushAgentsChain();
+    return applyImports(out);
+  }
+
+  // Copilot CLI reads AGENTS.md + the repo's .github/copilot-instructions.md —
+  // not CLAUDE.md, Cursor, Windsurf, Gemini or ~/.claude (validated on a real
+  // 1.0.92 session, which read AGENTS.md and ignored the rest).
+  if (agentTool === "copilot-cli") {
+    pushAgentsChain();
+    if (has(join(".github", "copilot-instructions.md"))) out.push({ path: join(dir, ".github", "copilot-instructions.md"), status: "loaded", format: "Copilot" });
     return applyImports(out);
   }
   const loaded = (rel: string, format: string, note?: string) => {
@@ -286,8 +298,8 @@ function applyImports(out: RuleSource[]): RuleSource[] {
 }
 
 /** Every rules file at one directory level that the agent actually loads. */
-function ruleFilesAtLevel(dir: string, pi: ProjectInstructions, isCodex = false): string[] {
-  return ruleSourcesAtLevel(dir, pi, isCodex).filter((s) => s.status === "loaded").map((s) => s.path);
+function ruleFilesAtLevel(dir: string, pi: ProjectInstructions, agentTool = "claude-code"): string[] {
+  return ruleSourcesAtLevel(dir, pi, agentTool).filter((s) => s.status === "loaded").map((s) => s.path);
 }
 
 /**
@@ -331,8 +343,8 @@ function projectLevels(cwd: string): string[] {
   return levels;
 }
 
-function findProjectRuleFiles(cwd: string, pi: ProjectInstructions, isCodex = false): string[] {
-  return projectLevels(cwd).flatMap((dir) => ruleFilesAtLevel(dir, pi, isCodex));
+function findProjectRuleFiles(cwd: string, pi: ProjectInstructions, agentTool = "claude-code"): string[] {
+  return projectLevels(cwd).flatMap((dir) => ruleFilesAtLevel(dir, pi, agentTool));
 }
 
 /**
@@ -410,11 +422,11 @@ function subtreeGlob(cwd: string, dir: string): string {
  * so discovering them can never manufacture a false accusation against a
  * session that never worked there.
  */
-function scopedRuleFilesBelow(cwd: string, pi: ProjectInstructions, isCodex = false): { path: string; scopeGlob: string }[] {
+function scopedRuleFilesBelow(cwd: string, pi: ProjectInstructions, agentTool = "claude-code"): { path: string; scopeGlob: string }[] {
   const out: { path: string; scopeGlob: string }[] = [];
   for (const dir of descendantLevels(cwd)) {
     const glob = subtreeGlob(cwd, dir);
-    for (const path of ruleFilesAtLevel(dir, pi, isCodex)) out.push({ path, scopeGlob: glob });
+    for (const path of ruleFilesAtLevel(dir, pi, agentTool)) out.push({ path, scopeGlob: glob });
   }
   return out;
 }
@@ -439,6 +451,7 @@ function scopedRuleFilesBelow(cwd: string, pi: ProjectInstructions, isCodex = fa
 export function loadRules(cwd: string, agentTool = "claude-code"): Rule[] {
   const rules: Rule[] = [];
   const isCodex = agentTool === "codex";
+  const isClaude = agentTool === "claude-code";
 
   // One file, one set of rules. Globals are read first, so a file reachable
   // both ways keeps its "global" label. Without this, running the check from
@@ -458,11 +471,12 @@ export function loadRules(cwd: string, agentTool = "claude-code"): Rule[] {
     rules.push(...parsed);
   };
 
-  // Global rules. Codex reads ~/.codex/AGENTS.md (its global AGENTS.md); it does
-  // NOT read ~/.claude. Claude Code reads every configured Claude home.
+  // Global rules. Codex reads ~/.codex/AGENTS.md (its global AGENTS.md). Claude
+  // Code reads every configured Claude home. Copilot CLI has no global rules
+  // file we load — neither reads ~/.claude.
   if (isCodex) {
     read(join(homedir(), ".codex", "AGENTS.md"), "global");
-  } else {
+  } else if (isClaude) {
     for (const base of claudeHomes()) {
       read(join(base, "CLAUDE.md"), "global");
       for (const file of markdownFilesIn(join(base, "rules"))) read(file, "global");
@@ -470,18 +484,18 @@ export function loadRules(cwd: string, agentTool = "claude-code"): Rule[] {
   }
 
   // /config "Project instructions" is a Claude Code setting; it does not apply to
-  // Codex (which has no CLAUDE-vs-AGENTS precedence — it only reads AGENTS.md).
-  const pi = isCodex ? "unknown" : projectInstructionsSetting(cwd);
-  for (const path of findProjectRuleFiles(cwd, pi, isCodex)) read(path, "project");
+  // Codex or Copilot (which only read the AGENTS.md family / their own file).
+  const pi = isClaude ? projectInstructionsSetting(cwd) : "unknown";
+  for (const path of findProjectRuleFiles(cwd, pi, agentTool)) read(path, "project");
   // Subfolder rules files (below cwd), each scoped to its own subtree.
-  for (const { path, scopeGlob } of scopedRuleFilesBelow(cwd, pi, isCodex)) read(path, "project", scopeGlob);
+  for (const { path, scopeGlob } of scopedRuleFilesBelow(cwd, pi, agentTool)) read(path, "project", scopeGlob);
 
   // Claude Code memory (feedback/project memories) as a rule source, so a
   // standing correction the user moved into memory is still checked and the
   // tool does not go stale against it. Non-office homes only; ids are
   // "memory:<name>", distinct from file-rule ids, so no dedup collision.
-  // Codex does not read Claude memory, so it is loaded for Claude sessions only.
-  if (!isCodex) rules.push(...loadMemoryRules(cwd));
+  // Only Claude Code reads Claude memory.
+  if (isClaude) rules.push(...loadMemoryRules(cwd));
   return dedupeRuleText(rules);
 }
 

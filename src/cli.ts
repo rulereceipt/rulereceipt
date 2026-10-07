@@ -9,6 +9,7 @@ import { parseClaudeMd } from "./parsers/readClaudeMd.js";
 import { subagentNote, sessionCwdOf } from "./parsers/transcriptParser.js";
 import { findLatestSession, sessionSourceNote, parseSessionFile } from "./adapters/index.js";
 import { sessionCwd as codexSessionCwd } from "./adapters/codex.js";
+import { copilotFormatIsKnown, workspaceCwd as copilotWorkspaceCwd } from "./adapters/copilot.js";
 import { loadRules } from "./rules.js";
 import { adviseRules } from "./checkability.js";
 import { shadowedAgentsMd } from "./shadowedAgents.js";
@@ -248,6 +249,11 @@ async function runCheck(opts: CheckOptions) {
     if (codexCwd !== null) {
       agentTool = "codex";
       if (existsSync(codexCwd)) cwd = codexCwd;
+    } else if (copilotFormatIsKnown(transcriptOverride)) {
+      // Copilot CLI: cwd is in the session dir's workspace.yaml, not the events file.
+      agentTool = "copilot-cli";
+      const cc = copilotWorkspaceCwd(dirname(transcriptOverride));
+      if (cc && existsSync(cc)) cwd = cc;
     } else {
       const claudeCwd = sessionCwdOf(transcriptOverride);
       if (claudeCwd && existsSync(claudeCwd)) cwd = claudeCwd;

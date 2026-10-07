@@ -95,7 +95,7 @@ Specific limits:
 | Claude Code | Yes | Yes | Yes (Stop hook, PreToolUse guard) |
 | Codex CLI | Yes | Yes (tested on 0.160.1) | No |
 | Cursor | Yes | No | No |
-| GitHub Copilot | Yes | No | No |
+| GitHub Copilot CLI | Yes | Yes (tested on 1.0.92) | No |
 | Windsurf | Yes | No | No |
 | Gemini CLI / agy | Yes | No | No |
 
@@ -322,3 +322,12 @@ approval gate must NOT be changed to address them without a fresh FA v1+v2 run.
   fire on violations; the *absence* of the forbidden action falls through to the
   judgment path. Ideal: a clean, deterministic Followed when the forbidden action
   is provably absent.
+- **A plain file-forbid rule (no backticks) routes to JUDGMENT, not the file
+  check.** `Never edit .env` (bare) is classified as a judgment call, so a real
+  `.env` edit can show needs-human instead of **Broken**; the backticked
+  `` Never edit `.env` `` routes to fileLifecycle and is Broken correctly. This is
+  a classification gap, not a verdict-code bug. **TOP PRIORITY after the agent
+  readers.** Fix is shadow-first + measured FA v1/v2 per Shilpa's hard rule — do
+  NOT widen the classifier to catch bare file tokens without measuring false
+  accusations (a bare `.env`/`dist/`/`src/` mentioned in prose must not become a
+  FAIL). Not in this release.

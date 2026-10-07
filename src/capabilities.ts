@@ -28,6 +28,7 @@ const UNVALIDATED = new Set<string>([]); // codex validated on a real 0.160.1 ro
 const NOTES: Record<string, string> = {
   "claude-code": "full support — parsed and validated end-to-end",
   codex: "supported — validated on a real end-to-end rollout (CLI 0.160.1, 2026-10-07); reads rollout-*.jsonl and compressed .jsonl.zst (zst needs Node 22.15+), incl. the 0.160 exec-harness (exec_command / apply_patch)",
+  "copilot-cli": "supported — validated on a real session (CLI 1.0.92, 2026-10-07); reads events.jsonl incl. apply_patch edits and the ask-user/permission approval step (a human-approved action reads as Followed)",
 };
 
 export function agentCapabilities(): AgentCapability[] {
