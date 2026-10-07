@@ -99,6 +99,65 @@ function shellCommandString(input: unknown): string | null {
   return null;
 }
 
+/** Unescape a JS/JSON string-literal body (the inside of a "...") to real text. */
+function unescapeJsString(s: string): string {
+  return s.replace(/\\(u[0-9a-fA-F]{4}|.)/g, (m, g: string) => {
+    if (g[0] === "u") return String.fromCharCode(parseInt(g.slice(1), 16));
+    switch (g) {
+      case "n": return "\n";
+      case "t": return "\t";
+      case "r": return "\r";
+      case "b": return "\b";
+      case "f": return "\f";
+      case '"': return '"';
+      case "\\": return "\\";
+      case "/": return "/";
+      default: return g;
+    }
+  });
+}
+
+/**
+ * Codex 0.160+ runs its "exec" custom tool by sending a JAVASCRIPT HARNESS
+ * string as the tool input, e.g.
+ *   const r = await tools.exec_command({cmd:"git push origin main", ...}); text(r.output);
+ *   text(await tools.apply_patch("*** Begin Patch\n*** Update File: a.ts\n..."));
+ * The real shell command / file edit is embedded in that string, so the
+ * command-scanning checks saw only `const r = await tools.exec_command({cmd:...`
+ * and a `git push origin main` produced zero violations (found 2026-10-07 on a
+ * real 0.160.1 rollout). Pull the actual command and patch targets back out.
+ */
+function looksLikeExecHarness(s: string): boolean {
+  return /tools\.(exec_command|apply_patch)\s*\(/.test(s) || s.includes("*** Begin Patch");
+}
+
+function execHarnessEvents(js: string, timestamp: string, callId: string | undefined): TranscriptEvent[] {
+  const events: TranscriptEvent[] = [];
+  const id = typeof callId === "string" ? callId : undefined;
+
+  // apply_patch: one file op per `*** Update/Add/Delete File: <path>` header.
+  const fileRe = /\*\*\* (Update|Add|Delete) File: (.+?)(?:\\n|")/g;
+  let fm: RegExpExecArray | null;
+  while ((fm = fileRe.exec(js)) !== null) {
+    const op = fm[1].toLowerCase();
+    const path = unescapeJsString(fm[2]).trim();
+    if (!path) continue;
+    if (op === "delete") {
+      events.push({ role: "assistant", kind: "tool_use", toolName: "Bash", input: { command: `rm -- ${path}` }, timestamp, toolUseId: id });
+    } else {
+      events.push({ role: "assistant", kind: "tool_use", toolName: op === "add" ? "Write" : "Edit", input: { file_path: path }, timestamp, toolUseId: id });
+    }
+  }
+
+  // exec_command: the real shell command is the cmd:"..." string literal.
+  const cm = js.match(/\bcmd\s*:\s*"((?:\\.|[^"\\])*)"/);
+  if (cm) {
+    events.push({ role: "assistant", kind: "tool_use", toolName: "Bash", input: { command: unescapeJsString(cm[1]) }, timestamp, toolUseId: id });
+  }
+
+  return events;
+}
+
 function textFromContent(content: unknown): string {
   if (typeof content === "string") return content;
   if (Array.isArray(content)) {
@@ -168,6 +227,15 @@ export function parseCodexLine(line: string): TranscriptEvent[] {
     // `arguments` is a JSON string in Codex; parse when possible so the checks
     // see structured input, else keep the raw value.
     let input: unknown = p.arguments ?? p.input ?? p.action ?? {};
+
+    // Codex 0.160+ "exec" custom tool: input is a JS harness string that wraps
+    // the real exec_command({cmd}) / apply_patch("*** Begin Patch..."). Pull the
+    // command and file edits out BEFORE the JSON parse (the harness is not JSON).
+    if (typeof input === "string" && looksLikeExecHarness(input)) {
+      const harness = execHarnessEvents(input, timestamp, typeof p.call_id === "string" ? p.call_id : undefined);
+      if (harness.length) return harness;
+    }
+
     if (typeof input === "string") {
       try {
         input = JSON.parse(input);
@@ -240,7 +308,7 @@ export function parseCodexTranscript(filePath: string): TranscriptEvent[] {
 }
 
 /** The cwd a rollout file was recorded in, from its first `session_meta` line. */
-function sessionCwd(filePath: string): string | null {
+export function sessionCwd(filePath: string): string | null {
   const raw = readRolloutText(filePath);
   if (raw === null) return null;
   const firstLine = raw.split("\n", 1)[0];

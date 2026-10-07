@@ -6,8 +6,9 @@ import { join, dirname, resolve, isAbsolute, basename } from "node:path";
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { parseClaudeMd } from "./parsers/readClaudeMd.js";
-import { subagentNote } from "./parsers/transcriptParser.js";
+import { subagentNote, sessionCwdOf } from "./parsers/transcriptParser.js";
 import { findLatestSession, sessionSourceNote, parseSessionFile } from "./adapters/index.js";
+import { sessionCwd as codexSessionCwd } from "./adapters/codex.js";
 import { loadRules } from "./rules.js";
 import { adviseRules } from "./checkability.js";
 import { shadowedAgentsMd } from "./shadowedAgents.js";
@@ -230,7 +231,16 @@ interface CheckOptions {
 
 async function runCheck(opts: CheckOptions) {
   const { markdown, json, checkUpdates, share, email, emailAlways, llm, telemetry, html, exitZero, requireSession, showSkipped, transcriptOverride, exportPath, dev } = opts;
-  const cwd = process.cwd();
+  // When --transcript points at a session recorded in ANOTHER project, load the
+  // rules from that project's cwd (where the agent actually ran) rather than
+  // wherever this command happens to be invoked — otherwise a Codex rollout from
+  // ~/Desktop/foo gets checked against the current folder's CLAUDE.md. Falls back
+  // to the current directory when the session cwd is unknown or not present here.
+  let cwd = process.cwd();
+  if (transcriptOverride) {
+    const sessionProjectDir = codexSessionCwd(transcriptOverride) ?? sessionCwdOf(transcriptOverride);
+    if (sessionProjectDir && existsSync(sessionProjectDir)) cwd = sessionProjectDir;
+  }
   const rules = loadRules(cwd);
 
   if (rules.length === 0) {
