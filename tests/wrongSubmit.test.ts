@@ -10,14 +10,22 @@ import type { CheckResult, Rule } from "../src/types.js";
  * mailto. Rule of the feature: nothing leaves the machine without a "y".
  */
 
+// Fake secrets are built at RUNTIME from split pieces, so no contiguous
+// secret-shaped literal ever lands in a tracked file (GitHub secret scanning /
+// secretlint flag them otherwise — real alert, 2026-10-07). See CLAUDE.md.
+const FAKE_STRIPE_KEY = "sk_live_" + "ABCDEFGHIJ0123456789xyz";
+const FAKE_STRIPE_WHSEC = "whsec_" + "ABCDEFGHIJ0123456789abcd";
+const FAKE_JWT = ["ey" + "JhbGciOiJIUzI1NiJ9", "ey" + "JzdWIiOiIxMjM0NTY3ODkwIn0", "SflKxwRJSMeKKF2QT4fwpMeJf36POk"].join(".");
+const FAKE_PEM = "-----BEGIN RSA PRIVATE " + "KEY-----\nMIIabc\n-----END RSA PRIVATE " + "KEY-----";
+
 describe("redact — the added secret formats", () => {
   const cases: Array<[string, string, RegExp]> = [
-    ["Stripe secret key", "key sk_live_ABCDEFGHIJ0123456789xyz", /redacted-stripe-key/],
-    ["Stripe webhook secret", "whsec_ABCDEFGHIJ0123456789abcd", /redacted-stripe-secret/],
-    ["JWT", "token eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk", /redacted-jwt/],
+    ["Stripe secret key", "key " + FAKE_STRIPE_KEY, /redacted-stripe-key/],
+    ["Stripe webhook secret", FAKE_STRIPE_WHSEC, /redacted-stripe-secret/],
+    ["JWT", "token " + FAKE_JWT, /redacted-jwt/],
     ["password in URL", "clone https://" + "alice:s3cr3tpass" + "@github.com/x/y.git", /alice:<redacted>@github\.com/],
-    ["private key block", "-----BEGIN RSA PRIVATE KEY-----\nMIIabc\n-----END RSA PRIVATE KEY-----", /redacted-private-key/],
-    [".env KEY=value", "API_SECRET=supersecretvalue123", /API_SECRET=<redacted>/],
+    ["private key block", FAKE_PEM, /redacted-private-key/],
+    [".env KEY=value", "API_SECRET=" + "supersecretvalue123", /API_SECRET=<redacted>/],
   ];
   for (const [name, input, expected] of cases) {
     it(`masks a ${name}`, () => {
@@ -28,7 +36,7 @@ describe("redact — the added secret formats", () => {
     expect(redact("run DISABLE_LOCKS=1 npm test", "/no/home")).toContain("DISABLE_LOCKS=1");
   });
   it("does not leak the raw secret after masking", () => {
-    expect(redact("sk_live_ABCDEFGHIJ0123456789xyz", "/no/home")).not.toContain("sk_live_ABCDEFGHIJ0123456789xyz");
+    expect(redact(FAKE_STRIPE_KEY, "/no/home")).not.toContain(FAKE_STRIPE_KEY);
   });
 });
 
@@ -79,13 +87,13 @@ describe("ghReady (mocked runner)", () => {
 
 describe("buildWrongReport — masking reaches the shared surfaces", () => {
   const rule: Rule = { id: "S1.1", title: "Never leak keys", text: "Never leak keys", source: "project" };
-  const result: CheckResult = { ruleId: "S1.1", ruleTitle: "Never leak keys", ruleSource: "project", status: "FAIL", evidence: 'wrote sk_live_ABCDEFGHIJ0123456789xyz to a file' };
+  const result: CheckResult = { ruleId: "S1.1", ruleTitle: "Never leak keys", ruleSource: "project", status: "FAIL", evidence: 'wrote ' + FAKE_STRIPE_KEY + ' to a file' };
   const report = buildWrongReport({ version: "9.9.9", rule, result, events: [], home: "/no/home" });
   it("carries the 'read before sending' masking disclaimer", () => {
     expect(report.markdown).toContain("Masking catches common formats only. Read before sending.");
   });
   it("masks the secret in BOTH the markdown and the pre-filled link", () => {
-    expect(report.markdown).not.toContain("sk_live_ABCDEFGHIJ0123456789xyz");
-    expect(report.issueUrl).not.toContain("sk_live_ABCDEFGHIJ0123456789xyz");
+    expect(report.markdown).not.toContain(FAKE_STRIPE_KEY);
+    expect(report.issueUrl).not.toContain(FAKE_STRIPE_KEY);
   });
 });

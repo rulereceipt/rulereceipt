@@ -17,7 +17,7 @@ function sess(dir: string, name: string, firstUser: string): string {
 describe("check --list-sessions", () => {
   const dir = mkdtempSync(join(tmpdir(), "rr-ls-"));
   const a = sess(dir, "a.jsonl", "fix the login page please");
-  const b = sess(dir, "b.jsonl", "deploy with token sk-abcdefghijklmnop1234 now");
+  const b = sess(dir, "b.jsonl", "deploy with token sk" + "-abcdefghijklmnop1234 now");
   const sessions = [
     { adapter: claudeCodeAdapter, file: a },
     { adapter: claudeCodeAdapter, file: b },
@@ -32,7 +32,7 @@ describe("check --list-sessions", () => {
 
   it("redacts secrets in the shown prompt", () => {
     const rows = listSessionRows(dir, 15, sessions);
-    expect(rows[1].firstPrompt).not.toContain("sk-abcdefghijklmnop1234");
+    expect(rows[1].firstPrompt).not.toContain(("sk" + "-abcdefghijklmnop1234"));
     expect(rows[1].firstPrompt).toMatch(/<redacted/);
   });
 
