@@ -11,7 +11,7 @@ const backup = (dir: string) => join(dir, ".rulereceipt", "protect-backup.json")
 
 describe("protect (plan / apply / undo)", () => {
   it("plans both hooks on a repo with no settings file", () => {
-    const plan = planProtect(repo());
+    const plan = planProtect(repo(), "project");
     expect(plan.existed).toBe(false);
     expect(plan.toAdd).toHaveLength(2);
     expect(plan.next).toContain("PreToolUse");
@@ -22,7 +22,7 @@ describe("protect (plan / apply / undo)", () => {
 
   it("apply then undo removes a settings file that did not exist before", () => {
     const dir = repo();
-    applyProtect(dir, planProtect(dir));
+    applyProtect(dir, planProtect(dir, "project"));
     expect(existsSync(settings(dir))).toBe(true);
     expect(existsSync(backup(dir))).toBe(true);
     const u = undoProtect(dir);
@@ -36,7 +36,7 @@ describe("protect (plan / apply / undo)", () => {
     mkdirSync(join(dir, ".claude"));
     const original = '{\n  "permissions": {\n    "allow": [ "Bash(ls:*)" ]\n  }\n}\n';
     writeFileSync(settings(dir), original);
-    applyProtect(dir, planProtect(dir));
+    applyProtect(dir, planProtect(dir, "project"));
     const after = readFileSync(settings(dir), "utf-8");
     expect(after).toContain("rulereceipt guard");
     expect(after).toContain("Bash(ls:*)"); // the user's own setting is preserved
@@ -46,14 +46,21 @@ describe("protect (plan / apply / undo)", () => {
 
   it("is idempotent: planning again after protecting has nothing to add", () => {
     const dir = repo();
-    applyProtect(dir, planProtect(dir));
-    expect(planProtect(dir).alreadyProtected).toBe(true);
+    applyProtect(dir, planProtect(dir, "project"));
+    expect(planProtect(dir, "project").alreadyProtected).toBe(true);
   });
 
   it("undo with no backup is a clear no-op, not a crash", () => {
     const u = undoProtect(repo());
     expect(u.ok).toBe(false);
     expect(u.message.toLowerCase()).toContain("nothing to undo");
+  });
+
+  it("DEFAULTS to user-level (~/.claude), not the project — the agent can't edit a project file to disable its own guard", () => {
+    const plan = planProtect(repo()); // no scope arg => default
+    expect(plan.scope).toBe("user");
+    expect(plan.settingsPath).toContain(join(".claude", "settings.json"));
+    expect(plan.settingsPath).not.toContain("rr-protect-"); // not under the temp project dir
   });
 });
 
@@ -64,7 +71,7 @@ describe("protect (CLI)", () => {
 
   it("--yes installs and points at undo; --undo restores", () => {
     const dir = repo();
-    const out = run(dir, "--yes");
+    const out = run(dir, "--project", "--yes");
     expect(out).toContain("PreToolUse guard");
     expect(out).toContain("Stop hook");
     expect(out).toMatch(/Done — added to/);
@@ -76,8 +83,8 @@ describe("protect (CLI)", () => {
 
   it("running --yes twice is idempotent (no duplicate hooks)", () => {
     const dir = repo();
-    run(dir, "--yes");
-    const out = run(dir, "--yes");
+    run(dir, "--project", "--yes");
+    const out = run(dir, "--project", "--yes");
     expect(out).toContain("Already protected");
     const s = readFileSync(settings(dir), "utf-8");
     expect(s.match(/rulereceipt guard/g)).toHaveLength(1); // exactly one
@@ -90,7 +97,7 @@ describe("protect refuses to touch an unparseable settings file (data-loss fix, 
     mkdirSync(join(dir, ".claude"), { recursive: true });
     const jsonc = '{\n  // my model\n  "model": "opus",\n  "permissions": { "deny": ["Bash(git push:*)"] },\n}';
     writeFileSync(settings(dir), jsonc);
-    const plan = planProtect(dir);
+    const plan = planProtect(dir, "project");
     expect(plan.parseError).toBe(true);
     expect(plan.next).toBe(jsonc); // unchanged
     expect(plan.toAdd).toEqual([]);
@@ -102,7 +109,7 @@ describe("protect refuses to touch an unparseable settings file (data-loss fix, 
     const jsonc = '{\n  "model": "opus", // keep\n  "permissions": { "deny": ["Bash(git push:*)"] },\n}';
     writeFileSync(settings(dir), jsonc);
     const before = readFileSync(settings(dir), "utf-8");
-    const plan = planProtect(dir);
+    const plan = planProtect(dir, "project");
     expect(() => applyProtect(dir, plan)).toThrow(); // refuses
     expect(readFileSync(settings(dir), "utf-8")).toBe(before); // byte-identical
   });

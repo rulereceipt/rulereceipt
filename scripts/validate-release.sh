@@ -110,9 +110,13 @@ check "guard: writes a receipt line (deny + would-deny)" 'grep -q "\"action\":\"
 
 echo "== protect apply + undo =="
 PP="$(newproj pp '## 1. Branch\nNever push to `main`.\n')"
-APPLY="$(printf 'y\n' | (cd "$PP" && "$RR" protect 2>&1))"
-check "protect: apply writes the guard hook (or shows it)" '[ -f "$PP/.claude/settings.json" ] && grep -q "rulereceipt guard" "$PP/.claude/settings.json" || echo "$APPLY" | grep -qiE "guard|PreToolUse"'
+# --project writes into the repo (a stable path to assert). The DEFAULT is
+# user-level (~/.claude) so the agent working in the repo can't edit a project
+# file to disable its own guard — checked via the plan output below.
+APPLY="$(cd "$PP" && "$RR" protect --project --yes 2>&1)"
+check "protect --project: apply writes the guard hook"   '[ -f "$PP/.claude/settings.json" ] && grep -q "rulereceipt guard" "$PP/.claude/settings.json"'
 check "protect --undo: reachable"                        'out "$PP" protect --undo | grep -qiE "restored|nothing to undo"'
+check "protect: default plan targets USER level, not the project" 'out "$PP" protect | grep -qi "user-level"'
 
 echo "== cold-start smoke (no crashes) =="
 EMPTY="$WORK/empty"; mkdir -p "$EMPTY"
