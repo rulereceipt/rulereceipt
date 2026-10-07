@@ -35,6 +35,18 @@ jobs:
       - run: npm run build
       - run: npm test
 
+      # The release gate's exit-code contract, enforced in CI (added 2026-10-07):
+      # (1) the self-test proves the suite still goes RED on a planted failure —
+      #     including a suite that throws at LOAD, the shape that masked a real
+      #     failure; (2) the frozen false-accusation benchmark must be 0 and now
+      #     fails by EXIT CODE, never by a grepped line. Run once, on 22.
+      - run: npm run gates:selftest
+        if: matrix.node-version == 22
+      - run: npx tsx scripts/false-accusation-rate.ts --frozen
+        if: matrix.node-version == 22
+      - run: npx tsx scripts/false-accusation-rate.ts --frozen --v2
+        if: matrix.node-version == 22
+
       # Cold-install guard: the exact commands a stranger runs after `npx`
       # must exit clean (no stack trace) on the freshly-built dist, and the
       # self-test's golden fixtures must all still be correct. A green unit

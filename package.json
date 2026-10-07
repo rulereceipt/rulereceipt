@@ -51,7 +51,9 @@
     "prepare": "node scripts/install-git-hooks.mjs",
     "prepublishOnly": "npm run build && npm run sbom && npm test",
     "build:checker": "esbuild src/browser/analyze.ts --bundle --format=esm --minify --outfile=landing/checker.js",
-    "verify": "npm run lint && npm run typecheck && npm test"
+    "verify": "npm run lint && npm run typecheck && npm test",
+    "gates": "bash scripts/gates.sh",
+    "gates:selftest": "bash scripts/gate-selftest.sh"
   },
   "engines": {
     "node": ">=20"
