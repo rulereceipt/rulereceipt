@@ -93,7 +93,7 @@ Specific limits:
 | Agent | Rules files read | Session log read | Live hooks |
 |---|---|---|---|
 | Claude Code | Yes | Yes | Yes (Stop hook, PreToolUse guard) |
-| Codex CLI | Yes | In testing | No |
+| Codex CLI | Yes | Yes (tested on 0.160.1) | No |
 | Cursor | Yes | No | No |
 | GitHub Copilot | Yes | No | No |
 | Windsurf | Yes | No | No |
@@ -205,9 +205,11 @@ and where it broke a rule it could be held to.
 Codex stores a compacted session as a Zstandard-compressed `rollout-*.jsonl.zst`.
 RuleReceipt now reads those (via `node:zlib` zstd), but that needs **Node 22.15 or
 newer** — on an older Node the compressed files are skipped with a one-line note,
-not read. Codex support as a whole is still **in testing**: it has been verified
-against the documented format and synthetic fixtures, not yet against a real
-end-to-end Codex rollout, so treat Codex verdicts as provisional until that check.
+not read. Codex support is now **validated end-to-end on a real rollout** (CLI
+0.160.1, 2026-10-07), including the 0.160 exec harness where the shell command and
+file edits are wrapped in a JS string (`tools.exec_command({cmd})` /
+`tools.apply_patch("*** Begin Patch…")`) rather than passed as structured fields.
+The redacted clean + planted-Broken fixtures live in `tests/fixtures/codex0160/`.
 
 ## Opaque commands the guard cannot read
 
@@ -297,3 +299,26 @@ a real one).
   rules, with the quoted evidence. They are complementary: a diff review can't see a
   `git push` that already happened or a "tests pass" claim contradicted by the run;
   a session receipt can't review code a human wrote by hand. Use both.
+
+## Deferred checker-semantics gaps (logged 2026-10-07, not yet fixed)
+
+These were found validating Codex 0.160.1 and deliberately left for later. The
+approval gate must NOT be changed to address them without a fresh FA v1+v2 run.
+
+- **Explicit in-prompt approval is not credited as Followed.** When the user's
+  own prompt instructs an action ("…commit and push to main"), an approval-gated
+  rule ("Never push to main *without asking*") still reports **can't-tell**, not
+  Followed — the gate does not treat the instruction itself as the approval. A
+  consequence: because the gate also assumes a permission prompt may have approved
+  a push (invisible in the transcript), an *unapproved* push to main is always
+  can't-tell — never Broken — for a session with no Claude permission-mode (e.g.
+  Codex). A deterministic **Broken** on a push needs a HARD branch rule
+  ("Never push to the `main` branch directly."), which `gitBranchPolicy` settles
+  without the gate. This is why `tests/fixtures/codex0160/broken-session` uses a
+  hard branch rule.
+- **A forbid rule whose action never happened isn't credited Followed.** "Never
+  edit `.env`" when `.env` was provably never edited this session reports
+  needs-human / can't-tell rather than **Followed**. The deterministic checkers
+  fire on violations; the *absence* of the forbidden action falls through to the
+  judgment path. Ideal: a clean, deterministic Followed when the forbidden action
+  is provably absent.

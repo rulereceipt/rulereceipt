@@ -19,7 +19,7 @@ npx rulereceipt
 Runs entirely on your machine. Plain `rulereceipt check` makes zero network
 calls — [Trust, privacy and licensing](#trust-privacy-and-licensing) has the full
 detail, including the three off-by-default opt-ins. Sessions it reads: Claude
-Code (supported), OpenAI Codex CLI (in testing), other agents experimental. It
+Code (supported), OpenAI Codex CLI (supported, tested on 0.160.1), other agents experimental. It
 also reads Cursor, Copilot and Windsurf rules files (and CLAUDE.md, AGENTS.md,
 Gemini `GEMINI.md`, Google's `.agents/rules`, and Claude Code memory).
 [Accuracy](https://rulereceipt.dev/accuracy)
@@ -82,7 +82,7 @@ memory — are read far more broadly; this table is about reading a *session*):
 | Agent | Session support | Notes |
 | :- | :- | :- |
 | Claude Code | **Supported** | incl. hosted/enterprise homes you configure via `RULERECEIPT_CLAUDE_HOMES` / `CLAUDE_CONFIG_DIR` |
-| OpenAI Codex CLI | **In testing** | reads `rollout-*.jsonl` and compressed `rollout-*.jsonl.zst` (zst needs Node ≥ 22.15); verified on the documented format + fixtures, **not yet validated on a real end-to-end rollout** |
+| OpenAI Codex CLI | **Supported** | reads `rollout-*.jsonl` and compressed `rollout-*.jsonl.zst` (zst needs Node ≥ 22.15); validated on a real end-to-end rollout (CLI 0.160.1), incl. the 0.160 exec-harness (`exec_command` / `apply_patch`) |
 | Copilot CLI, Gemini CLI, Cursor, OpenCode | **Experimental** | reachable with `--transcript`; mapped from documented formats, synthetic fixtures only |
 | Cline, Antigravity, Aider, Windsurf | Not yet | — |
 
@@ -95,7 +95,7 @@ Auto-detection picks the newest session across supported tools.
    current project directory and your global rules file.
 2. Reads your most recent agent session transcript — Claude Code today
    (including hosted/enterprise variants under a different directory), and
-   OpenAI Codex CLI (in testing); newest session across tools wins.
+   OpenAI Codex CLI (supported, tested on 0.160.1); newest session across tools wins.
 3. Routes each rule to the narrowest check that can actually answer it:
    - **Structured checks** read what the session really did — an actual
      git command's branch argument, actual file edits, actual file

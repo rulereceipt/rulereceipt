@@ -57,7 +57,7 @@ function realpathOr(p: string): string {
 }
 
 /** The cwd a session folder belongs to, read from the first line that carries it. */
-function sessionCwdOf(sessionFile: string): string | null {
+export function sessionCwdOf(sessionFile: string): string | null {
   let text: string;
   try {
     text = readFileSync(sessionFile, "utf-8");

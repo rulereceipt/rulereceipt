@@ -10,8 +10,9 @@ import { ADAPTERS, EXPERIMENTAL_ADAPTERS, UNSUPPORTED_TOOLS } from "./adapters/i
  *
  * "Read" status is separate from "validated": an adapter can parse a format
  * (`read: "full"`) while its end-to-end accuracy is still unproven on a real
- * personal session (`validated: false`) — Codex is exactly that today, and the
- * matrix says so rather than implying more than we've shown.
+ * personal session (`validated: false`) — the experimental adapters are exactly
+ * that, and the matrix says so rather than implying more than we've shown.
+ * (Claude Code and Codex are both validated end-to-end on real sessions.)
  */
 
 export interface AgentCapability {
@@ -23,10 +24,10 @@ export interface AgentCapability {
 
 // Tools whose end-to-end behaviour we have NOT yet validated on a real personal
 // session — kept explicit so "we can parse it" is never shown as "we validated it".
-const UNVALIDATED = new Set<string>(["codex"]);
+const UNVALIDATED = new Set<string>([]); // codex validated on a real 0.160.1 rollout (2026-10-07)
 const NOTES: Record<string, string> = {
   "claude-code": "full support — parsed and validated end-to-end",
-  codex: "in testing — reads rollout-*.jsonl and compressed .jsonl.zst (zst needs Node 22.15+), not yet validated on a real end-to-end rollout",
+  codex: "supported — validated on a real end-to-end rollout (CLI 0.160.1, 2026-10-07); reads rollout-*.jsonl and compressed .jsonl.zst (zst needs Node 22.15+), incl. the 0.160 exec-harness (exec_command / apply_patch)",
 };
 
 export function agentCapabilities(): AgentCapability[] {

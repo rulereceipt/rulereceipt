@@ -14,8 +14,15 @@ import { breakContext, renderBreakContext } from "../breakContext.js";
 function locationOf(r: CheckResult): string {
   if (!r.sourcePath) return "";
   const home = homedir();
-  const path = r.sourcePath.startsWith(home) ? `~${r.sourcePath.slice(home.length)}` : r.sourcePath;
-  return r.sourceLine ? `${path}:${r.sourceLine}` : path;
+  const fmt = (p?: string, line?: number) => {
+    if (!p) return "";
+    const path = p.startsWith(home) ? `~${p.slice(home.length)}` : p;
+    return line ? `${path}:${line}` : path;
+  };
+  const primary = fmt(r.sourcePath, r.sourceLine);
+  // Same rule text in more than one file: name them all (deduped to one rule).
+  const also = (r.alsoSources ?? []).map((s) => fmt(s.sourcePath, s.sourceLine)).filter(Boolean);
+  return also.length ? `${primary} (also ${also.join(", ")})` : primary;
 }
 
 export interface ReportMeta {

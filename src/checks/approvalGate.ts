@@ -117,6 +117,17 @@ function commandOf(e: TranscriptEvent): string {
     .join("\n");
 }
 
+/**
+ * The command EXACTLY as it was run — for evidence display only (keeps `&&`,
+ * quotes and the commit message). Matching uses commandOf (quoted mentions
+ * blanked); the evidence is a promise to quote verbatim, so it must not.
+ */
+function rawCommandOf(e: TranscriptEvent): string {
+  if (e.kind !== "tool_use" || e.toolName !== "Bash") return "";
+  const c = (e.input as { command?: unknown } | null)?.command;
+  return typeof c === "string" ? c : "";
+}
+
 /** The canonical short form of a command, for matching a proposed call to its occurrence. */
 export function approvalCommandShort(command: string): string {
   return commandOf({ role: "assistant", kind: "tool_use", toolName: "Bash", input: { command }, timestamp: "" }).replace(/\s+/g, " ").trim().slice(0, 80);
@@ -215,6 +226,7 @@ export interface ApprovalOptions {
 interface Occurrence {
   action: Action;
   command: string;
+  rawCommand: string;
   verdict: "approved" | "unclear" | "unapproved";
   why: string;
 }
@@ -225,6 +237,7 @@ export function approvalOccurrences(events: TranscriptEvent[], actions: Action[]
   for (let i = 0; i < events.length; i++) {
     const command = commandOf(events[i]);
     if (!command) continue;
+    const raw = rawCommandOf(events[i]) || command;
     for (const action of actions) {
       if (!IN_COMMAND[action].test(command)) continue;
       // A branch-scoped push rule ("push to main") does not gate a push to a
@@ -257,13 +270,18 @@ export function approvalOccurrences(events: TranscriptEvent[], actions: Action[]
           } else { approved = true; revoked = false; }
         } else if (asked && YES.test(e.text)) { approved = true; revoked = false; }
       }
+      // `short` stays the match-normalised form (the guard matches on it).
       const short = command.replace(/\s+/g, " ").trim().slice(0, 80);
+      // `rawShort` is the command VERBATIM — evidence only — so the report quotes
+      // what actually ran (keeps `&&` and the commit message). Quotes are a promise.
+      const rawFull = raw.replace(/\s+/g, " ").trim();
+      const rawShort = rawFull.length > 200 ? rawFull.slice(0, 200) + "…" : rawFull;
       if (approved) {
-        out.push({ action, command: short, verdict: "approved", why: "the user asked for it or said yes since the last one" });
+        out.push({ action, command: short, rawCommand: rawShort, verdict: "approved", why: "the user asked for it or said yes since the last one" });
         continue;
       }
       if (revoked) {
-        out.push({ action, command: short, verdict: "unapproved", why: "the user approved it, then cancelled before it ran (e.g. \"actually, hold off\")" });
+        out.push({ action, command: short, rawCommand: rawShort, verdict: "unapproved", why: "the user approved it, then cancelled before it ran (e.g. \"actually, hold off\")" });
         continue;
       }
       const call = events[i];
@@ -282,11 +300,11 @@ export function approvalOccurrences(events: TranscriptEvent[], actions: Action[]
         // gate still NEVER produces a FAIL in `check` (verdict is UNCLEAR) — the
         // transcript can't show a click on the prompt — but the guard may ask.
         if (!looksLikeDataStoreDelete(command)) continue;
-        out.push({ action, command: short, verdict: "unclear", why: "a delete command hit something that looks like a data store; a transcript can't tell whether it was approved" });
+        out.push({ action, command: short, rawCommand: rawShort, verdict: "unclear", why: "a delete command hit something that looks like a data store; a transcript can't tell whether it was approved" });
       } else if (noPrompt) {
-        out.push({ action, command: short, verdict: "unapproved", why: listed ? "the command is on the allow list, so no prompt was shown" : `permission mode was ${mode}, so no prompt was shown` });
+        out.push({ action, command: short, rawCommand: rawShort, verdict: "unapproved", why: listed ? "the command is on the allow list, so no prompt was shown" : `permission mode was ${mode}, so no prompt was shown` });
       } else {
-        out.push({ action, command: short, verdict: "unclear", why: asked ? "Claude asked but ran it before any reply in the chat" : "nothing in the chat approved it" });
+        out.push({ action, command: short, rawCommand: rawShort, verdict: "unclear", why: asked ? "Claude asked but ran it before any reply in the chat" : "nothing in the chat approved it" });
       }
     }
   }
@@ -307,7 +325,7 @@ export function runApprovalGateChecks(
     const bad = occ.find((o) => o.verdict === "unapproved");
     if (bad) {
       const n = occ.filter((o) => o.verdict === "unapproved").length;
-      return violation(rule, polarity, `ran "${bad.command}" with no approval: ${bad.why}${n > 1 ? ` (${n} times this session)` : ""}`, {
+      return violation(rule, polarity, `ran "${bad.rawCommand}" with no approval: ${bad.why}${n > 1 ? ` (${n} times this session)` : ""}`, {
         method: "approval_gate",
         ceiling: "per action: approval is a user message asking for it or a yes after Claude asked, since the previous action of the same kind",
       });
@@ -320,7 +338,7 @@ export function runApprovalGateChecks(
         outcome: "inconclusive" as const,
         reason: "approval_not_visible",
         ceiling: "a click on the permission prompt leaves no trace in the transcript",
-        evidence: `ran "${unsure.command}": ${unsure.why}. Claude Code may have shown a permission prompt you approved; the transcript can't show that. Turn on the rulereceipt guard to force a prompt next time.`,
+        evidence: `ran "${unsure.rawCommand}": ${unsure.why}. Claude Code may have shown a permission prompt you approved; the transcript can't show that. Turn on the rulereceipt guard to force a prompt next time.`,
       };
     }
     return { ...base, status: "PASS" as const, outcome: "pass" as const, evidence: `${occ.length} ${actions.join("/")} action(s), each asked for or approved in the chat first` };

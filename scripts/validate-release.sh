@@ -186,7 +186,7 @@ check "health: clean project says none, exits 0"        '[ "$(rc "$PB" health)" 
 
 echo "== doctor --capabilities (capability matrix) =="
 check "doctor --capabilities: lists claude-code"        'out "$PB" doctor --capabilities | grep -qi "claude-code"'
-check "doctor --capabilities: codex shown in testing"   'out "$PB" doctor --capabilities | grep -qi "codex" && out "$PB" doctor --capabilities | grep -qi "in testing"'
+check "doctor --capabilities: codex shown supported"    'out "$PB" doctor --capabilities | grep -qi "codex" && out "$PB" doctor --capabilities | grep -Ei "codex +supported"'
 check "doctor --capabilities: states guard limits"      'out "$PB" doctor --capabilities | grep -qi "CANNOT catch"'
 check "doctor --capabilities: exits 0"                  '[ "$(rc "$PB" doctor --capabilities)" = "0" ]'
 check "doctor --capabilities --json: valid JSON"        'out "$PB" doctor --capabilities --json | node -e "let s=\"\";process.stdin.on(\"data\",d=>s+=d).on(\"end\",()=>{const j=JSON.parse(s);process.exit(Array.isArray(j.agents)&&j.guardLimits.length>0?0:1)})"'

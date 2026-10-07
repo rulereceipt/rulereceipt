@@ -148,6 +148,6 @@ export function attachSourceLocation(results: CheckResult[], rules: Rule[]): Che
   return results.map((r) => {
     const rule = byKey.get(locationKey(r.ruleSource, r.ruleId, r.ruleTitle));
     if (!rule) return r;
-    return { ...r, sourcePath: rule.sourcePath, sourceLine: rule.sourceLine };
+    return { ...r, sourcePath: rule.sourcePath, sourceLine: rule.sourceLine, alsoSources: rule.alsoSources };
   });
 }
