@@ -1,4 +1,5 @@
 import { homedir } from "node:os";
+import { stripTerminalEscapes } from "./sanitize.js";
 import type { CheckResult, Rule, TranscriptEvent } from "./types.js";
 import { ruleFingerprint } from "./overrides.js";
 
@@ -67,7 +68,9 @@ const SECRET_PATTERNS: Array<[RegExp, string]> = [
 
 /** Masks the things most likely to be private. Not a guarantee — the user is told to read it. */
 export function redact(text: string, home = homedir()): string {
-  let out = text;
+  // Strip terminal control sequences first: a session can embed ANSI/OSC escapes
+  // that would spoof output when this redacted text is printed or shared.
+  let out = stripTerminalEscapes(text);
   if (home && home.length > 1) out = out.split(home).join("~");
   for (const [re, rep] of SECRET_PATTERNS) out = out.replace(re, rep);
   return out;
