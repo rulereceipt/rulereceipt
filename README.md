@@ -478,6 +478,10 @@ GitHub SSH keys set up. The shorthand `claude plugin marketplace add
 rulereceipt/rulereceipt` also works, but it clones over **SSH** (`git@github.com:…`),
 which fails if you don't have SSH keys configured — use the HTTPS URL above if in doubt.
 
+> **Troubleshooting:** if `marketplace add` fails with *"source doesn't match its
+> `extraKnownMarketplaces` entry"*, run `claude plugin marketplace remove rulereceipt`
+> first, then add it again.
+
 It adds a **PreToolUse guard** (refuses a command that breaks a file/branch rule, asks
 before an unapproved push/commit), a **Stop hook** (won't let a session end on a broken
 rule), and `/rulereceipt:check`, `:audit`, `:health`, `:why`. The hooks call the
