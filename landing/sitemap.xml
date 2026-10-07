@@ -30,4 +30,16 @@
   <url>
     <loc>https://rulereceipt.dev/stories/database-corruption</loc>
   </url>
+  <url>
+    <loc>https://rulereceipt.dev/guides/check-claude-code-followed-claude-md</loc>
+  </url>
+  <url>
+    <loc>https://rulereceipt.dev/guides/claude-code-pushed-to-main-without-asking</loc>
+  </url>
+  <url>
+    <loc>https://rulereceipt.dev/guides/did-my-ai-agent-run-the-tests</loc>
+  </url>
+  <url>
+    <loc>https://rulereceipt.dev/guides/agents-md-claude-md-rule-compliance-for-teams</loc>
+  </url>
 </urlset>
