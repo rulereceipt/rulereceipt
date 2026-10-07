@@ -1,4 +1,5 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync, renameSync, rmSync } from "node:fs";
+import { homedir } from "node:os";
 import { join, dirname } from "node:path";
 
 /**
@@ -18,11 +19,28 @@ import { join, dirname } from "node:path";
 const GUARD_CMD = "rulereceipt guard";
 const HOOK_CMD = "rulereceipt hook";
 
-function settingsPathFor(cwd: string): string {
-  return join(cwd, ".claude", "settings.json");
+export type ProtectScope = "user" | "project";
+
+/**
+ * Where protect writes its hooks. Default is USER level (~/.claude/settings.json),
+ * not the project's .claude/settings.json — because the agent being guarded is
+ * working INSIDE the project and can edit a project-level settings file to turn
+ * its own guard off (raised on HN, 2026-10-07). A user-level hook sits outside
+ * the repo the agent edits, and applies your rules to every project (it is a
+ * no-op where a project has no rules). For true tamper-resistance, enterprise
+ * managed-settings.json is the only real answer — see KNOWN-GAPS.
+ */
+function settingsPathFor(cwd: string, scope: ProtectScope): string {
+  return scope === "project"
+    ? join(cwd, ".claude", "settings.json")
+    : join(homedir(), ".claude", "settings.json");
 }
-function backupPathFor(cwd: string): string {
-  return join(cwd, ".rulereceipt", "protect-backup.json");
+function backupPathFor(cwd: string, scope: ProtectScope): string {
+  // User-level backup lives under the home dir so `protect --undo` finds it from
+  // any directory; project-level stays next to the project it guards.
+  return scope === "project"
+    ? join(cwd, ".rulereceipt", "protect-backup.json")
+    : join(homedir(), ".rulereceipt", "protect-backup.json");
 }
 
 interface HookEntry {
@@ -54,6 +72,8 @@ function atomicWrite(path: string, content: string): void {
 }
 
 export interface ProtectPlan {
+  /** Where the hooks are written: "user" (~/.claude) by default, or "project". */
+  scope: ProtectScope;
   settingsPath: string;
   existed: boolean;
   /** The exact original bytes, or null if the settings file did not exist. */
@@ -80,8 +100,8 @@ export const PROTECT_HOOK_SNIPPET = `"hooks": {
   "Stop": [{ "hooks": [{ "type": "command", "command": "${HOOK_CMD}" }] }]
 }`;
 
-export function planProtect(cwd: string): ProtectPlan {
-  const settingsPath = settingsPathFor(cwd);
+export function planProtect(cwd: string, scope: ProtectScope = "user"): ProtectPlan {
+  const settingsPath = settingsPathFor(cwd, scope);
   const existed = existsSync(settingsPath);
   let original: string | null = null;
   let settings: Settings = {};
@@ -95,7 +115,7 @@ export function planProtect(cwd: string): ProtectPlan {
       // it would silently delete the user's own settings — deny rules, model,
       // other hooks. Return a plan that changes NOTHING and flags the parse
       // error so the caller can tell the user and show the lines to add by hand.
-      return { settingsPath, existed, original, next: original, toAdd: [], alreadyProtected: false, parseError: true };
+      return { scope, settingsPath, existed, original, next: original, toAdd: [], alreadyProtected: false, parseError: true };
     }
   }
 
@@ -110,6 +130,7 @@ export function planProtect(cwd: string): ProtectPlan {
   }
 
   return {
+    scope,
     settingsPath,
     existed,
     original,
@@ -126,7 +147,7 @@ export function applyProtect(cwd: string, plan: ProtectPlan): void {
   if (plan.parseError) throw new Error("refusing to write: the settings file is not valid JSON");
   // Record exactly what to restore (the original bytes, or that there was no
   // file) BEFORE touching anything, so --undo is byte-for-byte.
-  atomicWrite(backupPathFor(cwd), `${JSON.stringify({ settingsPath: plan.settingsPath, existed: plan.existed, original: plan.original }, null, 2)}\n`);
+  atomicWrite(backupPathFor(cwd, plan.scope), `${JSON.stringify({ settingsPath: plan.settingsPath, existed: plan.existed, original: plan.original }, null, 2)}\n`);
   atomicWrite(plan.settingsPath, plan.next);
 }
 
@@ -136,9 +157,12 @@ export interface UndoResult {
 }
 
 export function undoProtect(cwd: string): UndoResult {
-  const backupPath = backupPathFor(cwd);
-  if (!existsSync(backupPath)) {
-    return { ok: false, message: "Nothing to undo — no `protect` backup found in .rulereceipt/." };
+  // Check the user-level backup (~/.rulereceipt) and the project-level one, so
+  // undo works whichever scope protect used.
+  // Project backup first (specific to this repo), then the user-level one.
+  const backupPath = [backupPathFor(cwd, "project"), backupPathFor(cwd, "user")].find((p) => existsSync(p));
+  if (!backupPath) {
+    return { ok: false, message: "Nothing to undo — no `protect` backup found in ~/.rulereceipt/ or ./.rulereceipt/." };
   }
   let backup: { settingsPath: string; existed: boolean; original: string | null };
   try {

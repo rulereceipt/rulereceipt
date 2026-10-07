@@ -1500,14 +1500,16 @@ function confirmYesNo(prompt: string): Promise<boolean> {
 program
   .command("protect")
   .description(
-    "Wire RuleReceipt's enforcement into Claude Code: a PreToolUse guard (refuses a command that breaks a file/branch rule; asks before an unapproved push/commit) and a Stop hook (won't let a session end on a broken rule). Shows exactly what it will add to .claude/settings.json and asks first. Undo anytime with --undo (restores the file byte-for-byte)."
+    "Wire RuleReceipt's enforcement into Claude Code: a PreToolUse guard (refuses a command that breaks a file/branch rule; asks before an unapproved push/commit) and a Stop hook (won't let a session end on a broken rule). Installs to your USER-level ~/.claude/settings.json by default — so the agent working inside a project can't edit a project file to disable its own guard; pass --project to scope it to this repo instead. Shows exactly what it will add and asks first. Undo anytime with --undo (restores byte-for-byte)."
   )
   .option("--undo", "remove what protect added, restoring .claude/settings.json byte-for-byte")
   .option("--git", "install a git pre-push hook that refuses a push breaking a branch rule (catches pushes made outside Claude Code); --git --undo removes it")
   .option("--replay", "shadow: run the current guard + rules against your recent sessions and show what it WOULD have blocked — changes nothing")
+  .option("--project", "install into this project's .claude/settings.json instead of user-level ~/.claude (the agent working here can edit a project file to disable its own guard — user-level is the default for that reason)")
   .option("--yes", "skip the confirmation prompt (for scripts)")
-  .action(async (opts: { undo?: boolean; git?: boolean; replay?: boolean; yes?: boolean }) => {
+  .action(async (opts: { undo?: boolean; git?: boolean; replay?: boolean; project?: boolean; yes?: boolean }) => {
     const cwd = process.cwd();
+    const scope = opts.project ? "project" : "user";
     if (opts.replay) {
       console.log(renderReplay(replayGuard(cwd)));
       return;
@@ -1556,7 +1558,7 @@ program
       if (!r.ok) process.exitCode = 1;
       return;
     }
-    const plan = planProtect(cwd);
+    const plan = planProtect(cwd, scope);
     if (plan.parseError) {
       console.log(`Your ${plan.settingsPath} is not valid JSON (a comment, a trailing comma, or a syntax error).`);
       console.log("protect will NOT touch it — rewriting it could delete your own settings (deny rules, model, other hooks).");
@@ -1569,7 +1571,8 @@ program
       console.log(`Already protected — the RuleReceipt hooks are in ${plan.settingsPath}. Nothing to add.`);
       return;
     }
-    console.log(`protect will add to ${plan.settingsPath}${plan.existed ? "" : " (new file)"}:`);
+    console.log(`protect will add to ${plan.settingsPath}${plan.existed ? "" : " (new file)"} (${scope}-level):`);
+    if (scope === "user") console.log("  (user-level so the agent working in a project can't edit a project file to disable its own guard; it applies your rules to every project, and is a no-op where a project has no rules. Use --project to scope it to this repo.)");
     for (const a of plan.toAdd) console.log(`  + ${a}`);
     console.log("\nThe file will read:\n");
     console.log(plan.next.split("\n").map((l) => `    ${l}`).join("\n"));

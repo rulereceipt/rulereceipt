@@ -239,3 +239,28 @@ grammar via tree-sitter-bash. We evaluated the swap and chose not to:
 So the cost is real and the marginal catch is ~zero on the cases that matter. If
 that ever changes — a concrete bypass the regex parser provably can't handle but a
 grammar can — this decision gets revisited with that benchmark as the evidence.
+
+## The guard can be turned off by the agent it guards
+
+RuleReceipt's enforcement is Claude Code hooks, which are configuration — and
+configuration the agent can reach:
+
+- **Project-level hook config is editable.** If the guard lives in a project's
+  `.claude/settings.json`, the agent working in that repo can edit or delete it,
+  or disable the hook, in the same session. For that reason `rulereceipt protect`
+  now installs to your **user-level `~/.claude/settings.json` by default** (outside
+  the repo the agent edits); `--project` is opt-in. User-level is harder to reach
+  incidentally, but it is still a file on disk the agent *could* edit.
+- **`git push --no-verify` skips git hooks.** The `protect --git` pre-push hook is
+  bypassed by `--no-verify` (by design in git) — so an agent, or anyone, can push
+  past it with one flag.
+- **The only tamper-resistant option is enterprise managed settings.** Claude
+  Code's `managed-settings.json` (admin-controlled, not user-writable) is the one
+  place a hook can't be edited by the session. For real enforcement against an
+  adversarial agent, use managed settings; treat `protect` as a strong default for
+  the honest case, not a sandbox.
+
+RuleReceipt flags these in-session when it can see them (a session that edits a
+hooks/settings file, or runs `--no-verify` while a branch rule exists, is reported
+as "guard modified/bypassed this session"), but detection after the fact is not
+prevention.
