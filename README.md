@@ -6,7 +6,7 @@
 [![npm](https://img.shields.io/npm/v/rulereceipt)](https://www.npmjs.com/package/rulereceipt)
 [![provenance](https://img.shields.io/badge/npm-provenance%20signed-blue)](https://www.npmjs.com/package/rulereceipt#provenance)
 
-**Check if your AI coding agent followed the rules in your CLAUDE.md, with the exact line as proof.**
+**Did your agent push without asking? Say tests pass when none ran? RuleReceipt shows you, with the exact line as proof.**
 
 [![RuleReceipt checking an agent session against your rules — three rules broken, each with the quoted line](https://raw.githubusercontent.com/rulereceipt/rulereceipt/main/docs/screenshot.png)](https://rulereceipt.dev)
 

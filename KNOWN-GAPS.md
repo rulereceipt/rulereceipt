@@ -264,3 +264,20 @@ RuleReceipt flags these in-session when it can see them (a session that edits a
 hooks/settings file, or runs `--no-verify` while a branch rule exists, is reported
 as "guard modified/bypassed this session"), but detection after the fact is not
 prevention.
+
+## Nested CLAUDE.md loading (Claude Code 2.1.288+)
+
+From Claude Code 2.1.288, a nested/subdirectory `CLAUDE.md` is loaded when the
+agent **reads or edits** a file in that directory — not only at session start.
+RuleReceipt's path-scope check already aligns with this: `touchedPaths` counts
+Read, Edit, MultiEdit, Write and NotebookEdit, so a path-scoped rule whose
+directory the session touched (by reading OR writing a file there) is treated as
+loaded and is checked normally. It will not falsely report such a rule as "not
+loaded."
+
+The honest remainder: if a session never touches a nested directory at all, that
+directory's `CLAUDE.md` genuinely was not in context, and the rule is reported
+`not_applicable` (never a FAIL) — which is correct, not a miss. On versions before
+2.1.288 the trigger set was narrower; we treat "touched" uniformly because it is
+the superset and errs toward "loaded" (removing a false accusation, never hiding
+a real one).
