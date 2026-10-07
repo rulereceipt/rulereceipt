@@ -1275,11 +1275,18 @@
       // When the whole element is the target and it has child markup (the conf
       // block's syntax-highlight spans), restore innerHTML so the highlighting
       // isn't flattened by the textContent swap.
-      var swapHtml = target === el && el.children.length > 0;
-      var original = swapHtml ? target.innerHTML : target.textContent;
+      // Save/restore child NODES (clones), never innerHTML — restoring an HTML
+      // string would be flagged as a DOM-XSS sink even though it's the element's
+      // own trusted markup. cloneNode keeps the conf block's syntax-highlight spans.
+      var swapNodes = target === el && el.children.length > 0;
+      var savedNodes = swapNodes ? Array.prototype.map.call(target.childNodes, function (n) { return n.cloneNode(true); }) : null;
+      var originalText = swapNodes ? null : target.textContent;
       target.textContent = 'copied!';
       clearTimeout(el._copyTimer);
-      el._copyTimer = setTimeout(function () { if (swapHtml) { target.innerHTML = original; } else { target.textContent = original; } }, 1400);
+      el._copyTimer = setTimeout(function () {
+        if (swapNodes) { target.textContent = ''; savedNodes.forEach(function (n) { target.appendChild(n); }); }
+        else { target.textContent = originalText; }
+      }, 1400);
     }
     el.addEventListener('click', doCopy);
     el.addEventListener('keydown', function (e) {
