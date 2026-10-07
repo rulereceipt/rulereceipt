@@ -468,9 +468,14 @@ never silently download anything.
 
 ```bash
 npm i -g rulereceipt            # prerequisite
-claude plugin marketplace add rulereceipt/rulereceipt
+claude plugin marketplace add https://github.com/rulereceipt/rulereceipt
 claude plugin install rulereceipt@rulereceipt
 ```
+
+The full `https://` URL clones over HTTPS, so it works whether or not you have
+GitHub SSH keys set up. The shorthand `claude plugin marketplace add
+rulereceipt/rulereceipt` also works, but it clones over **SSH** (`git@github.com:…`),
+which fails if you don't have SSH keys configured — use the HTTPS URL above if in doubt.
 
 It adds a **PreToolUse guard** (refuses a command that breaks a file/branch rule, asks
 before an unapproved push/commit), a **Stop hook** (won't let a session end on a broken
