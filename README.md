@@ -18,10 +18,11 @@ npx rulereceipt
 
 Runs entirely on your machine. Plain `rulereceipt check` makes zero network
 calls — [Trust, privacy and licensing](#trust-privacy-and-licensing) has the full
-detail, including the three off-by-default opt-ins. Works with Claude Code today
-(OpenAI Codex CLI in testing); reads rules from CLAUDE.md, AGENTS.md, Cursor
-(`.cursor/rules`), GitHub Copilot, Windsurf, Gemini (`GEMINI.md`), Google's
-`.agents/rules`, and Claude Code memory. [Accuracy](https://rulereceipt.dev/accuracy)
+detail, including the three off-by-default opt-ins. Sessions it reads: Claude
+Code (supported), OpenAI Codex CLI (in testing), other agents experimental. It
+also reads Cursor, Copilot and Windsurf rules files (and CLAUDE.md, AGENTS.md,
+Gemini `GEMINI.md`, Google's `.agents/rules`, and Claude Code memory).
+[Accuracy](https://rulereceipt.dev/accuracy)
 · [Known gaps](KNOWN-GAPS.md) · Source-available, not OSI — see [LICENSE](LICENSE).
 
 ## See it in 10 seconds
