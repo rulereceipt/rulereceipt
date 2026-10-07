@@ -15,6 +15,7 @@ import { auditSessions, renderComplianceReport } from "./report/complianceReport
 import { auditProject, renderProjectAudit } from "./audit.js";
 import { runHealth, renderHealth } from "./health.js";
 import { evaluateSession } from "./evaluate.js";
+import { detectGuardTamper, renderGuardTamper } from "./checks/guardTamper.js";
 import { buildWrongReport, findTarget, reportedLabel } from "./wrong.js";
 import { saveFixture, replayFixtures, renderAccuracy } from "./accuracy.js";
 import { ghReady, issueTitle, issueCreateArgs, buildMailto, mailtoSubject } from "./wrongSubmit.js";
@@ -377,6 +378,11 @@ async function runCheck(opts: CheckOptions) {
   } else {
     if (editedNote) console.log(`${editedNote}\n`);
     console.log(reportText);
+    // Shadow advisory (not a verdict, not counted, no exit-code effect): did the
+    // session edit/bypass its own guard wiring? hasBranchRule is derived from the
+    // results (a git_events verdict means a branch rule is loaded).
+    const tamperLines = renderGuardTamper(detectGuardTamper(events, { hasBranchRule: results.some((r) => r.method === "git_events") }));
+    if (tamperLines.length) console.log(tamperLines.join("\n"));
     // Name the tool when it is not the default Claude Code, so a Codex run is
     // not silently reported as if it were a Claude session.
     const sourceNote = transcriptOverride ? null : sessionSourceNote(cwd);
