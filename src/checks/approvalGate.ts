@@ -128,6 +128,27 @@ export function approvalCommandShort(command: string): string {
  * a feature branch. Found by a real test 2026-09-29: the guard asked on every
  * push. Returns undefined for a generic "never push without asking" (all pushes).
  */
+/**
+ * The branch a USER's approval is scoped to — "push to feature/x", "only push to
+ * staging". Such an approval covers only that branch. Returns undefined for a
+ * generic approval ("push it", "go ahead") and for a remote name ("push to
+ * origin"), so neither is mistaken for a branch scope. Kept tight: a word with a
+ * slash, a known branch, or a plain non-stopword token counts; stopwords and
+ * remotes do not.
+ */
+const APPROVAL_NONBRANCH = new Set([
+  "it", "now", "this", "that", "these", "those", "them", "there", "here", "the",
+  "my", "our", "your", "again", "please", "changes", "code", "up", "already",
+  "remote", "origin", "upstream", "github", "gitlab", "everything", "all",
+]);
+function approvalBranchScope(text: string): string | undefined {
+  const m = text.match(/\bpush(?:ing|ed)?\s+(?:it\s+)?to\s+(?:the\s+)?(?:branch\s+)?([A-Za-z0-9][\w.\-]*(?:\/[\w.\-]+)*)/i);
+  if (!m) return undefined;
+  const b = m[1].toLowerCase();
+  if (b.includes("/")) return b;
+  return APPROVAL_NONBRANCH.has(b) ? undefined : b;
+}
+
 export function approvalScopedBranch(rule: { title: string; text: string }): string | undefined {
   const m = `${rule.title} ${rule.text}`.match(/\b(?:push(?:ing)?|commit(?:ting)?|merg(?:e|ing))\b[^.\n]*?\b(main|master|develop|trunk|release)\b/i);
   return m ? m[1].toLowerCase() : undefined;
@@ -225,8 +246,16 @@ export function approvalOccurrences(events: TranscriptEvent[], actions: Action[]
         // Order-sensitive: a cancellation flips an approval given earlier in the
         // window; a later re-approval ("ok, actually do it now") flips it back.
         if (approved && REVOKE.test(e.text)) { approved = false; revoked = true; continue; }
-        if (IN_USER_TEXT[action].test(e.text) && !negated(e.text, IN_USER_TEXT[action])) { approved = true; revoked = false; }
-        else if (asked && YES.test(e.text)) { approved = true; revoked = false; }
+        if (IN_USER_TEXT[action].test(e.text) && !negated(e.text, IN_USER_TEXT[action])) {
+          // A branch-scoped approval ("push to feature/x") covers ONLY that
+          // branch: it does not approve an explicit push to a DIFFERENT branch.
+          // pushTargetsBranch is true for a bare/unknown target, so this only
+          // withholds approval on a clear mismatch — never on an ambiguous push.
+          const bScope = action === "push" ? approvalBranchScope(e.text) : undefined;
+          if (bScope && !pushTargetsBranch(command, bScope, opts.currentBranch)) {
+            /* approval was for another branch; does not cover this push */
+          } else { approved = true; revoked = false; }
+        } else if (asked && YES.test(e.text)) { approved = true; revoked = false; }
       }
       const short = command.replace(/\s+/g, " ").trim().slice(0, 80);
       if (approved) {
