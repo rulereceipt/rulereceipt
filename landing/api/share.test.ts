@@ -28,7 +28,7 @@ describe("OPTIONS", () => {
     const { res, statusCode, headers } = mockRes();
     await handler(mockReq({ method: "OPTIONS" }), res);
     expect(statusCode()).toBe(204);
-    expect(headers()["Access-Control-Allow-Origin"]).toBe("*");
+    expect(headers()["Access-Control-Allow-Origin"]).toBe("https://rulereceipt.dev");
   });
 });
 
