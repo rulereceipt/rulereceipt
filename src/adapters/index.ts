@@ -59,19 +59,19 @@ export const codexAdapter: SessionAdapter = {
 };
 
 /**
- * GitHub Copilot CLI — EXPERIMENTAL. Reader is ours; the format is per
- * cli-continues (MIT, pinned SHA — see REUSE.md/NOTICE). No real-session
- * fixtures yet, so not auto-detected; reachable via `--transcript <events.jsonl>`.
+ * GitHub Copilot CLI — SUPPORTED, validated on a real 1.0.92 session
+ * (2026-10-07), incl. apply_patch edits and the ask-user/permission approval
+ * step (a human-approved push reads as Followed). Reader is ours; the base
+ * format is per cli-continues (MIT, pinned SHA — see REUSE.md/NOTICE).
  */
 export const copilotCliAdapter: SessionAdapter = {
   tool: "copilot-cli",
   listSessions: (cwd) => listCopilotSessions(cwd),
   parse: (sessionFile) => parseCopilotTranscript(sessionFile),
-  experimental: true,
 };
 
 /** Adapters with a verified, tested parser — these auto-detect the newest session. */
-export const ADAPTERS: SessionAdapter[] = [claudeCodeAdapter, codexAdapter];
+export const ADAPTERS: SessionAdapter[] = [claudeCodeAdapter, codexAdapter, copilotCliAdapter];
 
 /** Gemini CLI — EXPERIMENTAL. Our reader; format per cli-continues (MIT, pinned). */
 export const geminiCliAdapter: SessionAdapter = {
@@ -98,7 +98,7 @@ export const openCodeAdapter: SessionAdapter = {
 };
 
 /** Experimental adapters: reader exists, awaiting real+planted+clean fixtures. */
-export const EXPERIMENTAL_ADAPTERS: SessionAdapter[] = [copilotCliAdapter, geminiCliAdapter, cursorAdapter, openCodeAdapter];
+export const EXPERIMENTAL_ADAPTERS: SessionAdapter[] = [geminiCliAdapter, cursorAdapter, openCodeAdapter];
 
 /**
  * Tools deliberately NOT read yet, with the honest reason. Kept as data (not
