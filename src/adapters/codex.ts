@@ -136,7 +136,10 @@ function execHarnessEvents(js: string, timestamp: string, callId: string | undef
   const id = typeof callId === "string" ? callId : undefined;
 
   // apply_patch: one file op per `*** Update/Add/Delete File: <path>` header.
-  const fileRe = /\*\*\* (Update|Add|Delete) File: (.+?)(?:\\n|")/g;
+  // The patch lines are separated by an escaped `\n` (the usual, from the JS
+  // string literal) OR a real newline (some encodings), so accept both, plus the
+  // closing quote as a terminator.
+  const fileRe = /\*\*\* (Update|Add|Delete) File: (.+?)(?:\\n|\r?\n|")/g;
   let fm: RegExpExecArray | null;
   while ((fm = fileRe.exec(js)) !== null) {
     const op = fm[1].toLowerCase();
