@@ -281,3 +281,19 @@ directory's `CLAUDE.md` genuinely was not in context, and the rule is reported
 2.1.288 the trigger set was narrower; we treat "touched" uniformly because it is
 the superset and errs toward "loaded" (removing a false accusation, never hiding
 a real one).
+
+## Claude Code hook dispatch and how we differ from /code-review (2.1.288–2.1.292)
+
+- **PreToolUse hooks fail CLOSED at the dispatch level since 2.1.288.** Claude Code
+  now *blocks* a tool call when a PreToolUse (or PermissionRequest) hook can't be
+  matched or the tool input can't be serialized (previously the hook was silently
+  skipped). That is Claude Code's dispatch behaviour, and it is good for enforcement.
+  RuleReceipt's own guard logic still fails *open* internally (a bug inside the
+  guard stands down rather than locking you out of your editor) — a deliberate,
+  different choice at a different layer. `rulereceipt check` in CI remains the backstop.
+- **We check the session, not the diff.** Anthropic's `/code-review` reviews a pull
+  request's *diff* against CLAUDE.md. RuleReceipt reads the *session* — what the agent
+  actually did (the commands it ran, the claims it made) and whether that matched your
+  rules, with the quoted evidence. They are complementary: a diff review can't see a
+  `git push` that already happened or a "tests pass" claim contradicted by the run;
+  a session receipt can't review code a human wrote by hand. Use both.
