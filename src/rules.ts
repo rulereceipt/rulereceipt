@@ -150,6 +150,15 @@ function ruleSourcesAtLevel(dir: string, pi: ProjectInstructions = "unknown", ag
     return applyImports(out);
   }
 
+  // Antigravity (Google; replaced Gemini CLI) reads AGENTS.md + GEMINI.md — not
+  // CLAUDE.md, Cursor, Copilot, Windsurf or ~/.claude (validated on a real 1.3.1
+  // session, which loaded AGENTS.md).
+  if (agentTool === "antigravity") {
+    pushAgentsChain();
+    if (has("GEMINI.md")) out.push({ path: join(dir, "GEMINI.md"), status: "loaded", format: "Gemini (GEMINI.md)" });
+    return applyImports(out);
+  }
+
   // Cursor reads AGENTS.md + .cursor/rules/*.mdc|.md (the modern dir supersedes the
   // legacy .cursorrules) — not CLAUDE.md, Copilot, Windsurf, Gemini or ~/.claude
   // (validated on a real session, which read AGENTS.md).

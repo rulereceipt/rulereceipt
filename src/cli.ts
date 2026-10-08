@@ -11,6 +11,7 @@ import { findLatestSession, sessionSourceNote, parseSessionFile } from "./adapte
 import { sessionCwd as codexSessionCwd } from "./adapters/codex.js";
 import { copilotFormatIsKnown, workspaceCwd as copilotWorkspaceCwd } from "./adapters/copilot.js";
 import { cursorFormatIsKnown, cursorSessionCwd } from "./adapters/cursor.js";
+import { antigravityFormatIsKnown, antigravitySessionCwd } from "./adapters/antigravity.js";
 import { loadRules } from "./rules.js";
 import { adviseRules } from "./checkability.js";
 import { shadowedAgentsMd } from "./shadowedAgents.js";
@@ -259,6 +260,11 @@ async function runCheck(opts: CheckOptions) {
       // Cursor: cwd is in the project's repo.json (…/projects/<slug>/repo.json).
       agentTool = "cursor";
       const cc = cursorSessionCwd(transcriptOverride);
+      if (cc && existsSync(cc)) cwd = cc;
+    } else if (antigravityFormatIsKnown(transcriptOverride)) {
+      // Antigravity: cwd is in the first run_command's Cwd arg.
+      agentTool = "antigravity";
+      const cc = antigravitySessionCwd(transcriptOverride);
       if (cc && existsSync(cc)) cwd = cc;
     } else {
       const claudeCwd = sessionCwdOf(transcriptOverride);

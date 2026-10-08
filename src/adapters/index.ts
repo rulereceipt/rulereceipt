@@ -7,6 +7,7 @@ import { listCopilotSessions, parseCopilotTranscript, copilotFormatIsKnown } fro
 import { listGeminiSessions, parseGeminiTranscript, geminiFormatIsKnown } from "./gemini.js";
 import { listCursorSessions, parseCursorTranscript, cursorFormatIsKnown } from "./cursor.js";
 import { listOpenCodeSessions, parseOpenCodeTranscript, openCodeFormatIsKnown } from "./opencode.js";
+import { listAntigravitySessions, parseAntigravityTranscript, antigravityFormatIsKnown } from "./antigravity.js";
 
 /**
  * A session adapter turns one coding agent's on-disk session log into the
@@ -70,7 +71,13 @@ export const copilotCliAdapter: SessionAdapter = {
   parse: (sessionFile) => parseCopilotTranscript(sessionFile),
 };
 
-/** Gemini CLI — EXPERIMENTAL. Our reader; format per cli-continues (MIT, pinned). */
+/**
+ * Gemini CLI — LEGACY / UNTESTED. The standalone Gemini CLI now refuses a personal
+ * Google login ("client no longer supported, migrate to Antigravity"), so we could
+ * not capture a real session to validate against — use the Antigravity adapter
+ * instead. Reader kept (format per cli-continues, MIT, pinned) and reachable via
+ * --transcript, but it is not a validated path.
+ */
 export const geminiCliAdapter: SessionAdapter = {
   tool: "gemini-cli",
   listSessions: (cwd) => listGeminiSessions(cwd),
@@ -101,11 +108,21 @@ export const openCodeAdapter: SessionAdapter = {
   experimental: true,
 };
 
+/** Antigravity CLI (Google; replaced the old Gemini CLI). EXPERIMENTAL — reader
+ * validated against a real 1.3.1 session but held pending Shilpa's validation.
+ * Reads ~/.gemini/antigravity-cli/brain/<id>/.system_generated/logs/transcript.jsonl. */
+export const antigravityAdapter: SessionAdapter = {
+  tool: "antigravity",
+  listSessions: (cwd) => listAntigravitySessions(cwd),
+  parse: (sessionFile) => parseAntigravityTranscript(sessionFile),
+  experimental: true,
+};
+
 /** Adapters with a verified, tested parser — these auto-detect the newest session. */
 export const ADAPTERS: SessionAdapter[] = [claudeCodeAdapter, codexAdapter, copilotCliAdapter];
 
 /** Experimental adapters: reader exists, awaiting real+planted+clean fixtures. */
-export const EXPERIMENTAL_ADAPTERS: SessionAdapter[] = [geminiCliAdapter, cursorAdapter, openCodeAdapter];
+export const EXPERIMENTAL_ADAPTERS: SessionAdapter[] = [geminiCliAdapter, cursorAdapter, openCodeAdapter, antigravityAdapter];
 
 /**
  * Tools deliberately NOT read yet, with the honest reason. Kept as data (not
@@ -215,6 +232,7 @@ export function parseSessionFile(file: string): TranscriptEvent[] {
   // OpenCode: a single session JSON (`id` starting `ses_`); the message/part
   // dirs are resolved relative to this file.
   if (openCodeFormatIsKnown(file)) return parseOpenCodeTranscript(file);
+  if (antigravityFormatIsKnown(file)) return parseAntigravityTranscript(file);
   return readTranscriptFromFile(file);
 }
 

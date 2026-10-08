@@ -29,6 +29,8 @@ const NOTES: Record<string, string> = {
   "claude-code": "full support — parsed and validated end-to-end",
   codex: "supported — validated on a real end-to-end rollout (CLI 0.160.1, 2026-10-07); reads rollout-*.jsonl and compressed .jsonl.zst (zst needs Node 22.15+), incl. the 0.160 exec-harness (exec_command / apply_patch)",
   "copilot-cli": "supported — validated on a real session (CLI 1.0.92, 2026-10-07); reads events.jsonl incl. apply_patch edits and the ask-user/permission approval step (a human-approved action reads as Followed)",
+  "gemini-cli": "legacy / untested — the standalone Gemini CLI refuses a personal Google login (\"client no longer supported, migrate to Antigravity\"), so there is no real session to validate against; use Antigravity instead",
+  antigravity: "experimental — reader validated on a real session (CLI 1.3.1, 2026-10-08); reads ~/.gemini/antigravity-cli/brain/<id>/.system_generated/logs/transcript.jsonl (PLANNER_RESPONSE tool_calls + GENERIC outputs). Held pending validation",
 };
 
 export function agentCapabilities(): AgentCapability[] {
@@ -37,7 +39,7 @@ export function agentCapabilities(): AgentCapability[] {
     rows.push({ tool: a.tool, read: "full", validated: !UNVALIDATED.has(a.tool), note: NOTES[a.tool] ?? (UNVALIDATED.has(a.tool) ? "in testing" : "supported") });
   }
   for (const a of EXPERIMENTAL_ADAPTERS) {
-    rows.push({ tool: a.tool, read: "experimental", validated: false, note: "experimental — reader exists, awaiting real + planted + clean fixtures" });
+    rows.push({ tool: a.tool, read: "experimental", validated: false, note: NOTES[a.tool] ?? "experimental — reader exists, awaiting real + planted + clean fixtures" });
   }
   for (const u of UNSUPPORTED_TOOLS) {
     rows.push({ tool: u.tool, read: "none", validated: false, note: u.reason });
