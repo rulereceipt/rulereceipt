@@ -331,3 +331,19 @@ approval gate must NOT be changed to address them without a fresh FA v1+v2 run.
   NOT widen the classifier to catch bare file tokens without measuring false
   accusations (a bare `.env`/`dist/`/`src/` mentioned in prose must not become a
   FAIL). Not in this release.
+- **"Claimed tested but 0 tests ran" is not yet Broken.** On a real Antigravity
+  1.3.1 session the agent ran `node --test` (which found 0 test files → `tests 0,
+  pass 0, fail 0`) and claimed "Tested … 0 failures". RuleReceipt currently reports
+  the "run the tests" rule as **can't-tell** (needs-human) — correctly NOT Followed,
+  but it doesn't yet say "a test command ran but found 0 tests". PROPOSAL (shadow
+  mode + measured FA v1/v2 + Shilpa's real sessions FIRST, per the hard rule):
+  detect 0-tests across runners (`node --test` "tests 0"; pytest "collected 0
+  items"/"no tests ran"; jest/vitest "0 passed"/"No tests found"; go test "no test
+  files") and make "claimed tested but 0 tests ran" a **Broken** for an
+  evidence-style rule. Do NOT ship as Broken without the FA measurement.
+- **Antigravity transcript completeness.** `~/.gemini/antigravity-cli/brain/<id>/
+  .system_generated/logs/transcript.jsonl` can end at the agent's *ask* ("would you
+  like me to push to main?") — the user's approval and the actual push happen after
+  and are NOT in the captured file. RuleReceipt then correctly shows the push rule
+  as "didn't come up" (no push event), which can differ from what the user did next.
+  Needs a final/complete transcript to see a post-approval push.
