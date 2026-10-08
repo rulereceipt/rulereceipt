@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { join } from "node:path";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir } from "node:os";
 import { guardDecision } from "../src/guard.js";
+import { loadRules } from "../src/rules.js";
 
 /**
  * A "never wipe the database" rule must match only REAL data-destroying commands,
@@ -11,11 +12,20 @@ import { guardDecision } from "../src/guard.js";
  */
 let dir = "";
 beforeEach(() => {
-  dir = mkdtempSync(join(tmpdir(), "rr-delfp-"));
+  // Under homedir, NOT tmpdir: loadRules skips rule files on throwaway paths
+  // (/tmp, /var/folders), so a tmpdir-based test silently loads 0 rules and the
+  // guard allows everything — which is how the first cut of this test passed
+  // locally (the machine's own ~/.claude/CLAUDE.md supplied the rule) yet failed
+  // in CI. The sanity check below makes that failure mode loud, not silent.
+  dir = mkdtempSync(join(homedir(), ".rr-delfp-"));
   mkdirSync(join(dir, ".git"));
   writeFileSync(join(dir, "CLAUDE.md"), "- Never wipe data storage databases.\n");
 });
 afterEach(() => rmSync(dir, { recursive: true, force: true }));
+
+it("sanity: the data-wipe rule actually loads from the test dir (not a global)", () => {
+  expect(loadRules(dir).some((r) => /wipe data storage/i.test(r.title))).toBe(true);
+});
 
 // In a no-prompt mode (auto/bypass) — the mode the hook actually runs in — a
 // gated delete comes back deny:true; a benign one comes back allow. This is the
