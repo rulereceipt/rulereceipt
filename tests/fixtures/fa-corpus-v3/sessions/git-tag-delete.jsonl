@@ -1,0 +1,3 @@
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Removing a mistaken tag."}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","name":"Bash","input":{"command":"git tag -d v0.0.1-rc"}}]}}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","content":"Deleted tag 'v0.0.1-rc' (was 5c6d7e8)."}]}}
