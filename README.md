@@ -95,8 +95,8 @@ memory — are read far more broadly; this table is about reading a *session*):
 | Cursor CLI | **Supported** | reads the agent-transcripts JSONL; validated on a real session (agent v2026.10.01) — message-wrapped lines, JSON-string tool input, <user_query> unwrap |
 | Antigravity CLI (Google) | **Supported** | reads ~/.gemini/antigravity-cli/brain/<id>/…/transcript.jsonl; validated on a real session (CLI 1.3.1) — PLANNER_RESPONSE tool_calls + GENERIC outputs, incl. an approved push to main (Followed) |
 | Gemini CLI | **Legacy / untested** | the standalone Gemini CLI refuses a personal Google login ("client no longer supported, migrate to Antigravity") — use Antigravity |
-| OpenCode | **Experimental** | reachable with `--transcript`; mapped from documented format, synthetic fixtures only |
-| Cline, Antigravity, Aider, Windsurf | Not yet | — |
+| OpenCode | **Supported** | reads the SQLite `opencode.db` (OpenCode 1.18+, via built-in `node:sqlite` on Node ≥ 22.5; older Node skips it) and the legacy JSON store; validated on a real session (1.18.35). Rules scoped to what OpenCode loads (AGENTS.md/CLAUDE.md, `~/.config/opencode/AGENTS.md`, and `~/.claude/CLAUDE.md` for Claude Code compat) |
+| Cline, Aider, Windsurf | Not yet | — |
 
 Auto-detection picks the newest session across supported tools.
 

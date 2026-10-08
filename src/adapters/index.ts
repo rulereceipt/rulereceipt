@@ -99,12 +99,16 @@ export const cursorAdapter: SessionAdapter = {
   parse: (sessionFile) => parseCursorTranscript(sessionFile),
 };
 
-/** OpenCode — EXPERIMENTAL. JSON file store (3-dir join); opencode.db SQLite deferred. */
+/**
+ * OpenCode — SUPPORTED, reader run against a real 1.18.35 session (2026-10-08).
+ * Reads the SQLite store (opencode.db, OpenCode 1.18+, via built-in node:sqlite
+ * on Node 22.5+; older Node skips it, noted once) AND the legacy JSON file store.
+ * Rules are tool-scoped to exactly what OpenCode loads — see rules.ts.
+ */
 export const openCodeAdapter: SessionAdapter = {
   tool: "opencode",
   listSessions: (cwd) => listOpenCodeSessions(cwd),
   parse: (sessionFile) => parseOpenCodeTranscript(sessionFile),
-  experimental: true,
 };
 
 /** Antigravity CLI (Google; replaced the old Gemini CLI). EXPERIMENTAL — reader
@@ -117,10 +121,10 @@ export const antigravityAdapter: SessionAdapter = {
 };
 
 /** Adapters with a verified, tested parser — these auto-detect the newest session. */
-export const ADAPTERS: SessionAdapter[] = [claudeCodeAdapter, codexAdapter, copilotCliAdapter, cursorAdapter, antigravityAdapter];
+export const ADAPTERS: SessionAdapter[] = [claudeCodeAdapter, codexAdapter, copilotCliAdapter, cursorAdapter, antigravityAdapter, openCodeAdapter];
 
 /** Experimental adapters: reader exists, awaiting real+planted+clean fixtures. */
-export const EXPERIMENTAL_ADAPTERS: SessionAdapter[] = [geminiCliAdapter, openCodeAdapter];
+export const EXPERIMENTAL_ADAPTERS: SessionAdapter[] = [geminiCliAdapter];
 
 /**
  * Tools deliberately NOT read yet, with the honest reason. Kept as data (not
@@ -139,6 +143,28 @@ export interface LatestSession {
 }
 
 /**
+ * mtime of a session's backing file. A session is usually a real path, but an
+ * OpenCode SQLite session is a `<…opencode.db>#ses_id` handle — not statable, so
+ * fall back to the db file's own mtime (a fair "last written" proxy for ordering
+ * one db's sessions against other tools'). Null when neither can be stat'd.
+ */
+function sessionMtimeMs(file: string): number | null {
+  try {
+    return statSync(file).mtimeMs;
+  } catch {
+    const hash = file.lastIndexOf("#");
+    if (hash > 0) {
+      try {
+        return statSync(file.slice(0, hash)).mtimeMs;
+      } catch {
+        /* fall through */
+      }
+    }
+    return null;
+  }
+}
+
+/**
  * The single most recently modified session across ALL supported tools for
  * this cwd — the same "newest wins" rule the Claude reader already uses across
  * every configured Claude home, now extended across tools. Returns null only
@@ -151,12 +177,8 @@ export function findLatestSession(cwd: string): LatestSession | null {
     const files = adapter.listSessions(cwd); // newest first
     if (files.length === 0) continue;
     const file = files[0];
-    let mtimeMs: number;
-    try {
-      mtimeMs = statSync(file).mtimeMs;
-    } catch {
-      continue;
-    }
+    const mtimeMs = sessionMtimeMs(file);
+    if (mtimeMs === null) continue;
     if (!best || mtimeMs > best.mtimeMs) best = { adapter, file, mtimeMs };
   }
   return best;
@@ -178,11 +200,8 @@ export function listAllSessions(cwd: string): { adapter: SessionAdapter; file: s
   const pairs: { adapter: SessionAdapter; file: string; mtimeMs: number }[] = [];
   for (const adapter of ADAPTERS) {
     for (const file of adapter.listSessions(cwd)) {
-      try {
-        pairs.push({ adapter, file, mtimeMs: statSync(file).mtimeMs });
-      } catch {
-        /* unreadable file: skip */
-      }
+      const mtimeMs = sessionMtimeMs(file);
+      if (mtimeMs !== null) pairs.push({ adapter, file, mtimeMs });
     }
   }
   pairs.sort((a, b) => b.mtimeMs - a.mtimeMs);
@@ -198,6 +217,10 @@ export function listAllSessions(cwd: string): { adapter: SessionAdapter; file: s
  * never a wrong parse presented as right.
  */
 export function parseSessionFile(file: string): TranscriptEvent[] {
+  // An OpenCode SQLite handle (<…opencode.db>#ses_id) is NOT a readable file —
+  // route it before the readFileSync below, which would otherwise throw and
+  // return no events (making a real session look empty).
+  if (/opencode\.db#ses_/i.test(file)) return parseOpenCodeTranscript(file);
   let raw: string;
   try {
     raw = readFileSync(file, "utf-8");

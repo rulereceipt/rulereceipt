@@ -172,6 +172,23 @@ function ruleSourcesAtLevel(dir: string, pi: ProjectInstructions = "unknown", ag
     }
     return applyImports(out);
   }
+
+  // OpenCode reads AGENTS.md at each level (primary), falling back to CLAUDE.md
+  // ONLY where there is no AGENTS.md — not Cursor/Copilot/Windsurf/Gemini, and
+  // not CLAUDE.md beside an AGENTS.md. Its globals (~/.config/opencode/AGENTS.md
+  // and, for Claude Code compatibility, ~/.claude/CLAUDE.md) are read in
+  // loadRules. Verified against opencode.ai/docs/rules and a real 1.18.35
+  // session (2026-10-08).
+  if (agentTool === "opencode") {
+    if (has("AGENTS.md") || has("AGENT.md") || has("AGENTS.local.md")) {
+      pushAgentsChain();
+    } else if (has("CLAUDE.md")) {
+      out.push({ path: join(dir, "CLAUDE.md"), status: "loaded", format: "Claude (CLAUDE.md)" });
+    } else if (has("CLAUDE.local.md")) {
+      out.push({ path: join(dir, "CLAUDE.local.md"), status: "loaded", format: "Claude (CLAUDE.local.md)" });
+    }
+    return applyImports(out);
+  }
   const loaded = (rel: string, format: string, note?: string) => {
     if (has(rel)) out.push({ path: join(dir, rel), status: "loaded", format, note });
   };
@@ -475,6 +492,7 @@ export function loadRules(cwd: string, agentTool = "claude-code"): Rule[] {
   const rules: Rule[] = [];
   const isCodex = agentTool === "codex";
   const isClaude = agentTool === "claude-code";
+  const isOpenCode = agentTool === "opencode";
 
   // One file, one set of rules. Globals are read first, so a file reachable
   // both ways keeps its "global" label. Without this, running the check from
@@ -503,6 +521,18 @@ export function loadRules(cwd: string, agentTool = "claude-code"): Rule[] {
     for (const base of claudeHomes()) {
       read(join(base, "CLAUDE.md"), "global");
       for (const file of markdownFilesIn(join(base, "rules"))) read(file, "global");
+    }
+  } else if (isOpenCode) {
+    // OpenCode globals: ~/.config/opencode/AGENTS.md (primary), plus — for Claude
+    // Code compatibility, ON by default — ~/.claude/CLAUDE.md, unless the user
+    // set OPENCODE_DISABLE_CLAUDE_CODE. This is why a real OpenCode session obeys
+    // a global ~/.claude/CLAUDE.md (opencode.ai/docs/rules, verified 2026-10-08).
+    // Scoped to exactly these two files — NOT ~/.claude/rules/*, not other homes.
+    const cfg = process.env.XDG_CONFIG_HOME?.trim();
+    const cfgBase = cfg && cfg.length > 0 ? join(cfg, "opencode") : join(homedir(), ".config", "opencode");
+    read(join(cfgBase, "AGENTS.md"), "global");
+    if (!/^(1|true|yes)$/i.test(process.env.OPENCODE_DISABLE_CLAUDE_CODE ?? "")) {
+      read(join(homedir(), ".claude", "CLAUDE.md"), "global");
     }
   }
 

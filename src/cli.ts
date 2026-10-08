@@ -12,6 +12,7 @@ import { sessionCwd as codexSessionCwd } from "./adapters/codex.js";
 import { copilotFormatIsKnown, workspaceCwd as copilotWorkspaceCwd } from "./adapters/copilot.js";
 import { cursorFormatIsKnown, cursorSessionCwd } from "./adapters/cursor.js";
 import { antigravityFormatIsKnown, antigravitySessionCwd } from "./adapters/antigravity.js";
+import { openCodeFormatIsKnown, openCodeSessionCwd } from "./adapters/opencode.js";
 import { loadRules } from "./rules.js";
 import { adviseRules } from "./checkability.js";
 import { shadowedAgentsMd } from "./shadowedAgents.js";
@@ -265,6 +266,11 @@ async function runCheck(opts: CheckOptions) {
       // Antigravity: cwd is in the first run_command's Cwd arg.
       agentTool = "antigravity";
       const cc = antigravitySessionCwd(transcriptOverride);
+      if (cc && existsSync(cc)) cwd = cc;
+    } else if (openCodeFormatIsKnown(transcriptOverride)) {
+      // OpenCode: cwd is the session's `directory` (db row or session JSON).
+      agentTool = "opencode";
+      const cc = openCodeSessionCwd(transcriptOverride);
       if (cc && existsSync(cc)) cwd = cc;
     } else {
       const claudeCwd = sessionCwdOf(transcriptOverride);

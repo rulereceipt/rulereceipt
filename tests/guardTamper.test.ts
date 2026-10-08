@@ -20,12 +20,37 @@ describe("guard-tamper shadow signal", () => {
     expect(detectGuardTamper([bash("git push --no-verify origin main")], { hasBranchRule: false })).toEqual([]);
   });
 
+  // Disabling git hooks wholesale (found on a real OpenCode 1.18.35 session).
+  // Fires regardless of hasBranchRule — the hooks that enforce ANY rule don't run.
+  it("flags `git -c core.hooksPath=/dev/null commit` as hooks-disabled", () => {
+    const f = detectGuardTamper([bash('git add app.js && git -c core.hooksPath=/dev/null commit -m "x"')], { hasBranchRule: false });
+    expect(f.map((x) => x.kind)).toContain("hooks-disabled");
+  });
+  it("flags `git config core.hooksPath /dev/null` (space form) too", () => {
+    expect(detectGuardTamper([bash("git config core.hooksPath /dev/null")], { hasBranchRule: false }).map((x) => x.kind)).toContain("hooks-disabled");
+  });
+  it("flags a HUSKY=0 env prefix", () => {
+    expect(detectGuardTamper([bash("HUSKY=0 git commit -m wip")], { hasBranchRule: false }).map((x) => x.kind)).toContain("hooks-disabled");
+    expect(detectGuardTamper([bash("HUSKY=0 npm run release")], { hasBranchRule: false }).map((x) => x.kind)).toContain("hooks-disabled");
+  });
+  it("flags .husky/* hook-config edits", () => {
+    expect(detectGuardTamper([write(".husky/pre-commit")], { hasBranchRule: false }).map((x) => x.kind)).toContain("hook-config-edit");
+  });
+
   // Must NOT fire (shadow signal still needs a low false rate):
   it("does not fire on ordinary edits or a normal push", () => {
     expect(detectGuardTamper([write("src/index.ts"), bash("git push origin feature/x"), bash("npm test")], { hasBranchRule: true })).toEqual([]);
   });
   it("does not fire on `git config` (not a --no-verify bypass)", () => {
     expect(detectGuardTamper([bash("git config user.name rulereceipt")], { hasBranchRule: true })).toEqual([]);
+  });
+  it("does NOT treat pointing core.hooksPath at a REAL dir as a bypass", () => {
+    // Setting hooks to a real directory enables hooks — it is not a disable.
+    expect(detectGuardTamper([bash("git config core.hooksPath .husky")], { hasBranchRule: true })).toEqual([]);
+    expect(detectGuardTamper([bash("git -c core.hooksPath=.githooks status")], { hasBranchRule: true })).toEqual([]);
+  });
+  it("does NOT fire on HUSKY=1 / an unrelated env var", () => {
+    expect(detectGuardTamper([bash("HUSKY=1 git commit -m ok"), bash("DEBUG=0 npm test")], { hasBranchRule: true })).toEqual([]);
   });
   it("does not fire on editing a normal .json that isn't settings", () => {
     expect(detectGuardTamper([write("package.json"), write("tsconfig.json")], { hasBranchRule: true })).toEqual([]);

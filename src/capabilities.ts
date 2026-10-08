@@ -32,6 +32,7 @@ const NOTES: Record<string, string> = {
   "gemini-cli": "legacy / untested — the standalone Gemini CLI refuses a personal Google login (\"client no longer supported, migrate to Antigravity\"), so there is no real session to validate against; use Antigravity instead",
   antigravity: "supported — validated on a real session (CLI 1.3.1, 2026-10-08); reads ~/.gemini/antigravity-cli/brain/<id>/.system_generated/logs/transcript.jsonl (PLANNER_RESPONSE tool_calls + GENERIC outputs), incl. an approved push to main (user said yes -> git push ran, exit 0 -> Followed)",
   cursor: "supported — validated on a real session (agent v2026.10.01, 2026-10-08); reads the agent-transcripts JSONL (message-wrapped lines, JSON-string tool input, <user_query> unwrap)",
+  opencode: "supported — validated on a real session (1.18.35, 2026-10-08); reads the SQLite opencode.db (OpenCode 1.18+, via built-in node:sqlite on Node 22.5+; older Node skips it, noted once) and the legacy JSON file store. Rules scoped to what OpenCode loads (AGENTS.md/CLAUDE.md, ~/.config/opencode/AGENTS.md, and ~/.claude/CLAUDE.md for Claude Code compat, off via OPENCODE_DISABLE_CLAUDE_CODE)",
 };
 
 export function agentCapabilities(): AgentCapability[] {

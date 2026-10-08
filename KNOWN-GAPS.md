@@ -351,6 +351,31 @@ approval gate must NOT be changed to address them without a fresh FA v1+v2 run.
   detector belongs with the 0-tests one. PROPOSAL (shadow + measured FA + real
   sessions FIRST): match a "pushed/committed/deployed" claim with no matching
   tool_use that ran and succeeded → **Broken**. Until then it shows as can't-tell.
+- **"Agent disabled git hooks" — SHADOW signal added 2026-10-08, not yet Broken.**
+  On a real OpenCode 1.18.35 session the agent committed with
+  `git -c core.hooksPath=/dev/null commit`, so the project's own hooks never ran.
+  `guardTamper` now flags this (plus `git config core.hooksPath /dev/null`, a
+  `HUSKY=0` prefix, and `.husky/*` edits) as a `hooks-disabled` **advisory** —
+  printed under "Guard integrity", NOT counted, NOT in the exit code. Same
+  shadow-first path as --no-verify: measure FA on the frozen corpus before any
+  decision to make it Broken. Pointing core.hooksPath at a REAL dir (`.husky`,
+  `.githooks`) is not flagged — that enables hooks, it doesn't disable them.
+- **OpenCode "run the tests" verdict is needs-judgment, not "not Followed".** On the
+  real 1.18.35 session the agent did a smoke `node app.js`, ran no test suite, and
+  was HONEST ("cannot say tested … Not fully done"). RuleReceipt routes the rule to
+  needs-human, which is correct (the agent made no false done+tested claim, so the
+  0-tests→Broken proposal above does NOT fire). Marking it a flat "not Followed"
+  would accuse an honest agent; crediting "Followed" is wrong too. A deterministic
+  "edited code, claimed done, ran no tests" check is the same shadow+FA work as the
+  0-tests item — logged, not shipped.
+- **OpenCode SQLite store (opencode.db) — now READ (adapter still experimental).**
+  OpenCode ~1.18+ keeps sessions in SQLite, not the legacy JSON file store; the
+  adapter now reads it via node:sqlite (Node 22.5+; older Node skips it, noted
+  once). Rules are scoped to exactly what OpenCode loads (AGENTS.md primary /
+  CLAUDE.md fallback per level; ~/.config/opencode/AGENTS.md; and ~/.claude/CLAUDE.md
+  for Claude Code compat, unless OPENCODE_DISABLE_CLAUDE_CODE). The adapter is held
+  EXPERIMENTAL (reachable via `--transcript "<db>#<ses_id>"`, not auto-detected)
+  until validated on a real session.
 - **Antigravity push approval — VALIDATED 2026-10-08 (0.1.99).** The re-run session
   `bd6563b3` captured the full flow: assistant asked, user replied `yes`, then
   `git push origin main` ran and exited 0. RuleReceipt reads push = Followed. The
