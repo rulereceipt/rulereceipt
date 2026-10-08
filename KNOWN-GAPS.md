@@ -94,7 +94,9 @@ Specific limits:
 |---|---|---|---|
 | Claude Code | Yes | Yes | Yes (Stop hook, PreToolUse guard) |
 | Codex CLI | Yes | Yes (tested on 0.160.1) | No |
-| Cursor | Yes | Reader validated; awaiting Shilpa validation | No |
+| Cursor | Yes | Yes (tested on v2026.10.01) | No |
+| Antigravity | Yes | Yes (tested on 1.3.1) | No |
+| Gemini CLI | Legacy/untested (login refused) | No | No |
 | GitHub Copilot CLI | Yes | Yes (tested on 1.0.92) | No |
 | Windsurf | Yes | No | No |
 | Gemini CLI / agy | Yes | No | No |

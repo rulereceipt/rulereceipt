@@ -97,7 +97,6 @@ export const cursorAdapter: SessionAdapter = {
   tool: "cursor",
   listSessions: (cwd) => listCursorSessions(cwd),
   parse: (sessionFile) => parseCursorTranscript(sessionFile),
-  experimental: true,
 };
 
 /** OpenCode — EXPERIMENTAL. JSON file store (3-dir join); opencode.db SQLite deferred. */
@@ -115,14 +114,13 @@ export const antigravityAdapter: SessionAdapter = {
   tool: "antigravity",
   listSessions: (cwd) => listAntigravitySessions(cwd),
   parse: (sessionFile) => parseAntigravityTranscript(sessionFile),
-  experimental: true,
 };
 
 /** Adapters with a verified, tested parser — these auto-detect the newest session. */
-export const ADAPTERS: SessionAdapter[] = [claudeCodeAdapter, codexAdapter, copilotCliAdapter];
+export const ADAPTERS: SessionAdapter[] = [claudeCodeAdapter, codexAdapter, copilotCliAdapter, cursorAdapter, antigravityAdapter];
 
 /** Experimental adapters: reader exists, awaiting real+planted+clean fixtures. */
-export const EXPERIMENTAL_ADAPTERS: SessionAdapter[] = [geminiCliAdapter, cursorAdapter, openCodeAdapter, antigravityAdapter];
+export const EXPERIMENTAL_ADAPTERS: SessionAdapter[] = [geminiCliAdapter, openCodeAdapter];
 
 /**
  * Tools deliberately NOT read yet, with the honest reason. Kept as data (not
