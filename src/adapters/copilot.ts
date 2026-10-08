@@ -72,7 +72,8 @@ export function listCopilotSessions(cwd: string): string[] {
     const events = join(dir, "events.jsonl");
     if (!existsSync(events)) continue;
     const wc = workspaceCwd(dir);
-    if (wc && realpathOr(wc) !== target) continue; // belongs to another project
+    // Only include a session we can CONFIRM belongs to this cwd (see cursor.ts).
+    if (!wc || realpathOr(wc) !== target) continue;
     try { hits.push({ file: events, mtimeMs: statSync(events).mtimeMs }); } catch { /* skip */ }
   }
   return hits.sort((a, b) => b.mtimeMs - a.mtimeMs).map((h) => h.file);

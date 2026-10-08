@@ -54,7 +54,15 @@ npx rulereceipt protect
 ```
 
 Adds a PreToolUse guard and a Stop hook to `.claude/settings.json` — after
-showing you exactly what it will add and asking. `protect --undo` restores the
+showing you exactly what it will add and asking.
+
+**Scope:** *checking* (`check`/`report`) works across **Claude Code, Codex and
+Copilot CLI**. *Blocking* with these guard hooks is **Claude Code only** — they
+are Claude Code hooks; equivalent hooks for Codex, Copilot CLI and Cursor are on
+the roadmap. (`rulereceipt protect --git` installs a git `pre-push` hook, which
+works with any agent because it runs at the git level, not the agent's.)
+
+`protect --undo` restores the
 file byte-for-byte. It's the only place RuleReceipt writes settings, and only
 with your yes.
 
@@ -517,7 +525,7 @@ don't.
 
 **Nothing leaves your machine unless you ask.** Your code, rules, and
 session content never leave your computer, ever. Plain `rulereceipt check`
-makes zero network calls. `--llm`, `--share`, and `--telemetry` are all
+makes no network calls unless you opt in (--share/--email/--llm/--telemetry/--check-updates). `--llm`, `--share`, and `--telemetry` are all
 separate, off-by-default opt-ins: `--llm` calls the Claude API using your
 own Anthropic key for rules that need judgment; `--share` sends aggregate
 pass/fail/unclear counts; `--telemetry` sends one random per-machine ID so
