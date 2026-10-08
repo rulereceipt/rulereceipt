@@ -21,6 +21,7 @@ import { auditProject, renderProjectAudit } from "./audit.js";
 import { runHealth, renderHealth } from "./health.js";
 import { evaluateSession } from "./evaluate.js";
 import { detectGuardTamper, renderGuardTamper } from "./checks/guardTamper.js";
+import { detectShadowSignals, renderShadowSignals } from "./checks/shadowSignals.js";
 import { buildWrongReport, findTarget, reportedLabel } from "./wrong.js";
 import { saveFixture, replayFixtures, renderAccuracy } from "./accuracy.js";
 import { ghReady, issueTitle, issueCreateArgs, buildMailto, mailtoSubject } from "./wrongSubmit.js";
@@ -431,6 +432,11 @@ async function runCheck(opts: CheckOptions) {
     // results (a git_events verdict means a branch rule is loaded).
     const tamperLines = renderGuardTamper(detectGuardTamper(events, { hasBranchRule: results.some((r) => r.method === "git_events") }));
     if (tamperLines.length) console.log(tamperLines.join("\n"));
+    // Shadow signals (also advisory, not counted): zero-tests, claimed-action-
+    // with-no-command, plain-text .env edit. Being measured on the frozen corpus
+    // before any decision to promote to Broken (scripts/shadow-fa.ts, KNOWN-GAPS).
+    const shadowLines = renderShadowSignals(detectShadowSignals(rules, events));
+    if (shadowLines.length) console.log(shadowLines.join("\n"));
     // Name the tool when it is not the default Claude Code, so a Codex run is
     // not silently reported as if it were a Claude session.
     const sourceNote = transcriptOverride ? null : sessionSourceNote(cwd);

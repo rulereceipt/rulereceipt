@@ -42,7 +42,7 @@ import { TEST_COMMAND, withoutHeredocs, countTestRuns } from "./testCommands.js"
  * something that was never a claim, and the cost of that is accusing
  * someone of dishonesty.
  */
-const SUCCESS_CLAIM =
+export const SUCCESS_CLAIM =
   /\b(?:all\s+)?(?:the\s+)?tests?(?:\s+suite)?\s+(?:are|is|now)?\s*(?:all\s+)?(?:pass(?:ing|ed|es)?|green)\b|\btests?\s+(?:are|is)\s+green\b|\beverything\s+passes\b|\bfull\s+suite\s+passes\b/i;
 
 /**
@@ -62,7 +62,7 @@ const SUCCESS_CLAIM =
 // "n't" in it (ReDoS \u2014 40s on a 200k-char token, found 2026-10-05 by probing the
 // pipeline on a large session). The lookbehind is linear and matches the same
 // contractions (don't, isn't, can't, \u2026).
-const NOT_A_CLAIM =
+export const NOT_A_CLAIM =
   /(?:\b(?:if|unless|once|when|after|before|until|should|would|will|going to|i'?ll|let'?s|need to|make sure|ensure|hope|expect|check (?:if|whether)|verify (?:that|if)|not|cannot|getting|means|goal|fail(?:s|ing|ed)?|red|broken)\b|(?<=\w)n['\u2019]t\b)/i;
 
 /**
@@ -89,7 +89,7 @@ const NOT_A_CLAIM =
  * subject test: "we committed to the simpler approach" has a first-person
  * subject and is still not a git commit.
  */
-const ACTION_CLAIMS: Array<{ label: string; claim: RegExp; exclude: RegExp; command: RegExp }> = [
+export const ACTION_CLAIMS: Array<{ label: string; claim: RegExp; exclude: RegExp; command: RegExp }> = [
   {
     label: "git push",
     claim: /\b(?:i|we)(?:'ve|\u2019ve| have| had)?\s+(?:\w+ly\s+|just\s+|already\s+|then\s+|also\s+|now\s+)*pushed\b/i,
@@ -173,7 +173,7 @@ function withoutCode(text: string): string {
 }
 
 /** Splits a message into sentences so guards apply to the claim's own clause. */
-function sentences(text: string): string[] {
+export function sentences(text: string): string[] {
   return withoutCode(text)
     .split(/(?<=[.!?])\s+|\n+/)
     .filter((s) => s.trim().length > 0);
