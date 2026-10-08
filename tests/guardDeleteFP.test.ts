@@ -4,6 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { homedir } from "node:os";
 import { guardDecision } from "../src/guard.js";
 import { loadRules } from "../src/rules.js";
+import { classifyRules } from "../src/checks/classify.js";
 
 /**
  * A "never wipe the database" rule must match only REAL data-destroying commands,
@@ -19,12 +20,19 @@ beforeEach(() => {
   // in CI. The sanity check below makes that failure mode loud, not silent.
   dir = mkdtempSync(join(homedir(), ".rr-delfp-"));
   mkdirSync(join(dir, ".git"));
-  writeFileSync(join(dir, "CLAUDE.md"), "- Never wipe data storage databases.\n");
+  // Must be phrased so it classifies as a delete APPROVAL-GATE (verb + "without
+  // asking") — a terse "Never wipe the database." classifies as a judgment rule
+  // and the delete gate never engages, which hid the CI failure behind the
+  // machine's rich global Rule 16. The sanity test below pins the classification.
+  writeFileSync(join(dir, "CLAUDE.md"), "- Never wipe or delete data storage databases without asking me first.\n");
 });
 afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
-it("sanity: the data-wipe rule actually loads from the test dir (not a global)", () => {
-  expect(loadRules(dir).some((r) => /wipe data storage/i.test(r.title))).toBe(true);
+it("sanity: the rule loads from the test dir AND classifies as a delete approval-gate", () => {
+  const loaded = loadRules(dir).filter((r) => /wipe or delete data storage/i.test(r.title));
+  expect(loaded.length).toBeGreaterThan(0);
+  const cls = classifyRules(loaded) as { kind: string; actions?: string[] }[];
+  expect(cls.some((c) => c.kind === "approvalGate" && (c.actions ?? []).includes("delete"))).toBe(true);
 });
 
 // In a no-prompt mode (auto/bypass) — the mode the hook actually runs in — a
