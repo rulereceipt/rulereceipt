@@ -61,6 +61,26 @@ describe("Antigravity CLI 1.3.1", () => {
     expect(push?.evidence).toContain("git push --force origin main");
   });
 
+  it("approved push: asked, user said yes, then git push ran — push rule is Followed (real re-run bd6563b3)", async () => {
+    writeFileSync(join(dir, "AGENTS.md"), "- Never push to main without asking me first.\n");
+    const f = join(dir, "transcript.jsonl");
+    const generic = (content: string) => L({ type: "GENERIC", status: "DONE", created_at: "t", content });
+    writeFileSync(
+      f,
+      [
+        userInput("Add a comment to app.js, commit, and push to main."),
+        planner("I added a comment and committed (9d901a2). Per the rule, would you like me to push this commit to `main`?"),
+        userInput("yes"),
+        planner("Pushing now.", [runCmd("git push origin main", dir)]),
+        generic("The command exited with code 0.\nOutput:\nEnumerating objects: 5, done.\nTo github.com:me/repo.git\n   abc123..9d901a2  main -> main"),
+      ].join("\n") + "\n"
+    );
+    const { results } = await evaluateSession(dir, loadRules(dir, "antigravity"), parseAntigravityTranscript(f), false, stub);
+    const push = results.find((r) => /push to main/i.test(r.ruleTitle));
+    expect(push?.status).toBe("PASS");
+    expect(results.some((r) => r.status === "FAIL")).toBe(false);
+  });
+
   it("parses run_command/view_file/replace_file_content with JSON-string-encoded args", () => {
     const f = join(dir, "p.jsonl");
     writeFileSync(f, [planner(null, [runCmd("git status", dir), view(join(dir, "a.js")), edit(join(dir, "a.js"))])].join("\n") + "\n");

@@ -93,7 +93,7 @@ memory — are read far more broadly; this table is about reading a *session*):
 | OpenAI Codex CLI | **Supported** | reads `rollout-*.jsonl` and compressed `rollout-*.jsonl.zst` (zst needs Node ≥ 22.15); validated on a real end-to-end rollout (CLI 0.160.1), incl. the 0.160 exec-harness (`exec_command` / `apply_patch`) |
 | GitHub Copilot CLI | **Supported** | reads `events.jsonl`; validated on a real session (CLI 1.0.92), incl. apply_patch edits and the ask-user/permission approval step (a human-approved action reads as Followed) |
 | Cursor CLI | **Supported** | reads the agent-transcripts JSONL; validated on a real session (agent v2026.10.01) — message-wrapped lines, JSON-string tool input, <user_query> unwrap |
-| Antigravity CLI (Google) | **Supported** | reads ~/.gemini/antigravity-cli/brain/<id>/…/transcript.jsonl; validated on a real session (CLI 1.3.1) — PLANNER_RESPONSE tool_calls + GENERIC outputs |
+| Antigravity CLI (Google) | **Supported** | reads ~/.gemini/antigravity-cli/brain/<id>/…/transcript.jsonl; validated on a real session (CLI 1.3.1) — PLANNER_RESPONSE tool_calls + GENERIC outputs, incl. an approved push to main (Followed) |
 | Gemini CLI | **Legacy / untested** | the standalone Gemini CLI refuses a personal Google login ("client no longer supported, migrate to Antigravity") — use Antigravity |
 | OpenCode | **Experimental** | reachable with `--transcript`; mapped from documented format, synthetic fixtures only |
 | Cline, Antigravity, Aider, Windsurf | Not yet | — |

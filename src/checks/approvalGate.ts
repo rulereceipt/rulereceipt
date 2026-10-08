@@ -46,7 +46,7 @@ const IN_COMMAND: Record<Action, RegExp> = {
   push: /\bgit\s+(?:\S+\s+){0,4}?push(?![\w-])/,
   commit: /\bgit\s+(?:\S+\s+){0,4}?commit(?![\w-])/,
   pr: /\bgh\s+pr\s+(?:create|merge)\b/,
-  delete: /(?:^|[;&|]\s*|\s)rm\s+-?\w|\bgit\b[^\n]*\s-D\b|\bdrop\s+table\b|\bdelete\s+from\b|\btruncate\s+table\b/i,
+  delete: /(?:^|[;&|]\s*|\s)rm\s+-?\w|\bdrop\s+(?:table|database|schema)\b|\bdelete\s+from\b|\btruncate\s+table\b|\bdropdb\b|\bflush(?:all|db)\b/i,
 };
 
 const IN_USER_TEXT: Record<Action, RegExp> = {
@@ -85,11 +85,17 @@ const NO_PROMPT_MODES = new Set(["bypassPermissions", "dontAsk", "auto"]);
 // rule protects), as opposed to a throwaway cleanup. A SQL wipe always counts.
 // A throwaway target (tmp/scratch/build/dist/node_modules/cache/…) never counts,
 // even if it ends in .db. Otherwise a data-store file or a data/ or db/ dir counts.
-const SQL_WIPE = /\bdrop\s+(?:table|database|schema)\b|\bdelete\s+from\b|\btruncate\b/i;
+const SQL_WIPE = /\bdrop\s+(?:table|database|schema)\b|\bdelete\s+from\b|\btruncate\b|\bdropdb\b|\bflush(?:all|db)\b/i;
 const THROWAWAY_TARGET = /(?:^|[\s/])(?:tmp|temp|scratch|build|dist|out|node_modules|\.cache|cache|coverage|\.next|\.turbo|\.venv|__pycache__|target)(?:[\s/]|$)|\/tmp\/|\/(?:private\/)?var\/folders\//i;
 const DATA_STORE_TARGET = /\.(?:db|sqlite\d?|mdb|rdb|dump|bak|ldf|mdf|frm|ibd)\b|(?:^|[\s/])(?:data|databases?|db|datastores?|storage|ledger|pgdata|mysql|postgres(?:ql)?|mongo(?:db)?|redis)(?:[\s/-]|$)/i;
+// Version-control and image/package deletes are NOT data-store wipes, however the
+// phrase reads. A branch/tag/stash delete, a docker image rm, an npm uninstall:
+// none destroys a database, so a "never wipe the database" rule must never fire on
+// them. Real incident 2026-10-08: the guard blocked `git branch -d` as a data wipe.
+const NOT_A_DATA_WIPE = /\bgit\s+(?:branch|tag|worktree)\s+(?:-[dD]\b|--delete\b)|\bgit\s+stash\s+(?:drop|clear)\b|\bdocker\s+(?:rmi\b|image\s+rm\b|(?:container\s+)?rm\b)|\b(?:npm|pnpm|yarn)\s+(?:uninstall|remove|rm)\b/i;
 
 function looksLikeDataStoreDelete(command: string): boolean {
+  if (NOT_A_DATA_WIPE.test(command)) return false;
   if (SQL_WIPE.test(command)) return true;
   if (THROWAWAY_TARGET.test(command)) return false;
   return DATA_STORE_TARGET.test(command);

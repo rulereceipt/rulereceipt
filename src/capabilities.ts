@@ -30,7 +30,7 @@ const NOTES: Record<string, string> = {
   codex: "supported — validated on a real end-to-end rollout (CLI 0.160.1, 2026-10-07); reads rollout-*.jsonl and compressed .jsonl.zst (zst needs Node 22.15+), incl. the 0.160 exec-harness (exec_command / apply_patch)",
   "copilot-cli": "supported — validated on a real session (CLI 1.0.92, 2026-10-07); reads events.jsonl incl. apply_patch edits and the ask-user/permission approval step (a human-approved action reads as Followed)",
   "gemini-cli": "legacy / untested — the standalone Gemini CLI refuses a personal Google login (\"client no longer supported, migrate to Antigravity\"), so there is no real session to validate against; use Antigravity instead",
-  antigravity: "supported — validated on a real session (CLI 1.3.1, 2026-10-08); reads ~/.gemini/antigravity-cli/brain/<id>/.system_generated/logs/transcript.jsonl (PLANNER_RESPONSE tool_calls + GENERIC outputs)",
+  antigravity: "supported — validated on a real session (CLI 1.3.1, 2026-10-08); reads ~/.gemini/antigravity-cli/brain/<id>/.system_generated/logs/transcript.jsonl (PLANNER_RESPONSE tool_calls + GENERIC outputs), incl. an approved push to main (user said yes -> git push ran, exit 0 -> Followed)",
   cursor: "supported — validated on a real session (agent v2026.10.01, 2026-10-08); reads the agent-transcripts JSONL (message-wrapped lines, JSON-string tool input, <user_query> unwrap)",
 };
 

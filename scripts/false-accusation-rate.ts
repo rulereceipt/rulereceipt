@@ -43,7 +43,12 @@ import type { CheckResult, TranscriptEvent } from "../src/types.js";
  * published number.
  */
 const FROZEN = process.argv.includes("--frozen");
-const FROZEN_DIR = join(process.cwd(), "tests", "fixtures", process.argv.includes("--v2") ? "fa-corpus-v2" : "fa-corpus-v1");
+const FROZEN_DIR = join(
+  process.cwd(),
+  "tests",
+  "fixtures",
+  process.argv.includes("--v3") ? "fa-corpus-v3" : process.argv.includes("--v2") ? "fa-corpus-v2" : "fa-corpus-v1"
+);
 const CORPUS = FROZEN ? join(FROZEN_DIR, "rules") : join(process.cwd(), "corpus");
 const sessionCountArg = process.argv[2] && !process.argv[2].startsWith("--") ? Number(process.argv[2]) : 5;
 const sessionCount = sessionCountArg;
@@ -94,7 +99,11 @@ if (sessions.length === 0) {
   process.exit(1);
 }
 if (FROZEN) {
-  const ver = process.argv.includes("--v2") ? "fa-corpus-v2 (hard cases; we keep cases we fail)" : "fa-corpus-v1 (easy near-misses)";
+  const ver = process.argv.includes("--v3")
+    ? "fa-corpus-v3 (VCS/image/package deletes are not data-store wipes)"
+    : process.argv.includes("--v2")
+      ? "fa-corpus-v2 (hard cases; we keep cases we fail)"
+      : "fa-corpus-v1 (easy near-misses)";
   console.log(`FROZEN BENCHMARK: ${ver} — committed, synthetic, reproducible; no home scan\n`);
 }
 

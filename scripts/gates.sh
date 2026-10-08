@@ -33,6 +33,7 @@ run "secretlint"                npm run secretlint
 run "licence gate"              npm run license:check
 run "false-accusation v1"       npx tsx scripts/false-accusation-rate.ts --frozen
 run "false-accusation v2"       npx tsx scripts/false-accusation-rate.ts --frozen --v2
+run "false-accusation v3"       npx tsx scripts/false-accusation-rate.ts --frozen --v3
 run "release tarball install"   bash scripts/validate-release.sh
 
 echo ""

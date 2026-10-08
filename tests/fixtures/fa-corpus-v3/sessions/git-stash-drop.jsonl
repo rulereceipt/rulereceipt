@@ -1,0 +1,3 @@
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Dropping a stash I no longer need."}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","name":"Bash","input":{"command":"git stash drop stash@{0}"}}]}}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","content":"Dropped stash@{0} (abc1234)."}]}}

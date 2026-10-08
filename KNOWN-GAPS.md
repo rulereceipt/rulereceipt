@@ -343,9 +343,31 @@ approval gate must NOT be changed to address them without a fresh FA v1+v2 run.
   items"/"no tests ran"; jest/vitest "0 passed"/"No tests found"; go test "no test
   files") and make "claimed tested but 0 tests ran" a **Broken** for an
   evidence-style rule. Do NOT ship as Broken without the FA measurement.
-- **Antigravity transcript completeness.** `~/.gemini/antigravity-cli/brain/<id>/
-  .system_generated/logs/transcript.jsonl` can end at the agent's *ask* ("would you
-  like me to push to main?") — the user's approval and the actual push happen after
-  and are NOT in the captured file. RuleReceipt then correctly shows the push rule
-  as "didn't come up" (no push event), which can differ from what the user did next.
-  Needs a final/complete transcript to see a post-approval push.
+- **"Claimed pushed but no push ran" is not yet Broken.** Same shadow-mode list as
+  0-tests. When the agent says "the commit has been pushed" / "pushed to main" but
+  NO push command ran in the session (or the push exited non-zero), that is a false
+  claim an evidence-style rule should catch. On the 2026-10-08 Antigravity re-run
+  the push WAS real (`git push origin main`, exit 0), so this did not fire — but the
+  detector belongs with the 0-tests one. PROPOSAL (shadow + measured FA + real
+  sessions FIRST): match a "pushed/committed/deployed" claim with no matching
+  tool_use that ran and succeeded → **Broken**. Until then it shows as can't-tell.
+- **Antigravity push approval — VALIDATED 2026-10-08 (0.1.99).** The re-run session
+  `bd6563b3` captured the full flow: assistant asked, user replied `yes`, then
+  `git push origin main` ran and exited 0. RuleReceipt reads push = Followed. The
+  earlier `ea7cbca5` transcript ended at the ask (user exited before approving), so
+  it correctly showed "didn't come up" — both are correct; the completeness caveat
+  about a transcript ending at the ask still holds for any session cut short there.
+- **Destroy verb hidden in a quoted argument (pre-existing).** A data-wipe rule does
+  not fire on `psql -c 'DROP TABLE users'` / `mysql -e 'DROP DATABASE prod'`: the
+  quoted SQL is blanked by the same quote-stripping that stops `echo "git push"`
+  reading as a push, so the verb is never seen. Unquoted DB-destroyers (`rm *.db`,
+  `dropdb`, `redis FLUSHALL`, bare `DROP TABLE`) still fire. Widening into quoted SQL
+  args risks new false positives, so it is deferred to a shadow-mode + FA pass.
+  Pinned NOT-caught in tests/guardDeleteFP.test.ts so a future change is visible.
+- **VCS/image/package deletes are not data wipes (FIXED 2026-10-08, 0.1.99).** The
+  guard read `git branch -d <name>` as a database wipe when the branch/tag name
+  contained a data-store word (data/db/storage) — the old delete-action pattern
+  matched `git …-D` and the name matched DATA_STORE_TARGET. Fixed: `git …-D` removed
+  from the delete pattern + a `NOT_A_DATA_WIPE` exclusion (git branch/tag/worktree/
+  stash, docker rmi, npm/pnpm/yarn remove). Covered by guardDeleteFP.test.ts and
+  fa-corpus-v3.
