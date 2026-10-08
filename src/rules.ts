@@ -149,6 +149,20 @@ function ruleSourcesAtLevel(dir: string, pi: ProjectInstructions = "unknown", ag
     if (has(join(".github", "copilot-instructions.md"))) out.push({ path: join(dir, ".github", "copilot-instructions.md"), status: "loaded", format: "Copilot" });
     return applyImports(out);
   }
+
+  // Cursor reads AGENTS.md + .cursor/rules/*.mdc|.md (the modern dir supersedes the
+  // legacy .cursorrules) — not CLAUDE.md, Copilot, Windsurf, Gemini or ~/.claude
+  // (validated on a real session, which read AGENTS.md).
+  if (agentTool === "cursor") {
+    pushAgentsChain();
+    const cursorRules = markdownFilesIn(join(dir, ".cursor", "rules"), [".mdc", ".md"]);
+    if (cursorRules.length > 0) {
+      for (const f of cursorRules) out.push({ path: f, status: "loaded", format: "Cursor (.cursor/rules)" });
+    } else if (has(".cursorrules")) {
+      out.push({ path: join(dir, ".cursorrules"), status: "loaded", format: "Cursor (.cursorrules)" });
+    }
+    return applyImports(out);
+  }
   const loaded = (rel: string, format: string, note?: string) => {
     if (has(rel)) out.push({ path: join(dir, rel), status: "loaded", format, note });
   };

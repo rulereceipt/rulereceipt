@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, readdirSync, statSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
 import type { TranscriptEvent } from "../types.js";
 
 /**
@@ -35,12 +35,41 @@ function realpathOr(p: string): string { try { return realpathSync(p); } catch {
 function str(v: unknown): string | undefined { return typeof v === "string" && v.length > 0 ? v : undefined; }
 function rec(v: unknown): Record<string, unknown> { return v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {}; }
 
-/** The cwd a Cursor project dir maps to, from its repo.json. */
+/**
+ * The cwd a Cursor project dir maps to. repo.json sometimes carries it
+ * (workspace/rootPath/path); on current Cursor it is only an id, and the real
+ * path is in `.workspace-trusted` (workspacePath). Never reads mcp-auth.json or
+ * cli-config.json (auth).
+ */
 function projectCwd(projectDir: string): string | null {
   try {
     const o = JSON.parse(readFileSync(join(projectDir, "repo.json"), "utf-8")) as Record<string, unknown>;
-    return str(o.workspace) ?? str(o.rootPath) ?? str(o.path) ?? null;
+    const c = str(o.workspace) ?? str(o.rootPath) ?? str(o.path);
+    if (c) return c;
+  } catch { /* fall through to .workspace-trusted */ }
+  try {
+    const o = JSON.parse(readFileSync(join(projectDir, ".workspace-trusted"), "utf-8")) as Record<string, unknown>;
+    return str(o.workspacePath) ?? null;
   } catch { return null; }
+}
+
+/**
+ * The project cwd for a Cursor agent-transcript file: walk up from the transcript
+ * (…/projects/<slug>/agent-transcripts/<uuid>/<uuid>.jsonl) to the <slug> dir that
+ * holds repo.json, and read the cwd from it. Returns null if not found.
+ */
+export function cursorSessionCwd(transcriptFile: string): string | null {
+  let dir = dirname(transcriptFile);
+  for (let i = 0; i < 5; i++) {
+    if (existsSync(join(dir, "repo.json")) || existsSync(join(dir, ".workspace-trusted"))) {
+      const c = projectCwd(dir);
+      if (c) return c;
+    }
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return null;
 }
 
 function jsonlFilesUnder(dir: string, out: string[], depth = 0): void {
@@ -67,7 +96,10 @@ export function listCursorSessions(cwd: string): string[] {
   for (const slug of projects) {
     const projectDir = join(base, slug);
     const mapped = projectCwd(projectDir);
-    if (mapped && realpathOr(mapped) !== target) continue; // another project
+    // Only include a session we can CONFIRM belongs to this cwd. If the project's
+    // cwd is unresolvable, exclude it — including unknown-cwd sessions pollutes
+    // every other project's auto-detection (found via replay, 2026-10-08).
+    if (!mapped || realpathOr(mapped) !== target) continue;
     const files: string[] = [];
     jsonlFilesUnder(join(projectDir, "agent-transcripts"), files);
     for (const f of files) {
@@ -93,8 +125,6 @@ function toToolUse(name: string, input: Record<string, unknown>, id: string | un
   return { role: "assistant", kind: "tool_use", toolName: name, toolUseId: id, input, timestamp: ts };
 }
 
-interface CursorLine { role?: string; content?: unknown; }
-
 function toolResultContent(block: Record<string, unknown>): string {
   const c = block.content;
   if (typeof c === "string") return c;
@@ -102,19 +132,29 @@ function toolResultContent(block: Record<string, unknown>): string {
   return c ? JSON.stringify(c).slice(0, 2000) : "";
 }
 
-/** True when a file looks like a Cursor agent-transcript (≥1 {role,content[]} line). */
+/** The Anthropic content blocks of a Cursor line: at top level OR under `message`. */
+function cursorContent(o: Record<string, unknown>): unknown[] | null {
+  if (Array.isArray(o.content)) return o.content;
+  const msg = rec(o.message);
+  if (Array.isArray(msg.content)) return msg.content;
+  return null;
+}
+
+/** True when a file looks like a Cursor agent-transcript (≥1 {role, content[]} line). */
 export function cursorFormatIsKnown(file: string): boolean {
   let raw: string;
   try { raw = readFileSync(file, "utf-8"); } catch { return false; }
+  let seen = 0;
   for (const line of raw.split("\n")) {
     if (!line.trim()) continue;
     try {
-      const o = JSON.parse(line) as CursorLine & { message?: unknown; type?: unknown };
-      // A Cursor line has a top-level role + content array and NO Claude-style
-      // `message` wrapper and NO Codex/Copilot `type`.
-      if ((o.role === "user" || o.role === "assistant") && Array.isArray(o.content) && o.message === undefined && o.type === undefined) return true;
+      const o = JSON.parse(line) as Record<string, unknown>;
+      // A Cursor line has a top-level `role` (user/assistant) and an Anthropic
+      // content array (top level or under `message`), and NO top-level `type`
+      // (Claude Code uses `type`; Codex/Copilot use `type` too).
+      if ((o.role === "user" || o.role === "assistant") && cursorContent(o) && o.type === undefined) return true;
     } catch { /* skip */ }
-    break; // only the first non-blank line decides
+    if (++seen >= 10) break; // a few lines decide, not just the first
   }
   return false;
 }
@@ -126,17 +166,34 @@ export function parseCursorTranscript(file: string): TranscriptEvent[] {
   const out: TranscriptEvent[] = [];
   for (const line of raw.split("\n")) {
     if (!line.trim()) continue;
-    let o: CursorLine;
-    try { o = JSON.parse(line) as CursorLine; } catch { continue; }
+    let o: Record<string, unknown>;
+    try { o = JSON.parse(line) as Record<string, unknown>; } catch { continue; }
     const role = o.role === "assistant" ? "assistant" : o.role === "user" ? "user" : undefined;
-    if (!role || !Array.isArray(o.content)) continue;
-    for (const raw2 of o.content as unknown[]) {
+    const content = cursorContent(o);
+    if (!role || !content) continue;
+    for (const raw2 of content) {
       const b = rec(raw2);
       if (b.type === "text" && str(b.text)) {
-        out.push({ role, kind: "text", text: b.text as string, timestamp: "" });
+        let text = b.text as string;
+        // Cursor wraps the real user input as
+        //   <timestamp>…</timestamp>\n<user_query>\n<the actual message>\n</user_query>
+        // Unwrap it so "yes" reads as "yes" (not "<timestamp>…yes…") and the
+        // prompt reads as its own words — otherwise approvals/instructions are
+        // hidden behind the wrapper and a confirmed push looks unapproved.
+        if (role === "user") {
+          const m = text.match(/<user_query>([\s\S]*?)<\/user_query>/i);
+          text = (m ? m[1] : text.replace(/<timestamp>[\s\S]*?<\/timestamp>/gi, "")).trim();
+        }
+        if (text) out.push({ role, kind: "text", text, timestamp: "" });
       } else if (b.type === "tool_use" && role === "assistant") {
         const name = str(b.name);
-        if (name) out.push(toToolUse(name, rec(b.input), str(b.id), ""));
+        if (!name) continue;
+        // `input` is a JSON STRING in the real format (not an object) — parse it.
+        let input: unknown = b.input;
+        if (typeof input === "string") {
+          try { input = JSON.parse(input); } catch { /* keep the raw string */ }
+        }
+        out.push(toToolUse(name, rec(input), str(b.id), ""));
       } else if (b.type === "tool_result") {
         out.push({ role: "user", kind: "tool_result", toolUseId: str(b.tool_use_id), content: toolResultContent(b), isError: b.is_error === true, timestamp: "" });
       }

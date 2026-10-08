@@ -70,9 +70,6 @@ export const copilotCliAdapter: SessionAdapter = {
   parse: (sessionFile) => parseCopilotTranscript(sessionFile),
 };
 
-/** Adapters with a verified, tested parser — these auto-detect the newest session. */
-export const ADAPTERS: SessionAdapter[] = [claudeCodeAdapter, codexAdapter, copilotCliAdapter];
-
 /** Gemini CLI — EXPERIMENTAL. Our reader; format per cli-continues (MIT, pinned). */
 export const geminiCliAdapter: SessionAdapter = {
   tool: "gemini-cli",
@@ -81,7 +78,14 @@ export const geminiCliAdapter: SessionAdapter = {
   experimental: true,
 };
 
-/** Cursor — EXPERIMENTAL. Current agent-transcripts (JSONL, Anthropic-shaped); old SQLite deferred. */
+/**
+ * Cursor — reader validated against a real session (agent v2026.10.01, 2026-10-08):
+ * agent-transcripts JSONL where each line is {role, message:{content:[…]}}, tool
+ * input is a JSON string, and user text is wrapped in <timestamp>/<user_query>
+ * (unwrapped so a confirmed push reads as Followed). Held EXPERIMENTAL in the
+ * public surface until Shilpa validates the output; reachable via --transcript.
+ * Old state.vscdb SQLite deferred.
+ */
 export const cursorAdapter: SessionAdapter = {
   tool: "cursor",
   listSessions: (cwd) => listCursorSessions(cwd),
@@ -96,6 +100,9 @@ export const openCodeAdapter: SessionAdapter = {
   parse: (sessionFile) => parseOpenCodeTranscript(sessionFile),
   experimental: true,
 };
+
+/** Adapters with a verified, tested parser — these auto-detect the newest session. */
+export const ADAPTERS: SessionAdapter[] = [claudeCodeAdapter, codexAdapter, copilotCliAdapter];
 
 /** Experimental adapters: reader exists, awaiting real+planted+clean fixtures. */
 export const EXPERIMENTAL_ADAPTERS: SessionAdapter[] = [geminiCliAdapter, cursorAdapter, openCodeAdapter];

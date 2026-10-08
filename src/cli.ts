@@ -10,6 +10,7 @@ import { subagentNote, sessionCwdOf } from "./parsers/transcriptParser.js";
 import { findLatestSession, sessionSourceNote, parseSessionFile } from "./adapters/index.js";
 import { sessionCwd as codexSessionCwd } from "./adapters/codex.js";
 import { copilotFormatIsKnown, workspaceCwd as copilotWorkspaceCwd } from "./adapters/copilot.js";
+import { cursorFormatIsKnown, cursorSessionCwd } from "./adapters/cursor.js";
 import { loadRules } from "./rules.js";
 import { adviseRules } from "./checkability.js";
 import { shadowedAgentsMd } from "./shadowedAgents.js";
@@ -253,6 +254,11 @@ async function runCheck(opts: CheckOptions) {
       // Copilot CLI: cwd is in the session dir's workspace.yaml, not the events file.
       agentTool = "copilot-cli";
       const cc = copilotWorkspaceCwd(dirname(transcriptOverride));
+      if (cc && existsSync(cc)) cwd = cc;
+    } else if (cursorFormatIsKnown(transcriptOverride)) {
+      // Cursor: cwd is in the project's repo.json (…/projects/<slug>/repo.json).
+      agentTool = "cursor";
+      const cc = cursorSessionCwd(transcriptOverride);
       if (cc && existsSync(cc)) cwd = cc;
     } else {
       const claudeCwd = sessionCwdOf(transcriptOverride);
@@ -585,7 +591,7 @@ program
 
 program
   .command("check", { isDefault: true })
-  .description("Check the current project's latest Claude Code session against CLAUDE.md/AGENTS.md")
+  .description("Check the current project's latest Claude Code, Codex, or Copilot CLI session against CLAUDE.md/AGENTS.md")
   .option("--markdown", "output as markdown, for pasting into a PR or Slack")
   .option("--json", "output a machine-readable JSON report instead of text — for CI, a GitHub Action, or any other consumer. Suppresses all human-only output; exit code is unchanged.")
   .option("--check-updates", "opt-in: check npm for a newer rulereceipt and print a one-line nudge if there is one (at most once a day). Off by default; RULERECEIPT_CHECK_UPDATES=1 also enables it.")
@@ -1197,7 +1203,7 @@ const PERIOD_MS: Record<Cadence, number> = {
 program
   .command("report")
   .description(
-    "Compliance report across your recent sessions (not just the latest): which policy rules were broken, where, with evidence. Deterministic, local, no network. An org-wide version (multi-repo, trends, a manager digest) is coming in the team version."
+    "Compliance report across your recent Claude Code, Codex and Copilot CLI sessions (not just the latest): which policy rules were broken, where, with evidence. Deterministic and local; no network calls unless you opt in. An org-wide version (multi-repo, trends, a manager digest) is coming in the team version -- join the waitlist at rulereceipt.dev/#signup."
   )
   .option("--last <n>", "how many recent sessions to audit", "25")
   .option("--markdown", "output as markdown, for a report you can send")

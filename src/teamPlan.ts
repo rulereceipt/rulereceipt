@@ -42,7 +42,7 @@ export function activateNote(key: string): string {
   }
   return (
     `Thanks for subscribing. Key ${masked} noted.\n` +
-    `Activation and the hosted team features are handled by the Team service (see rulereceipt.dev/thanks).\n` +
+    `Activation and the hosted team features are handled by the Team service (see rulereceipt.dev/#signup (team waitlist)).\n` +
     `Manage your subscription: ${TEAM_PLAN.portalUrl || TEAM_PLAN.contact}`
   );
 }
