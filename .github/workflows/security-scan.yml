@@ -1,0 +1,76 @@
+name: Security scan (manual)
+
+# External pen-test scans against PRODUCTION, run on GitHub's runners (which have
+# Docker) instead of installing tools locally. Deliberately:
+#   - workflow_dispatch ONLY — never on push or pull_request, so untrusted PR code
+#     can never trigger a scan or reach any secret.
+#   - PASSIVE / SAFE only: ZAP baseline (passive), nuclei with intrusive/dos/fuzz
+#     tags excluded and rate-limited, testssl (read-only TLS probing).
+#   - every third-party action pinned by commit SHA.
+# It is a report: no job fails the run on findings. Read the job logs + artifacts.
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Target URL to scan"
+        required: true
+        default: "https://rulereceipt.dev"
+
+permissions:
+  contents: read
+
+jobs:
+  zap-baseline:
+    name: OWASP ZAP baseline (passive)
+    runs-on: ubuntu-latest
+    steps:
+      - name: ZAP baseline passive scan
+        uses: zaproxy/action-baseline@de8ad967d3548d44ef623df22cf95c3b0baf8b25 # v0.15.0
+        with:
+          target: ${{ inputs.target }}
+          # Passive only. Stop the spider from SUBMITTING forms, so it can't POST
+          # junk into the signup/share endpoints; cap the run time.
+          cmd_options: "-z \"-config spider.postform=false -config spider.processform=false\" -T 5 -I"
+          allow_issue_writing: false
+          fail_action: false
+          artifact_name: zap-baseline-report
+
+  nuclei:
+    name: Nuclei (safe templates, rate-limited)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Nuclei scan
+        uses: projectdiscovery/nuclei-action@cc153d0541e1adf8a42bbe31c0a4fb2376147538 # v3.1.1
+        with:
+          # v3 is a thin wrapper: the whole nuclei command goes in `args`. Safe
+          # only — drop intrusive/dos/fuzzing/brute-force tags, rate-limit, no OOB
+          # interactsh callbacks. Detection + CVEs + misconfig + exposures only.
+          args: "-u ${{ inputs.target }} -rate-limit 10 -timeout 10 -severity info,low,medium,high,critical -exclude-tags intrusive,dos,fuzzing,fuzz,brute-force -no-interactsh -stats -output nuclei-findings.txt"
+          stdout: true
+      - name: Print findings
+        if: always()
+        run: |
+          echo "=== nuclei findings ==="
+          if [ -s nuclei-findings.txt ]; then cat nuclei-findings.txt; else echo "(no findings reported)"; fi
+
+  testssl:
+    name: testssl.sh (TLS, read-only)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run testssl.sh in Docker
+        run: |
+          set -o pipefail
+          HOST="$(echo '${{ inputs.target }}' | sed -E 's#^https?://##; s#/.*$##')"
+          echo "Scanning $HOST:443"
+          docker run --rm drwetter/testssl.sh:3.2 \
+            --quiet --color 0 --warnings off \
+            --protocols --server-defaults --vulnerable --headers \
+            "$HOST:443" | tee testssl-output.txt
+      - name: Upload testssl output
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: testssl-report
+          path: testssl-output.txt
+          if-no-files-found: ignore
