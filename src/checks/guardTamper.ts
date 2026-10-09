@@ -1,5 +1,5 @@
 import type { TranscriptEvent } from "../types.js";
-import { segments } from "./shellCommand.js";
+import { segments, withoutQuotedMentions, withoutHeredocs } from "./shellCommand.js";
 
 /**
  * SHADOW signal (not a verdict): did this session modify or bypass its own guard?
@@ -62,19 +62,25 @@ export function detectGuardTamper(events: TranscriptEvent[], opts: { hasBranchRu
       if (typeof cmd === "string") {
         for (const seg of segments(cmd)) {
           const trimmed = seg.replace(/\s+/g, " ").trim().slice(0, 100);
+          // Match only what the command actually RUNS: blank heredoc bodies and
+          // quoted strings first, so a commit message / echo that merely MENTIONS
+          // `core.hooksPath=/dev/null`, `HUSKY=0` or `--no-verify` does not fire.
+          // Real FP 2026-10-09: a `git commit -m "… core.hooksPath=/dev/null …"`
+          // (a changelog/commit line describing this very feature) tripped it.
+          const runnable = withoutQuotedMentions(withoutHeredocs(seg));
           // --no-verify skips the pre-push hook — only meaningful when a branch
           // rule exists for it to bypass (and not a `git config …` line).
-          if (opts.hasBranchRule && /\bgit\b/.test(seg) && /(^|\s)--no-verify(\s|=|$)/.test(seg) && !/\bgit\b[^\n]*\bconfig\b/.test(seg)) {
+          if (opts.hasBranchRule && /\bgit\b/.test(runnable) && /(^|\s)--no-verify(\s|=|$)/.test(runnable) && !/\bgit\b[^\n]*\bconfig\b/.test(runnable)) {
             const key = `nv:${seg.slice(0, 80)}`;
             if (!seen.has(key)) { seen.add(key); out.push({ kind: "no-verify", evidence: `ran a git command with --no-verify (skips the pre-push guard): ${trimmed}` }); }
           }
           // Disabling git hooks wholesale is a bypass regardless of which rule
           // exists — the hooks that would enforce ANY of them never run.
-          if (HOOKS_PATH_NULLED.test(seg)) {
+          if (HOOKS_PATH_NULLED.test(runnable)) {
             const key = `hp:${seg.slice(0, 80)}`;
             if (!seen.has(key)) { seen.add(key); out.push({ kind: "hooks-disabled", evidence: `ran a command that disables git hooks (core.hooksPath nulled, so no hook runs): ${trimmed}` }); }
           }
-          if (HUSKY_OFF.test(seg)) {
+          if (HUSKY_OFF.test(runnable)) {
             const key = `husky:${seg.slice(0, 80)}`;
             if (!seen.has(key)) { seen.add(key); out.push({ kind: "hooks-disabled", evidence: `ran a command with HUSKY=0 (disables husky-managed git hooks): ${trimmed}` }); }
           }

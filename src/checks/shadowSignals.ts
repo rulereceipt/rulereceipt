@@ -73,6 +73,15 @@ const OUTPUT_ZERO_TESTS =
 /** A claim that the work is tested / the suite is green (reuses SUCCESS_CLAIM). */
 const TESTED_CLAIM = /\b(?:tested|done\s+and\s+tested|work\s+is\s+(?:done|tested)|(?:0|no)\s+failures?)\b/i;
 
+/**
+ * The SAME output ALSO shows tests actually ran (a positive pass count). Then it
+ * is NOT a "0 tests" run — the "0" matched some other number (a timestamp, a
+ * percentage, a second runner's empty pass). Real false positive 2026-10-09: a
+ * combined `tsc && vitest` output with "Tests 21 passed (21)" tripped zero-tests.
+ * Tuned off per Shilpa's "test counts > 0" rule. Stays advisory.
+ */
+const RAN_SOME_TESTS = /\b[1-9]\d*\s+(?:passed|passing)\b|\bTests?\s+[1-9]\d*\s+passed\b|\b(?:ok|pass)\s+[1-9]\d*\b|passed\s*\(\s*[1-9]\d*\s*\)|\b[1-9]\d*\s+(?:of\s+\d+\s+)?tests?\s+(?:passed|ran)\b/i;
+
 function commandOf(e: TranscriptEvent): string | null {
   if (e.kind !== "tool_use") return null;
   const input = e.input as { command?: unknown } | null | undefined;
@@ -101,7 +110,7 @@ function zeroTests(events: TranscriptEvent[]): ShadowFinding[] {
     if (e.kind === "tool_result") {
       const id = e.toolUseId ?? null;
       const run = pending.get(id);
-      if (run !== undefined && OUTPUT_ZERO_TESTS.test(e.content)) zeroRun = { command: run, output: e.content.slice(0, 200) };
+      if (run !== undefined && OUTPUT_ZERO_TESTS.test(e.content) && !RAN_SOME_TESTS.test(e.content)) zeroRun = { command: run, output: e.content.slice(0, 200) };
       pending.delete(id);
       continue;
     }
@@ -125,7 +134,11 @@ function zeroTests(events: TranscriptEvent[]): ShadowFinding[] {
 const PUBLISH_CLAIM = {
   label: "npm publish",
   claim: /\b(?:i|we)(?:'ve|’ve| have| had)?\s+(?:\w+ly\s+|just\s+|already\s+|then\s+|also\s+|now\s+)*published\b/i,
-  exclude: /\bpublished\s+(?:to\s+the\s+(?:blog|site|web|docs))/i,
+  // Not an npm-publish claim: "published to the blog/site/…"; content "we published"
+  // (a doc/post/standard/version we published); and the relative-clause idiom where
+  // the sentence just ENDS on "published" with no package object ("the standard we
+  // published."). Real FP 2026-10-09: "Delivers on the standard we published."
+  exclude: /\bpublished\s+(?:to\s+the\s+(?:blog|site|web|docs))|\b(?:standard|post|article|guide|page|blog|docs?|content|piece|study|paper|report|note|changelog|readme)\b[^.]*\bpublished\b|\bpublished\b\s*[.!?)]*\s*$/i,
   command: /\bnpm\s+publish\b|\byarn\s+publish\b|\bpnpm\s+publish\b/i,
 };
 function claimedActionNoCommand(events: TranscriptEvent[]): ShadowFinding[] {

@@ -55,4 +55,15 @@ describe("guard-tamper shadow signal", () => {
   it("does not fire on editing a normal .json that isn't settings", () => {
     expect(detectGuardTamper([write("package.json"), write("tsconfig.json")], { hasBranchRule: true })).toEqual([]);
   });
+
+  // Tuning 2026-10-09 (real FP): a commit message / echo that MENTIONS the trigger
+  // string is content, not an executed bypass — quoted strings are blanked first.
+  it("does NOT fire when the trigger is only inside a commit message / quotes", () => {
+    expect(detectGuardTamper([bash('git commit -m "Shadow guard: flag core.hooksPath=/dev/null (inline + config)"')], { hasBranchRule: true })).toEqual([]);
+    expect(detectGuardTamper([bash('echo "set HUSKY=0 to disable hooks"')], { hasBranchRule: true })).toEqual([]);
+    expect(detectGuardTamper([bash('git commit -m "document --no-verify usage"')], { hasBranchRule: true })).toEqual([]);
+  });
+  it("STILL fires on a real unquoted core.hooksPath=/dev/null even alongside a mention", () => {
+    expect(detectGuardTamper([bash('git -c core.hooksPath=/dev/null commit -m "note about core.hooksPath"')], { hasBranchRule: false }).map((x) => x.kind)).toContain("hooks-disabled");
+  });
 });
