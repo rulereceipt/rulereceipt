@@ -35,20 +35,21 @@ for (const corpus of corpora) {
   const rulesFiles = readdirSync(rulesDir).filter((f) => statSync(join(rulesDir, f)).isFile());
   const sessions = readdirSync(sessDir).filter((f) => f.endsWith(".jsonl")).sort();
   const parsed = new Map<string, TranscriptEvent[]>();
-  for (const s of sessions) parsed.set(s, readTranscriptFromFile(join(sessDir, s)));
+  const rawText = new Map<string, string>();
+  for (const s of sessions) { parsed.set(s, readTranscriptFromFile(join(sessDir, s))); rawText.set(s, readFileSync(join(sessDir, s), "utf-8")); }
 
   for (const rf of rulesFiles) {
     const rules = parseClaudeMd(join(rulesDir, rf), "project");
     const hasBranchRule = rules.some((r) => /\bbranch\b|\bpush\b|\bmain\b/i.test(`${r.title} ${r.text}`));
     for (const [s, events] of parsed) {
       reports += 1;
-      for (const f of detectShadowSignals(rules, events)) fires.push({ signal: f.signal, corpus, rulesFile: rf, session: s, evidence: f.evidence });
+      for (const f of detectShadowSignals(rules, events, rawText.get(s))) fires.push({ signal: f.signal, corpus, rulesFile: rf, session: s, evidence: f.evidence });
       for (const f of detectGuardTamper(events, { hasBranchRule })) fires.push({ signal: f.kind, corpus, rulesFile: rf, session: s, evidence: f.evidence });
     }
   }
 }
 
-const SIGNALS = ["zero-tests", "claimed-action-no-command", "env-strict", "hooks-disabled", "no-verify", "hook-config-edit"];
+const SIGNALS = ["zero-tests", "claimed-action-no-command", "env-strict", "approved-in-prompt", "edited-rule-not-loaded", "hooks-disabled", "no-verify", "hook-config-edit"];
 console.log(`SHADOW FA — corpora: ${corpora.join(", ")}`);
 console.log(`Clean reports measured: ${reports} (rules files × sessions). Every fire below is a candidate false positive.\n`);
 console.log("signal                       fires   distinct-evidence");

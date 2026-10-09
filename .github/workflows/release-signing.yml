@@ -34,14 +34,29 @@ jobs:
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: ${{ steps.pack.outputs.file }}
-      - name: Create / update the GitHub release with signed artifacts
+      # Draft -> upload -> publish, in that order. This is the flow GitHub
+      # "release immutability" requires: once a release is PUBLISHED its assets
+      # are frozen, so they must be attached while it is still a DRAFT. The old
+      # one-shot `gh release create <files>` (published-with-assets) plus an
+      # `upload --clobber` fallback is incompatible — clobbering a published
+      # release's assets is exactly what immutability forbids. Creating the draft
+      # first works whether or not immutability is enabled on the repo.
+      - name: Create a DRAFT release, attach signed artifacts, then publish
         env:
           GH_TOKEN: ${{ github.token }}
           FILE: ${{ steps.pack.outputs.file }}
           BUNDLE: ${{ steps.attest.outputs.bundle-path }}
+          TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
           cp "$BUNDLE" "${FILE}.sigstore"
-          gh release create "$GITHUB_REF_NAME" "$FILE" "${FILE}.sigstore" \
-            --title "$GITHUB_REF_NAME" --generate-notes \
-            || gh release upload "$GITHUB_REF_NAME" "$FILE" "${FILE}.sigstore" --clobber
+          # Create the release as a draft if it does not exist yet. (If it already
+          # exists and is published+immutable, upload below will fail loudly —
+          # correct: an immutable release must not be silently re-signed.)
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --draft --title "$TAG" --generate-notes
+          fi
+          # Attach the tarball + sigstore bundle while the release is still a draft.
+          gh release upload "$TAG" "$FILE" "${FILE}.sigstore" --clobber
+          # Publish the draft (this is the point assets become immutable) and mark latest.
+          gh release edit "$TAG" --draft=false --latest

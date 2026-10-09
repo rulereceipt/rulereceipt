@@ -208,6 +208,23 @@ check "protect --git: installs an executable pre-push"  '(cd "$PGIT" && "$RR" pr
 check "protect --git: hook calls rulereceipt git-guard" 'grep -q "rulereceipt git-guard" "$PGIT/.git/hooks/pre-push"'
 check "protect --git --undo: removes the hook"          '(cd "$PGIT" && "$RR" protect --git --undo >/dev/null 2>&1); [ ! -e "$PGIT/.git/hooks/pre-push" ]'
 
+echo "== large session + rules-scan bounds (must not hang) =="
+# A session larger than the byte budget must be READ SHORT and SAID so — never a
+# hang, and never a clean verdict silently covering the unread tail. Tiny budget
+# via env so the check is instant. (2026-10-09 hang fix.)
+PBIG="$(newproj pbig '## Branch\nNever push to the `main` branch without asking me first.\n')"
+jtext "get my feature branch up to date" > "$PBIG/s.jsonl"
+jbash "git push origin feature/x" >> "$PBIG/s.jsonl"
+for i in $(seq 1 200); do jtext "filler line $i padding padding padding padding" >> "$PBIG/s.jsonl"; done
+BIGOUT="$(cd "$PBIG" && RR_MAX_TRANSCRIPT_BYTES=1000 "$RR" check --transcript s.jsonl 2>&1)"
+check "large session: reports a short read ('Large session') and does not hang" 'echo "$BIGOUT" | grep -qi "large session"'
+check "large session: no clean 'Followed' PASS survives a short read"           '! echo "$BIGOUT" | grep -qE "✓ PASS"'
+# A giant repo's subfolder-rules scan must stop at its cap and SAY so, not hang.
+PSCAN="$(newproj pscan '## R\nRule one.\n')"; mkdir -p "$PSCAN/a" "$PSCAN/b" "$PSCAN/c"
+jbash "ls" > "$PSCAN/s.jsonl"
+SCANOUT="$(cd "$PSCAN" && RR_MAX_DESCEND_DIRS=1 "$RR" check --transcript s.jsonl 2>&1)"
+check "rules scan: reports stopping early at the dir cap"                        'echo "$SCANOUT" | grep -qi "rules scan stopped"'
+
 echo "== no stack traces =="
 ALL="$B
 $(out "$PE" check --transcript s.jsonl)

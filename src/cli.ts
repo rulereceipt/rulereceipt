@@ -6,7 +6,7 @@ import { join, dirname, resolve, isAbsolute, basename } from "node:path";
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { parseClaudeMd } from "./parsers/readClaudeMd.js";
-import { subagentNote, sessionCwdOf } from "./parsers/transcriptParser.js";
+import { subagentNote, sessionCwdOf, readBoundedText, maxTranscriptBytes } from "./parsers/transcriptParser.js";
 import { findLatestSession, sessionSourceNote, parseSessionFile } from "./adapters/index.js";
 import { sessionCwd as codexSessionCwd } from "./adapters/codex.js";
 import { copilotFormatIsKnown, workspaceCwd as copilotWorkspaceCwd } from "./adapters/copilot.js";
@@ -14,7 +14,8 @@ import { cursorFormatIsKnown, cursorSessionCwd } from "./adapters/cursor.js";
 import { antigravityFormatIsKnown, antigravitySessionCwd } from "./adapters/antigravity.js";
 import { openCodeFormatIsKnown, openCodeSessionCwd } from "./adapters/opencode.js";
 import { clineFormatIsKnown, clineSessionCwd } from "./adapters/cline.js";
-import { loadRules } from "./rules.js";
+import { devinFormatIsKnown, devinSessionCwd } from "./adapters/devin.js";
+import { loadRules, lastRuleScanInfo } from "./rules.js";
 import { adviseRules } from "./checkability.js";
 import { shadowedAgentsMd } from "./shadowedAgents.js";
 import { auditSessions, renderComplianceReport } from "./report/complianceReport.js";
@@ -279,6 +280,12 @@ async function runCheck(opts: CheckOptions) {
       agentTool = "cline";
       const cc = clineSessionCwd(transcriptOverride);
       if (cc && existsSync(cc)) cwd = cc;
+    } else if (devinFormatIsKnown(transcriptOverride)) {
+      // Devin Desktop: a `<…sessions.db>#<id>` handle; cwd is the session's
+      // `working_directory`.
+      agentTool = "devin";
+      const cc = devinSessionCwd(transcriptOverride);
+      if (cc && existsSync(cc)) cwd = cc;
     } else {
       const claudeCwd = sessionCwdOf(transcriptOverride);
       if (claudeCwd && existsSync(claudeCwd)) cwd = claudeCwd;
@@ -287,6 +294,9 @@ async function runCheck(opts: CheckOptions) {
     agentTool = latestSession.adapter.tool;
   }
   const rules = loadRules(cwd, agentTool);
+  // Did the subfolder-rules descendant walk stop at its dir/time cap? Captured
+  // right after loadRules (before any other call can overwrite the module stat).
+  const ruleScan = lastRuleScanInfo();
 
   if (rules.length === 0) {
     console.log(
@@ -381,18 +391,39 @@ async function runCheck(opts: CheckOptions) {
   const projectConfig = loadProjectConfig(cwd);
   const handleFor = handleMap(rules);
   // The raw session text — for A4 "why it broke" context AND for the
-  // visibility pass (#4). Best-effort: if it can't be read, visibility is left
-  // undetermined (a would-be break stays Broken) and no A4 context is shown.
+  // visibility pass (#4). Read BOUNDED: a 262 MB session would otherwise hang
+  // here on readFileSync just like the parser did (2026-10-09). Best-effort: if
+  // it can't be read, visibility is left undetermined (a would-be break stays
+  // Broken) and no A4 context is shown.
   let transcriptText: string | undefined;
-  try {
-    if (sessionFilePath) transcriptText = readFileSync(sessionFilePath, "utf-8");
-  } catch {
-    /* unreadable: never a crash */
+  let sessionTruncated = false;
+  let sessionBytes = 0, sessionTotalBytes = 0;
+  if (sessionFilePath) {
+    const b = readBoundedText(sessionFilePath);
+    if (b.text) transcriptText = b.text;
+    sessionTruncated = b.truncated;
+    sessionBytes = Math.min(b.totalBytes, maxTranscriptBytes());
+    sessionTotalBytes = b.totalBytes;
   }
   // "Rule not visible" (#4): downgrade a FAIL whose rule was never in the
   // agent's context at the break. Applied HERE, before anything counts a break,
   // so the report, the exit code and the export all agree.
-  const results = applyVisibility(visibleResults(rawResults, projectConfig, handleFor), transcriptText);
+  let results = applyVisibility(visibleResults(rawResults, projectConfig, handleFor), transcriptText);
+  // Large session read short (byte/time budget): the verdicts only cover the part
+  // read, so a clean verdict (PASS, or "didn't apply") over a PREFIX is NOT a
+  // clean verdict over the session — downgrade those to couldn't-tell. A FAIL
+  // found in the read part is a real, proven break and stands; a judgment rule is
+  // already couldn't-tell. This makes the unread tail "can't tell", never a silent
+  // Followed. (2026-10-09, requested after 60–262 MB sessions were found.)
+  if (sessionTruncated) {
+    const mb = (n: number) => (n / (1024 * 1024)).toFixed(0);
+    const note = `large session: only the first ${mb(sessionBytes)} of ${mb(sessionTotalBytes)} MB was read, so this can't confirm it over the rest`;
+    results = results.map((r) => {
+      const clean = r.status === "PASS" || r.outcome === "not_applicable";
+      if (!clean) return r;
+      return { ...r, status: "UNCLEAR" as const, outcome: "inconclusive" as const, reason: "session_truncated", evidence: `${r.evidence}${r.evidence ? " — " : ""}${note}` };
+    });
+  }
   const blockingFails = blockingFailures(results, projectConfig, handleFor);
   const warnedFails = warningFailures(results, projectConfig, handleFor);
 
@@ -432,6 +463,17 @@ async function runCheck(opts: CheckOptions) {
     console.log(generateJsonReport(results, meta, pkg.version, editedRuleFiles));
   } else {
     if (editedNote) console.log(`${editedNote}\n`);
+    // Bad news first (Rule 4): if the session was read short, say so BEFORE the
+    // verdicts, so nobody reads a prefix's result as the whole session's.
+    if (sessionTruncated) {
+      const mb = (n: number) => (n / (1024 * 1024)).toFixed(0);
+      console.log(`⚠ Large session: read only the first ${mb(sessionBytes)} MB of ${mb(sessionTotalBytes)} MB. Verdicts cover that part only; anything in the rest is "couldn't tell", never "followed". (Byte budget: ${mb(maxTranscriptBytes())} MB.)\n`);
+    }
+    // The subfolder-rules scan stopped at its cap on a very large repo — say so, so
+    // a rule in an unscanned deep folder is understood as possibly-missed, not absent.
+    if (ruleScan.stoppedEarly) {
+      console.log(`⚠ Rules scan stopped at ${ruleScan.dirsScanned} directories (cap ${ruleScan.capDirs} dirs / ${(ruleScan.capMs / 1000).toFixed(0)}s). A subfolder rules file deeper than that was not scanned; run \`check\` from that subfolder to include it.\n`);
+    }
     console.log(reportText);
     // Shadow advisory (not a verdict, not counted, no exit-code effect): did the
     // session edit/bypass its own guard wiring? hasBranchRule is derived from the
@@ -439,9 +481,10 @@ async function runCheck(opts: CheckOptions) {
     const tamperLines = renderGuardTamper(detectGuardTamper(events, { hasBranchRule: results.some((r) => r.method === "git_events") }));
     if (tamperLines.length) console.log(tamperLines.join("\n"));
     // Shadow signals (also advisory, not counted): zero-tests, claimed-action-
-    // with-no-command, plain-text .env edit. Being measured on the frozen corpus
-    // before any decision to promote to Broken (scripts/shadow-fa.ts, KNOWN-GAPS).
-    const shadowLines = renderShadowSignals(detectShadowSignals(rules, events));
+    // with-no-command, plain-text .env edit, approved-in-prompt, edited-rule-not-
+    // loaded. Reuses the BOUNDED transcriptText read above (the "edited without the
+    // rule loaded" signal reads Claude Code's context-injection records from it).
+    const shadowLines = renderShadowSignals(detectShadowSignals(rules, events, transcriptText));
     if (shadowLines.length) console.log(shadowLines.join("\n"));
     // Name the tool when it is not the default Claude Code, so a Codex run is
     // not silently reported as if it were a Claude session.

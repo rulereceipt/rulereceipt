@@ -34,6 +34,7 @@ const NOTES: Record<string, string> = {
   cursor: "supported — validated on a real session (agent v2026.10.01, 2026-10-08); reads the agent-transcripts JSONL (message-wrapped lines, JSON-string tool input, <user_query> unwrap)",
   opencode: "supported — validated on a real session (1.18.35, 2026-10-08); reads the SQLite opencode.db (OpenCode 1.18+, via built-in node:sqlite on Node 22.5+; older Node skips it, noted once) and the legacy JSON file store. Rules scoped to what OpenCode loads (AGENTS.md/CLAUDE.md, ~/.config/opencode/AGENTS.md, and ~/.claude/CLAUDE.md for Claude Code compat, off via OPENCODE_DISABLE_CLAUDE_CODE)",
   cline: "supported — validated on a real session (CLI v3.0.70, 2026-10-09); reads ~/.cline/data/sessions/<id>/ (meta + .messages.json), maps ask_question to the user's approval (an authorised push reads as Followed). Rules scoped to what Cline loads (.clinerules, .cline/rules, .cursorrules, .windsurfrules, AGENTS.md — not CLAUDE.md/GEMINI.md)",
+  devin: "supported — validated on a real session (Devin Desktop 3.10.48, backend windsurf, model swe-1-6-slow, 2026-10-09); reads the SQLite ~/.local/share/devin/cli/sessions.db (via built-in node:sqlite on Node 22.5+; older Node skips it, noted once), walking each session's main chain so retry branches are deduped. Rules scoped to what Devin loads (project AGENTS.md + CLAUDE.md, global ~/.claude/CLAUDE.md and ~/.codeium/windsurf/memories/global_rules.md — not GEMINI.md)",
 };
 
 export function agentCapabilities(): AgentCapability[] {

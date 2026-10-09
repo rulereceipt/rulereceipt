@@ -9,6 +9,7 @@ import { listCursorSessions, parseCursorTranscript, cursorFormatIsKnown } from "
 import { listOpenCodeSessions, parseOpenCodeTranscript, openCodeFormatIsKnown } from "./opencode.js";
 import { listAntigravitySessions, parseAntigravityTranscript, antigravityFormatIsKnown } from "./antigravity.js";
 import { listClineSessions, parseClineTranscript, clineFormatIsKnown } from "./cline.js";
+import { listDevinSessions, parseDevinTranscript, devinFormatIsKnown, isDevinHandle } from "./devin.js";
 
 /**
  * A session adapter turns one coding agent's on-disk session log into the
@@ -135,8 +136,26 @@ export const clineAdapter: SessionAdapter = {
   parse: (sessionFile) => parseClineTranscript(sessionFile),
 };
 
+/**
+ * Devin Desktop (the Windsurf / Codeium "devin-cli" stack) — reader validated
+ * against a real local session (`showy-attention`, backend "windsurf", model
+ * swe-1-6-slow, Devin Desktop 3.10.48, 2026-10-09). Reads the SQLite store
+ * `~/.local/share/devin/cli/sessions.db` (via built-in node:sqlite on Node
+ * 22.5+; older Node skips it, noted once), walking each session's main chain
+ * (its `main_chain_id` head back to a root) so retry branches are deduped. A
+ * session is addressed by a `<…sessions.db>#<id>` handle, like OpenCode. Rules
+ * scoped to what Devin loads (AGENTS.md + CLAUDE.md, global ~/.claude/CLAUDE.md
+ * and ~/.codeium/windsurf/memories/global_rules.md — NOT GEMINI.md), confirmed
+ * from the session's own always-on <rules> block. See adapters/devin.ts.
+ */
+export const devinAdapter: SessionAdapter = {
+  tool: "devin",
+  listSessions: (cwd) => listDevinSessions(cwd),
+  parse: (sessionFile) => parseDevinTranscript(sessionFile),
+};
+
 /** Adapters with a verified, tested parser — these auto-detect the newest session. */
-export const ADAPTERS: SessionAdapter[] = [claudeCodeAdapter, codexAdapter, copilotCliAdapter, cursorAdapter, antigravityAdapter, openCodeAdapter, clineAdapter];
+export const ADAPTERS: SessionAdapter[] = [claudeCodeAdapter, codexAdapter, copilotCliAdapter, cursorAdapter, antigravityAdapter, openCodeAdapter, clineAdapter, devinAdapter];
 
 /** Experimental adapters: reader exists, awaiting real+planted+clean fixtures. */
 export const EXPERIMENTAL_ADAPTERS: SessionAdapter[] = [geminiCliAdapter];
@@ -148,7 +167,7 @@ export const EXPERIMENTAL_ADAPTERS: SessionAdapter[] = [geminiCliAdapter];
  */
 export const UNSUPPORTED_TOOLS: { tool: string; reason: string }[] = [
   { tool: "aider", reason: "history is a Markdown transcript (.aider.chat.history.md), not structured events — needs a prose parser, not a field mapping" },
-  { tool: "windsurf", reason: "IDE-embedded; history in undocumented internal state, same as old Cursor" },
+  { tool: "windsurf", reason: "the Windsurf IDE itself is IDE-embedded (history in undocumented internal state, same as old Cursor) — but its Devin Desktop CLI, the same Codeium/ACP stack, IS read: see the `devin` adapter" },
 ];
 
 export interface LatestSession {
@@ -236,6 +255,10 @@ export function parseSessionFile(file: string): TranscriptEvent[] {
   // route it before the readFileSync below, which would otherwise throw and
   // return no events (making a real session look empty).
   if (/opencode\.db#ses_/i.test(file)) return parseOpenCodeTranscript(file);
+  // A Devin handle (<…sessions.db>#<id>) is likewise a db handle, not a file —
+  // route it before readFileSync for the same reason. devinFormatIsKnown then
+  // confirms the db actually holds that session.
+  if (isDevinHandle(file) && devinFormatIsKnown(file)) return parseDevinTranscript(file);
   let raw: string;
   try {
     raw = readFileSync(file, "utf-8");

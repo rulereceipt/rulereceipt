@@ -37,6 +37,45 @@ export function touchedPaths(events: TranscriptEvent[]): string[] {
   return [...out];
 }
 
+/**
+ * Files a session VIEWED through a single-file Bash reader — `cat FILE`,
+ * `head FILE`, `tail FILE`, `sed -n … FILE`, `grep … FILE`. Since Claude Code
+ * 2.1.293 such a view ALSO loads a nested/path-scoped rule governing that file's
+ * directory, the same way Read/Edit do (issue #90450, 2026-10-09). This is kept
+ * SEPARATE from `touchedPaths` on purpose: `touchedPaths` feeds the verdict
+ * path's visibility decisions, and widening it would change verdicts — which the
+ * approval/visibility hard rule forbids without a fresh FA run. This helper is
+ * for the ADVISORY "edited without the rule loaded" shadow signal only.
+ *
+ * Deliberately narrow and fails safe: only a reader whose FINAL argument is a
+ * single path, with NO pipe / redirection / chaining / command-substitution /
+ * glob / option-valued flag confusion — because a piped or chained command does
+ * NOT trigger the nested load (per the same issue), so counting it would be
+ * wrong. When in doubt the file is simply not returned.
+ */
+const BASH_VIEWERS = new Set(["cat", "head", "tail", "sed", "grep", "bat", "less", "more"]);
+export function bashViewedPaths(events: TranscriptEvent[]): string[] {
+  const out = new Set<string>();
+  for (const e of events) {
+    if (e.kind !== "tool_use" || e.toolName !== "Bash") continue;
+    const cmd = (e.input as { command?: unknown } | null)?.command;
+    if (typeof cmd !== "string") continue;
+    // Reject anything chained/piped/redirected/substituted — those don't trigger
+    // the nested load, so they must not count.
+    if (/[|&;><`]|\$\(|<\(/.test(cmd)) continue;
+    const tokens = cmd.trim().split(/\s+/);
+    if (tokens.length === 0) continue;
+    const prog = tokens[0];
+    if (!BASH_VIEWERS.has(prog)) continue;
+    // The last token must be a plain path (not a flag, not a glob).
+    const last = tokens[tokens.length - 1];
+    if (!last || last.startsWith("-") || /[*?[\]{}]/.test(last)) continue;
+    // `sed -n '…' FILE` carries a script arg; still a single trailing file.
+    out.add(last.replace(/^['"]|['"]$/g, "").replace(/\\/g, "/"));
+  }
+  return [...out];
+}
+
 function expandBraces(glob: string): string[] {
   const m = glob.match(/\{([^{}]*)\}/);
   if (!m || m.index === undefined) return [glob];

@@ -1,6 +1,9 @@
 import type { TranscriptEvent, Rule } from "../types.js";
 import { TEST_COMMAND, withoutHeredocs } from "./testCommands.js";
 import { ACTION_CLAIMS, NOT_A_CLAIM, SUCCESS_CLAIM, sentences } from "./claimEvidence.js";
+import { approvalOccurrences } from "./approvalGate.js";
+import { ruleWasLoaded, touchedPaths, bashViewedPaths } from "./pathScope.js";
+import { basename } from "node:path";
 
 /**
  * SHADOW signals — facts about a session, NEVER verdicts.
@@ -29,11 +32,27 @@ import { ACTION_CLAIMS, NOT_A_CLAIM, SUCCESS_CLAIM, sentences } from "./claimEvi
  *                               the gap where a real .env edit shows needs-human
  *                               instead of Broken — WITHOUT widening the classifier.)
  *
+ *   - approved-in-prompt:       a gated action (push / commit) was credited as
+ *                               Followed, and the ONLY thing that approved it was
+ *                               an instruction in the OPENING prompt ("…commit and
+ *                               push to main") — no separate ask→yes. The approval
+ *                               gate already treats this as approval; this measures
+ *                               how often that mapping is the sole clearer, so its
+ *                               false-clear rate can be hand-checked (KNOWN-GAPS).
+ *   - edited-rule-not-loaded:   a path-scoped rule governs a file the session
+ *                               EDITED, but the raw transcript shows the rule file
+ *                               was never in context before that edit (no injection
+ *                               record, no Read/Edit/single-file-Bash-view of its
+ *                               directory) — or was dropped by a compaction and not
+ *                               re-injected. "The agent never saw this rule" =
+ *                               Can't-tell, NEVER Broken. Claude Code only (the
+ *                               injection records are Claude's); needs the raw text.
+ *
  * hooks-disabled / --no-verify / hook-config edits live in guardTamper.ts (already
  * shadow); the measurement script tallies those alongside these.
  */
 
-export type ShadowSignal = "zero-tests" | "claimed-action-no-command" | "env-strict";
+export type ShadowSignal = "zero-tests" | "claimed-action-no-command" | "env-strict" | "approved-in-prompt" | "edited-rule-not-loaded";
 export interface ShadowFinding {
   signal: ShadowSignal;
   evidence: string;
@@ -186,8 +205,110 @@ function envStrict(rules: Rule[], events: TranscriptEvent[]): ShadowFinding[] {
   return out;
 }
 
-export function detectShadowSignals(rules: Rule[], events: TranscriptEvent[]): ShadowFinding[] {
-  return [...zeroTests(events), ...claimedActionNoCommand(events), ...envStrict(rules, events)];
+/* ── approved-in-prompt ───────────────────────────────────────────────────────
+ * A gated action (push / commit) was credited as approved, and the opening prompt
+ * was the SOLE approver: removing the first user turn flips the gate from approved
+ * to not-approved. That isolates exactly the "instruction in the prompt == approval"
+ * mapping (a session with a separate ask→yes still approves without the prompt, so
+ * it does NOT fire). Advisory only — the gate's verdict is unchanged. */
+type PromptAction = "push" | "commit";
+const PROMPT_ACTIONS: PromptAction[] = ["push", "commit"];
+const PROMPT_VERB: Record<PromptAction, RegExp> = { push: /\bpush/i, commit: /\bcommit/i };
+function approvedInPrompt(events: TranscriptEvent[]): ShadowFinding[] {
+  const firstUserIdx = events.findIndex((e) => e.kind === "text" && e.role === "user");
+  if (firstUserIdx < 0) return [];
+  const firstUser = events[firstUserIdx] as Extract<TranscriptEvent, { kind: "text" }>;
+  // Only an UNSOLICITED opening instruction counts. If the agent said anything
+  // before the first user turn, that turn may be a reply to an ask ("yes, go
+  // ahead") — which is ordinary approval, not instruction-in-prompt — so skip.
+  if (events.slice(0, firstUserIdx).some((e) => e.kind === "text" && e.role === "assistant")) return [];
+  // Events with the opening instruction removed, to test whether it was the sole clearer.
+  const withoutPrompt = events.filter((_, i) => i !== firstUserIdx);
+  const out: ShadowFinding[] = [];
+  for (const action of PROMPT_ACTIONS) {
+    // The opening turn must NAME the action ("…push to main"); a bare "yes" is not
+    // an instruction-in-prompt, it's a confirmation.
+    if (!PROMPT_VERB[action].test(firstUser.text)) continue;
+    const withApproved = approvalOccurrences(events, [action]).filter((o) => o.verdict === "approved");
+    if (withApproved.length === 0) continue;
+    const withoutApproved = approvalOccurrences(withoutPrompt, [action]).some((o) => o.verdict === "approved");
+    if (withoutApproved) continue; // a separate approval exists; the prompt is not the sole clearer
+    out.push({ signal: "approved-in-prompt", evidence: `"${short(firstUser.text)}" in the opening prompt was read as the sole approval for ${withApproved.length} ${action} action(s) (no separate confirmation)` });
+  }
+  return out;
+}
+
+/* ── edited-rule-not-loaded ───────────────────────────────────────────────────
+ * A path-scoped rule governs a file the session EDITED, but the raw transcript
+ * shows the rule's file was never in context before that edit. Keys off Claude
+ * Code's own context-injection records (the authoritative signal, same as
+ * breakContext.ts), with a compaction resetting prior loads; a single-file Bash
+ * view (cat/head/tail/sed -n/grep) counts as a load trigger too (Claude 2.1.293+).
+ * Fires ONLY when the log actually records context machinery — on a thin log we
+ * cannot tell, so we stay silent rather than guess. "The agent never saw this
+ * rule" = Can't-tell, NEVER Broken. */
+const COMPACTION_LINE = /"isCompactSummary"\s*:\s*true/;
+/** An injection record naming a specific rules file (by basename), Claude Code's forms. */
+function ruleFileInjectedBefore(lines: string[], limit: number, ruleBasename: string, afterCompaction: number): boolean {
+  const esc = ruleBasename.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  // "Contents of …/<file> (project instructions", a claudeMd/instructions/
+  // nested_memory attachment whose path ends in <file>, escaped or not.
+  const re = new RegExp(`Contents of [^\\n"]*${esc}|${esc}[^"\\\\]{0,40}(?:project instructions|claudeMd|nested_memory|instructions)|(?:claudeMd|nested_memory|instructions)[^"]{0,200}${esc}`, "i");
+  for (let i = Math.max(0, afterCompaction); i < limit; i++) if (re.test(lines[i])) return true;
+  return false;
+}
+function editedRuleNotLoaded(rules: Rule[], events: TranscriptEvent[], transcriptText?: string): ShadowFinding[] {
+  if (!transcriptText) return []; // Claude-Code injection records only; nothing to key off otherwise
+  const lines = transcriptText.split(/\r?\n/);
+  const contextObserved = lines.some((l) => /<system-reminder>|"claudeMd"|"type"\s*:\s*"(?:instructions|nested_memory|attachment|system)"|project instructions|Contents of [^\n"]*\.md|"isCompactSummary"\s*:\s*true/i.test(l));
+  if (!contextObserved) return []; // too thin to tell whether a rule was loaded
+  const lastCompaction = (() => { let idx = -1; for (let i = 0; i < lines.length; i++) if (COMPACTION_LINE.test(lines[i])) idx = i; return idx; })();
+
+  const editedFileAt = (e: TranscriptEvent): string | null => {
+    if (e.kind !== "tool_use") return null;
+    if (e.toolName !== "Edit" && e.toolName !== "Write" && e.toolName !== "NotebookEdit") return null;
+    const input = e.input as { file_path?: unknown; notebook_path?: unknown } | null;
+    const p = typeof input?.file_path === "string" ? input.file_path : typeof input?.notebook_path === "string" ? input.notebook_path : null;
+    return p ? p.replace(/\\/g, "/") : null;
+  };
+  if (!events.some((e) => editedFileAt(e))) return [];
+
+  const out: ShadowFinding[] = [];
+  const fired = new Set<string>();
+  for (const r of rules) {
+    if (!r.paths || r.paths.length === 0 || !r.sourcePath) continue; // path-scoped file rules only
+    // The FIRST event-position at which a GOVERNED file was edited.
+    let firstEditIdx = -1;
+    for (let i = 0; i < events.length; i++) {
+      const f = editedFileAt(events[i]);
+      if (f && ruleWasLoaded(r.paths, [f])) { firstEditIdx = i; break; }
+    }
+    if (firstEditIdx === -1) continue; // the rule governs nothing this session edited
+    // Load triggers that happened STRICTLY BEFORE that edit — the edit itself
+    // loads the nested rule, but the question is whether the agent had it in
+    // context when it DECIDED to edit, i.e. earlier. A Read / earlier Edit / Write
+    // or a single-file Bash view of the rule's folder, before the edit, counts.
+    const before = events.slice(0, firstEditIdx);
+    const loadTriggersBefore = [...touchedPaths(before), ...bashViewedPaths(before)];
+    const dirTouchedBefore = loadTriggersBefore.some((p) => ruleWasLoaded(r.paths!, [p]));
+    const injected = ruleFileInjectedBefore(lines, lines.length, basename(r.sourcePath), lastCompaction);
+    if (!injected && !dirTouchedBefore && !fired.has(r.sourcePath)) {
+      fired.add(r.sourcePath);
+      const why = lastCompaction >= 0 ? "no injection record for it after the last compaction, and nothing opened its folder before the edit" : "no injection record for it, and nothing opened its folder before the edit";
+      out.push({ signal: "edited-rule-not-loaded", evidence: `edited a file governed by "${short(r.title)}" (${basename(r.sourcePath)}), but ${why} — the agent may never have seen this rule` });
+    }
+  }
+  return out;
+}
+
+export function detectShadowSignals(rules: Rule[], events: TranscriptEvent[], transcriptText?: string): ShadowFinding[] {
+  return [
+    ...zeroTests(events),
+    ...claimedActionNoCommand(events),
+    ...envStrict(rules, events),
+    ...approvedInPrompt(events),
+    ...editedRuleNotLoaded(rules, events, transcriptText),
+  ];
 }
 
 /** Advisory lines (printed only when there is a finding). Never a verdict. */

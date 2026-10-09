@@ -209,6 +209,18 @@ function ruleSourcesAtLevel(dir: string, pi: ProjectInstructions = "unknown", ag
     pushAgentsChain();
     return applyImports(out);
   }
+  // Devin Desktop (Windsurf/Codeium stack) loads BOTH AGENTS.md and CLAUDE.md at
+  // each project level — NOT GEMINI.md. Confirmed from a real session's own
+  // always-on <rules> block, which listed the project's AGENTS.md and CLAUDE.md
+  // (and the two globals, read in loadRules) but no GEMINI.md. Its globals are
+  // ~/.claude/CLAUDE.md and ~/.codeium/windsurf/memories/global_rules.md.
+  if (agentTool === "devin") {
+    if (has("CLAUDE.md")) out.push({ path: join(dir, "CLAUDE.md"), status: "loaded", format: "Claude (CLAUDE.md)" });
+    if (has("CLAUDE.local.md")) out.push({ path: join(dir, "CLAUDE.local.md"), status: "loaded", format: "Claude (CLAUDE.local.md)" });
+    if (has("AGENTS.md")) out.push({ path: join(dir, "AGENTS.md"), status: "loaded", format: "AGENTS.md" });
+    if (has("AGENTS.local.md")) out.push({ path: join(dir, "AGENTS.local.md"), status: "loaded", format: "AGENTS (AGENTS.local.md)" });
+    return applyImports(out);
+  }
   const loaded = (rel: string, format: string, note?: string) => {
     if (has(rel)) out.push({ path: join(dir, rel), status: "loaded", format, note });
   };
@@ -419,6 +431,23 @@ const SKIP_DESCEND = new Set([
 // Bounded so scanning a large workspace root can never run away.
 const MAX_DESCEND_DEPTH = 8;
 const MAX_DESCEND_DIRS = 3000;
+// A wall-clock ceiling on top of the dir-count cap: on a slow or networked
+// filesystem even 3000 readdir+stat calls can take many seconds, so the walk also
+// stops after this long. (2026-10-09: a giant repo made the descendant walk the
+// slow part of a rules scan.)
+const MAX_DESCEND_MS = 2000;
+
+/**
+ * Whether the LAST descendant walk stopped early (hit the dir-count or time cap),
+ * and how many directories it scanned. loadRules records this; the CLI surfaces it
+ * so a short scan is reported ("rules scan stopped at N dirs"), never silent —
+ * subfolder rules below the cut are then reported as possibly-missed, not absent.
+ */
+let lastScanStoppedEarly = false;
+let lastScanDirs = 0;
+export function lastRuleScanInfo(): { stoppedEarly: boolean; dirsScanned: number; capDirs: number; capMs: number } {
+  return { stoppedEarly: lastScanStoppedEarly, dirsScanned: lastScanDirs, capDirs: MAX_DESCEND_DIRS, capMs: MAX_DESCEND_MS };
+}
 
 /**
  * Every directory strictly BELOW cwd, bounded. The up-walk (`projectLevels`)
@@ -442,12 +471,19 @@ function descendantLevels(cwd: string): string[] {
   // into one big subtree and starve a sibling's depth-1 CLAUDE.md — the bug this
   // replaces, caught 2026-10-03 when costrr/ and rulereceipt/ were missed from a
   // workspace root.)
+  // Env overrides exist ONLY so the caps are testable without building a 3000-dir
+  // tree or waiting 2s; production uses the constants.
+  const capDirs = Number(process.env.RR_MAX_DESCEND_DIRS) || MAX_DESCEND_DIRS;
+  const capMs = Number(process.env.RR_MAX_DESCEND_MS) || MAX_DESCEND_MS;
   let queue: { dir: string; depth: number }[] = [{ dir: cwd, depth: 0 }];
-  let budget = MAX_DESCEND_DIRS;
+  let budget = capDirs;
+  const deadline = Date.now() + capMs;
+  let stoppedEarly = false;
   while (queue.length > 0 && budget > 0) {
     const next: { dir: string; depth: number }[] = [];
     for (const { dir, depth } of queue) {
       if (budget <= 0) break;
+      if (Date.now() > deadline) { stoppedEarly = true; break; }
       let entries: import("node:fs").Dirent[];
       try {
         entries = readdirSync(dir, { withFileTypes: true });
@@ -464,8 +500,13 @@ function descendantLevels(cwd: string): string[] {
         if (depth + 1 < MAX_DESCEND_DEPTH) next.push({ dir: full, depth: depth + 1 });
       }
     }
+    if (stoppedEarly) break;
     queue = next;
   }
+  // If the dir budget ran out with directories still queued, that is also an early stop.
+  if (budget <= 0 && queue.length > 0) stoppedEarly = true;
+  lastScanStoppedEarly = stoppedEarly;
+  lastScanDirs = out.length;
   return out;
 }
 
@@ -514,6 +555,7 @@ export function loadRules(cwd: string, agentTool = "claude-code"): Rule[] {
   const isClaude = agentTool === "claude-code";
   const isOpenCode = agentTool === "opencode";
   const isCline = agentTool === "cline";
+  const isDevin = agentTool === "devin";
 
   // One file, one set of rules. Globals are read first, so a file reachable
   // both ways keeps its "global" label. Without this, running the check from
@@ -563,6 +605,13 @@ export function loadRules(cwd: string, agentTool = "claude-code"): Rule[] {
       for (const file of markdownFilesIn(base)) read(file, "global");
     }
     read(join(homedir(), ".agents", "AGENTS.md"), "global");
+  } else if (isDevin) {
+    // Devin Desktop globals, confirmed from a real session's always-on <rules>
+    // block: ~/.claude/CLAUDE.md (Claude Code compatibility) and the Codeium
+    // global memory ~/.codeium/windsurf/memories/global_rules.md. NOT ~/.claude/
+    // rules/* or other homes.
+    read(join(homedir(), ".claude", "CLAUDE.md"), "global");
+    read(join(homedir(), ".codeium", "windsurf", "memories", "global_rules.md"), "global");
   }
 
   // /config "Project instructions" is a Claude Code setting; it does not apply to

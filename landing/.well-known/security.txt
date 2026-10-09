@@ -1,0 +1,7 @@
+# RuleReceipt security contact (RFC 9116)
+Contact: https://github.com/rulereceipt/rulereceipt/security/advisories/new
+Contact: mailto:hello@rulereceipt.dev
+Expires: 2027-10-09T00:00:00.000Z
+Preferred-Languages: en
+Canonical: https://rulereceipt.dev/.well-known/security.txt
+Policy: https://github.com/rulereceipt/rulereceipt/blob/main/SECURITY.md

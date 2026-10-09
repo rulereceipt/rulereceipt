@@ -1,7 +1,7 @@
-import { readFileSync, readdirSync, statSync, realpathSync, existsSync } from "node:fs";
+import { readFileSync, readdirSync, statSync, realpathSync, existsSync, openSync, readSync, closeSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, dirname, basename, sep, isAbsolute } from "node:path";
-import { parseTranscriptText } from "./transcriptLine.js";
+import { parseTranscriptText, parseLine } from "./transcriptLine.js";
 import type { TranscriptEvent } from "../types.js";
 
 /**
@@ -211,9 +211,144 @@ export { parseLine } from "./transcriptLine.js";
  * not a failure.
  */
 export function readTranscriptFromFile(filePath: string): TranscriptEvent[] {
-  // Pure parsing (including permission-mode tracking) lives in transcriptLine.ts
-  // so the browser demo can run the exact same logic on a dropped file.
-  return parseTranscriptText(readFileSync(filePath, "utf-8"));
+  return readTranscriptWithCoverage(filePath).events;
+}
+
+/**
+ * How much of a session was actually read, and whether it was cut short.
+ *
+ * `readFileSync` on a real 262 MB session hangs `check`/`report` (a quarter-gig
+ * string, then `.split("\n")` on it). Real incident 2026-10-09: 60–262 MB
+ * transcripts on a dev laptop. So the reader STREAMS the file in bounded chunks
+ * and stops at a byte OR time budget — bounded memory, bounded time, never a
+ * hang. When it stops early, `truncated` is true and the verdict layer must treat
+ * the unread tail as "couldn't tell", NEVER as Followed (a PASS over a prefix is
+ * not a PASS over the session). See cli.ts, which downgrades on `truncated`.
+ */
+export interface TranscriptCoverage {
+  events: TranscriptEvent[];
+  /** True when the byte/time budget stopped the read before EOF. */
+  truncated: boolean;
+  /** Bytes actually read and parsed. */
+  bytesRead: number;
+  /** Total size of the file on disk. */
+  totalBytes: number;
+}
+
+// A generous ceiling: typical sessions are KB–low-MB; this bounds the pathological
+// case without cutting a normal session short.
+const DEFAULT_MAX_TRANSCRIPT_BYTES = 64 * 1024 * 1024;
+// Env override exists ONLY so the budget is testable with a tiny file; production
+// uses the 64 MB default. Read lazily so a test can set it per-case.
+export function maxTranscriptBytes(): number {
+  const n = Number(process.env.RR_MAX_TRANSCRIPT_BYTES);
+  return Number.isFinite(n) && n > 0 ? n : DEFAULT_MAX_TRANSCRIPT_BYTES;
+}
+/** Back-compat constant for display; the live budget is maxTranscriptBytes(). */
+export const MAX_TRANSCRIPT_BYTES = DEFAULT_MAX_TRANSCRIPT_BYTES;
+const READ_CHUNK = 1 << 20; // 1 MiB
+const DEFAULT_TIME_BUDGET_MS = 10_000;
+
+/**
+ * Stream a JSONL transcript line by line with bounded memory, stopping at a byte
+ * or wall-clock budget. Replicates parseTranscriptText's permission-mode tracking
+ * per line, so a streamed read and a whole-string read agree on a small file.
+ */
+export function readTranscriptWithCoverage(
+  filePath: string,
+  opts: { maxBytes?: number; timeBudgetMs?: number } = {}
+): TranscriptCoverage {
+  const maxBytes = opts.maxBytes ?? maxTranscriptBytes();
+  const timeBudgetMs = opts.timeBudgetMs ?? DEFAULT_TIME_BUDGET_MS;
+  let totalBytes = 0;
+  try { totalBytes = statSync(filePath).size; } catch { /* unreadable -> 0 */ }
+
+  // Small files: the whole-string path keeps the exact, long-tested behaviour.
+  if (totalBytes <= maxBytes) {
+    let raw = "";
+    try { raw = readFileSync(filePath, "utf-8"); } catch { return { events: [], truncated: false, bytesRead: 0, totalBytes }; }
+    return { events: parseTranscriptText(raw), truncated: false, bytesRead: Buffer.byteLength(raw), totalBytes };
+  }
+
+  // Large file: stream, bounded.
+  const events: TranscriptEvent[] = [];
+  let mode: string | undefined;
+  let bytesRead = 0;
+  let truncated = false;
+  const started = Date.now();
+  const processLine = (line: string): void => {
+    if (!line.trim()) return;
+    const m =
+      line.match(/"(?:permissionMode|permission_mode)":"([A-Za-z]+)"/) ??
+      (line.includes('"permission-mode"') ? line.match(/"mode":"([A-Za-z]+)"/) : null);
+    if (m) mode = m[1];
+    const parsed = parseLine(line);
+    if (mode) for (const e of parsed) if (e.kind === "tool_use") e.permissionMode = mode;
+    for (const e of parsed) events.push(e);
+  };
+
+  let fd: number | undefined;
+  try {
+    fd = openSync(filePath, "r");
+    const buf = Buffer.allocUnsafe(READ_CHUNK);
+    let carry = "";
+    for (;;) {
+      if (bytesRead >= maxBytes) { truncated = true; break; }
+      if (Date.now() - started > timeBudgetMs) { truncated = true; break; }
+      // Read at most the remaining budget, so the read stops PRECISELY at maxBytes
+      // rather than overshooting by up to one chunk (which would read a whole
+      // sub-chunk file even past the budget).
+      const want = Math.min(READ_CHUNK, maxBytes - bytesRead);
+      const n = readSync(fd, buf, 0, want, null);
+      if (n === 0) break; // EOF
+      bytesRead += n;
+      const text = carry + buf.toString("utf-8", 0, n);
+      const lines = text.split("\n");
+      carry = lines.pop() ?? ""; // last element is a partial line (or "")
+      for (const line of lines) processLine(line);
+    }
+    // A clean EOF (not truncated) leaves a final line with no trailing newline.
+    if (!truncated && carry) processLine(carry);
+  } catch {
+    /* partial read: return what we parsed, marked truncated below if applicable */
+  } finally {
+    if (fd !== undefined) try { closeSync(fd); } catch { /* ignore */ }
+  }
+  if (bytesRead < totalBytes) truncated = true;
+  return { events, truncated, bytesRead, totalBytes };
+}
+
+/**
+ * Read a session file's RAW TEXT, bounded to `maxBytes`. Used for the context
+ * scans (breakContext/visibility/shadow signals) that need the raw JSONL, not the
+ * parsed events — those previously did `readFileSync` of the whole file, which
+ * hung on a 262 MB session just like the parser did. `truncated` lets the caller
+ * say the scan only covered the first N bytes.
+ */
+export function readBoundedText(filePath: string, maxBytes = maxTranscriptBytes()): { text: string; truncated: boolean; totalBytes: number } {
+  let totalBytes = 0;
+  try { totalBytes = statSync(filePath).size; } catch { return { text: "", truncated: false, totalBytes: 0 }; }
+  if (totalBytes <= maxBytes) {
+    try { return { text: readFileSync(filePath, "utf-8"), truncated: false, totalBytes }; } catch { return { text: "", truncated: false, totalBytes }; }
+  }
+  let fd: number | undefined;
+  try {
+    fd = openSync(filePath, "r");
+    const buf = Buffer.allocUnsafe(maxBytes);
+    const n = readSync(fd, buf, 0, maxBytes, 0);
+    return { text: buf.toString("utf-8", 0, n), truncated: true, totalBytes };
+  } catch {
+    return { text: "", truncated: true, totalBytes };
+  } finally {
+    if (fd !== undefined) try { closeSync(fd); } catch { /* ignore */ }
+  }
+}
+
+/** Coverage for a session file without re-parsing it (statSync vs the budget). */
+export function transcriptCoverage(filePath: string, maxBytes = maxTranscriptBytes()): { truncated: boolean; bytesRead: number; totalBytes: number } {
+  let totalBytes = 0;
+  try { totalBytes = statSync(filePath).size; } catch { return { truncated: false, bytesRead: 0, totalBytes: 0 }; }
+  return totalBytes > maxBytes ? { truncated: true, bytesRead: maxBytes, totalBytes } : { truncated: false, bytesRead: totalBytes, totalBytes };
 }
 
 /**
