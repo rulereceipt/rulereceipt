@@ -8,6 +8,7 @@ import { listGeminiSessions, parseGeminiTranscript, geminiFormatIsKnown } from "
 import { listCursorSessions, parseCursorTranscript, cursorFormatIsKnown } from "./cursor.js";
 import { listOpenCodeSessions, parseOpenCodeTranscript, openCodeFormatIsKnown } from "./opencode.js";
 import { listAntigravitySessions, parseAntigravityTranscript, antigravityFormatIsKnown } from "./antigravity.js";
+import { listClineSessions, parseClineTranscript, clineFormatIsKnown } from "./cline.js";
 
 /**
  * A session adapter turns one coding agent's on-disk session log into the
@@ -120,8 +121,22 @@ export const antigravityAdapter: SessionAdapter = {
   parse: (sessionFile) => parseAntigravityTranscript(sessionFile),
 };
 
+/**
+ * Cline (CLI, provider "cline") — reader validated against a real session
+ * (cli v3.0.70, 2026-10-09): ~/.cline/data/sessions/<id>/<id>.json meta +
+ * <id>.messages.json transcript. ask_question → the user's selection is mapped
+ * as their approval (like Copilot's ask-user), so an authorised push reads as
+ * Followed. Held pending Shilpa's validation. Read-only; never opens settings/,
+ * providers.json, oauth, or the db/*.db stores. See adapters/cline.ts.
+ */
+export const clineAdapter: SessionAdapter = {
+  tool: "cline",
+  listSessions: (cwd) => listClineSessions(cwd),
+  parse: (sessionFile) => parseClineTranscript(sessionFile),
+};
+
 /** Adapters with a verified, tested parser — these auto-detect the newest session. */
-export const ADAPTERS: SessionAdapter[] = [claudeCodeAdapter, codexAdapter, copilotCliAdapter, cursorAdapter, antigravityAdapter, openCodeAdapter];
+export const ADAPTERS: SessionAdapter[] = [claudeCodeAdapter, codexAdapter, copilotCliAdapter, cursorAdapter, antigravityAdapter, openCodeAdapter, clineAdapter];
 
 /** Experimental adapters: reader exists, awaiting real+planted+clean fixtures. */
 export const EXPERIMENTAL_ADAPTERS: SessionAdapter[] = [geminiCliAdapter];
@@ -243,6 +258,10 @@ export function parseSessionFile(file: string): TranscriptEvent[] {
   } catch {
     /* first line is not JSON: treat as a Claude transcript below */
   }
+  // Cline: a session meta `{provider:"cline", messages_path}` or a messages file
+  // `{sessionId, messages:[…]}`. Checked BEFORE Gemini — both are `{messages:[…]}`
+  // JSON — so a Cline transcript is not mis-read as Gemini.
+  if (clineFormatIsKnown(file)) return parseClineTranscript(file);
   // Gemini CLI: a `{messages:[...]}` JSON or JSONL of `type:'gemini'|'user'`
   // records (with their own `content`, unlike Claude's `message.content`).
   // Confirmed by a known-format check so a Claude/other log is never mis-read.

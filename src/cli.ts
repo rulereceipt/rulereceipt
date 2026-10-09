@@ -13,6 +13,7 @@ import { copilotFormatIsKnown, workspaceCwd as copilotWorkspaceCwd } from "./ada
 import { cursorFormatIsKnown, cursorSessionCwd } from "./adapters/cursor.js";
 import { antigravityFormatIsKnown, antigravitySessionCwd } from "./adapters/antigravity.js";
 import { openCodeFormatIsKnown, openCodeSessionCwd } from "./adapters/opencode.js";
+import { clineFormatIsKnown, clineSessionCwd } from "./adapters/cline.js";
 import { loadRules } from "./rules.js";
 import { adviseRules } from "./checkability.js";
 import { shadowedAgentsMd } from "./shadowedAgents.js";
@@ -272,6 +273,11 @@ async function runCheck(opts: CheckOptions) {
       // OpenCode: cwd is the session's `directory` (db row or session JSON).
       agentTool = "opencode";
       const cc = openCodeSessionCwd(transcriptOverride);
+      if (cc && existsSync(cc)) cwd = cc;
+    } else if (clineFormatIsKnown(transcriptOverride)) {
+      // Cline: cwd is the session meta's `cwd`/`workspace_root`.
+      agentTool = "cline";
+      const cc = clineSessionCwd(transcriptOverride);
       if (cc && existsSync(cc)) cwd = cc;
     } else {
       const claudeCwd = sessionCwdOf(transcriptOverride);

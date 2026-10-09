@@ -189,6 +189,26 @@ function ruleSourcesAtLevel(dir: string, pi: ProjectInstructions = "unknown", ag
     }
     return applyImports(out);
   }
+
+  // Cline reads .clinerules (a single file OR a .clinerules/ directory), the
+  // .cline/rules/ directory, the legacy .cursorrules / .windsurfrules files, and
+  // AGENTS.md — NOT CLAUDE.md or GEMINI.md (verified against docs.cline.bot and a
+  // real cli v3.0.70 session, which loaded AGENTS.md and only READ CLAUDE.md /
+  // GEMINI.md as files, never as rules). Its global rules dirs are read in loadRules.
+  if (agentTool === "cline") {
+    const clinerules = join(dir, ".clinerules");
+    if (has(".clinerules")) {
+      let isDir = false;
+      try { isDir = statSync(clinerules).isDirectory(); } catch { /* treat as file */ }
+      if (isDir) { for (const f of markdownFilesIn(clinerules)) out.push({ path: f, status: "loaded", format: "Cline (.clinerules)" }); }
+      else out.push({ path: clinerules, status: "loaded", format: "Cline (.clinerules)" });
+    }
+    for (const f of markdownFilesIn(join(dir, ".cline", "rules"))) out.push({ path: f, status: "loaded", format: "Cline (.cline/rules)" });
+    if (has(".cursorrules")) out.push({ path: join(dir, ".cursorrules"), status: "loaded", format: "Cline (.cursorrules)" });
+    if (has(".windsurfrules")) out.push({ path: join(dir, ".windsurfrules"), status: "loaded", format: "Cline (.windsurfrules)" });
+    pushAgentsChain();
+    return applyImports(out);
+  }
   const loaded = (rel: string, format: string, note?: string) => {
     if (has(rel)) out.push({ path: join(dir, rel), status: "loaded", format, note });
   };
@@ -493,6 +513,7 @@ export function loadRules(cwd: string, agentTool = "claude-code"): Rule[] {
   const isCodex = agentTool === "codex";
   const isClaude = agentTool === "claude-code";
   const isOpenCode = agentTool === "opencode";
+  const isCline = agentTool === "cline";
 
   // One file, one set of rules. Globals are read first, so a file reachable
   // both ways keeps its "global" label. Without this, running the check from
@@ -534,6 +555,14 @@ export function loadRules(cwd: string, agentTool = "claude-code"): Rule[] {
     if (!/^(1|true|yes)$/i.test(process.env.OPENCODE_DISABLE_CLAUDE_CODE ?? "")) {
       read(join(homedir(), ".claude", "CLAUDE.md"), "global");
     }
+  } else if (isCline) {
+    // Cline globals (docs.cline.bot): the user Rules directories ~/Documents/Cline/
+    // Rules, ~/.cline/rules, ~/Cline/Rules, plus ~/.agents/AGENTS.md for cross-tool
+    // compatibility. NOT ~/.claude — Cline does not read Claude Code's global rules.
+    for (const base of [join(homedir(), "Documents", "Cline", "Rules"), join(homedir(), ".cline", "rules"), join(homedir(), "Cline", "Rules")]) {
+      for (const file of markdownFilesIn(base)) read(file, "global");
+    }
+    read(join(homedir(), ".agents", "AGENTS.md"), "global");
   }
 
   // /config "Project instructions" is a Claude Code setting; it does not apply to
