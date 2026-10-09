@@ -66,6 +66,17 @@ describe("GET", () => {
     expect(statusCode()).toBe(429);
     expect(jsonBody()).toEqual({ error: "rate limit exceeded, try again later" });
   });
+
+  // Security fix 2026-10-09: a forged, rotating leftmost x-forwarded-for must NOT
+  // escape the rate limit. With x-real-ip constant, all requests share one bucket.
+  it("a rotating forged x-forwarded-for does not bypass the limit when x-real-ip is constant", async () => {
+    for (let i = 0; i < 60; i++) {
+      await handler(mockReq({ method: "GET", headers: { "x-real-ip": "9.9.9.9", "x-forwarded-for": `1.2.3.${i}, 9.9.9.9` } }), mockRes().res);
+    }
+    const { res, statusCode } = mockRes();
+    await handler(mockReq({ method: "GET", headers: { "x-real-ip": "9.9.9.9", "x-forwarded-for": "1.2.3.254, 9.9.9.9" } }), res);
+    expect(statusCode()).toBe(429); // still limited — the forged leftmost token was ignored
+  });
 });
 
 describe("unsupported methods", () => {
