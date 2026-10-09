@@ -14,8 +14,9 @@ vi.mock("@upstash/redis", () => ({
 
 process.env.KV_REST_API_URL = "https://fake.upstash.io";
 process.env.KV_REST_API_TOKEN = "fake-token";
+process.env.UNSUBSCRIBE_HMAC_SECRET = "test-unsubscribe-secret-0123456789";
 
-const { default: handler } = await import("./unsubscribe.js");
+const { default: handler, unsubscribeToken } = await import("./unsubscribe.js");
 
 beforeEach(() => {
   redisInstance._store.clear();
@@ -73,41 +74,66 @@ describe("POST validation", () => {
 
   it("returns 429 once the rate limit (10/hr) is exceeded", async () => {
     for (let i = 0; i < 10; i++) {
-      await handler(mockReq({ method: "POST", body: { email: `x${i}@example.com` } }), mockRes().res);
+      await handler(mockReq({ method: "POST", body: { email: `x${i}@example.com`, token: unsubscribeToken(`x${i}@example.com`) } }), mockRes().res);
     }
     const { res, statusCode } = mockRes();
-    await handler(mockReq({ method: "POST", body: { email: "one-too-many@example.com" } }), res);
+    await handler(mockReq({ method: "POST", body: { email: "one-too-many@example.com", token: unsubscribeToken("one-too-many@example.com") } }), res);
     expect(statusCode()).toBe(429);
   });
 });
 
-describe("POST success — real removal", () => {
-  it("actually removes a previously-signed-up email from the Redis set", async () => {
+describe("POST success — real removal (requires the email's valid HMAC token)", () => {
+  it("removes a previously-signed-up email when the token is valid", async () => {
     await redisInstance.sadd("rulereceipt:signups", "real.user@example.com");
     expect(redisInstance._sets.get("rulereceipt:signups")?.has("real.user@example.com")).toBe(true);
 
     const { res, statusCode, jsonBody } = mockRes();
-    await handler(mockReq({ method: "POST", body: { email: "  Real.User@Example.com  " } }), res);
+    // Token generated for the normalized form; the submitted email has padding/case.
+    await handler(mockReq({ method: "POST", body: { email: "  Real.User@Example.com  ", token: unsubscribeToken("real.user@example.com") } }), res);
 
     expect(statusCode()).toBe(200);
     expect(jsonBody()).toEqual({ ok: true });
     expect(redisInstance._sets.get("rulereceipt:signups")?.has("real.user@example.com")).toBe(false);
   });
 
-  it("returns { ok: true } even for an email that was never on the list (no enumeration oracle)", async () => {
+  it("returns { ok: true } for an email never on the list, with a valid token (no oracle)", async () => {
     const { res, statusCode, jsonBody } = mockRes();
-    await handler(mockReq({ method: "POST", body: { email: "never-signed-up@example.com" } }), res);
+    await handler(mockReq({ method: "POST", body: { email: "never@example.com", token: unsubscribeToken("never@example.com") } }), res);
     expect(statusCode()).toBe(200);
     expect(jsonBody()).toEqual({ ok: true });
   });
+});
 
-  it("does not remove unrelated emails from the set", async () => {
+describe("POST security — no token means no removal (the 'anyone can unsubscribe anyone' fix)", () => {
+  it("does NOT remove when the token is absent, and still returns { ok: true } (uniform, no oracle)", async () => {
+    await redisInstance.sadd("rulereceipt:signups", "victim@example.com");
+    const { res, statusCode, jsonBody } = mockRes();
+    await handler(mockReq({ method: "POST", body: { email: "victim@example.com" } }), res); // no token
+    expect(statusCode()).toBe(200);
+    expect(jsonBody()).toEqual({ ok: true });
+    expect(redisInstance._sets.get("rulereceipt:signups")?.has("victim@example.com")).toBe(true); // NOT removed
+  });
+
+  it("does NOT remove with a forged/wrong token", async () => {
+    await redisInstance.sadd("rulereceipt:signups", "victim@example.com");
+    const { res, statusCode } = mockRes();
+    await handler(mockReq({ method: "POST", body: { email: "victim@example.com", token: "0".repeat(64) } }), res);
+    expect(statusCode()).toBe(200);
+    expect(redisInstance._sets.get("rulereceipt:signups")?.has("victim@example.com")).toBe(true); // NOT removed
+  });
+
+  it("does NOT remove with a token minted for a DIFFERENT email", async () => {
+    await redisInstance.sadd("rulereceipt:signups", "victim@example.com");
+    const { res } = mockRes();
+    await handler(mockReq({ method: "POST", body: { email: "victim@example.com", token: unsubscribeToken("attacker@example.com") } }), res);
+    expect(redisInstance._sets.get("rulereceipt:signups")?.has("victim@example.com")).toBe(true); // NOT removed
+  });
+
+  it("does not touch unrelated emails even with a valid token for the target", async () => {
     await redisInstance.sadd("rulereceipt:signups", "keep-me@example.com");
     await redisInstance.sadd("rulereceipt:signups", "remove-me@example.com");
-
     const { res } = mockRes();
-    await handler(mockReq({ method: "POST", body: { email: "remove-me@example.com" } }), res);
-
+    await handler(mockReq({ method: "POST", body: { email: "remove-me@example.com", token: unsubscribeToken("remove-me@example.com") } }), res);
     expect(redisInstance._sets.get("rulereceipt:signups")?.has("keep-me@example.com")).toBe(true);
     expect(redisInstance._sets.get("rulereceipt:signups")?.has("remove-me@example.com")).toBe(false);
   });

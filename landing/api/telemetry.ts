@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "./vercel-types.js";
-import { Redis } from "@upstash/redis";
+import { redis, rateLimited, withRedis, tooLarge } from "./_shared.js";
 
 // Receives only a random, non-identifying per-install ID from `rulereceipt
 // check` (unless the user opted out via --no-telemetry / DO_NOT_TRACK /
@@ -8,41 +8,12 @@ import { Redis } from "@upstash/redis";
 // month-bucketed Redis Set so SCARD gives a real distinct-installs count,
 // not just an event count.
 
-const redis = new Redis({
-  url: process.env.KV_REST_API_URL!,
-  token: process.env.KV_REST_API_TOKEN!,
-});
-
 // UUIDs are 36 chars; a little slack for older/future ID formats without
 // accepting arbitrary junk as a Redis set member.
 const ID_SHAPE = /^[A-Za-z0-9-]{8,64}$/;
 
 function isValidId(id: unknown): id is string {
   return typeof id === "string" && ID_SHAPE.test(id);
-}
-
-function clientIp(req: VercelRequest): string {
-  // Vercel sets x-real-ip to the true client IP and OVERWRITES any caller value,
-  // so it can't be spoofed to dodge the rate limit. Prefer it. Fall back to the
-  // RIGHTMOST x-forwarded-for entry (appended by the trusted proxy), NEVER the
-  // leftmost — the leftmost is caller-controlled, so keying on it let an attacker
-  // rotate buckets with a forged header and bypass the limit entirely.
-  const real = req.headers["x-real-ip"];
-  const realIp = (Array.isArray(real) ? real[0] : real)?.trim();
-  if (realIp) return realIp;
-  const fwd = req.headers["x-forwarded-for"];
-  const fwdStr = Array.isArray(fwd) ? fwd[fwd.length - 1] : fwd;
-  const parts = (fwdStr ?? "").split(",").map((s) => s.trim()).filter(Boolean);
-  return parts.length ? parts[parts.length - 1] : "unknown";
-}
-
-async function rateLimited(req: VercelRequest, bucket: string, max: number): Promise<boolean> {
-  const key = `rulereceipt:ratelimit:${bucket}:${clientIp(req)}`;
-  const count = await redis.incr(key);
-  if (count === 1) {
-    await redis.expire(key, 3600);
-  }
-  return count > max;
 }
 
 function currentMonthKey(): string {
@@ -60,19 +31,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  const contentLength = Number(req.headers["content-length"] ?? 0);
-  if (contentLength > 2048) {
+  if (tooLarge(req)) {
     res.status(413).json({ error: "payload too large" });
     return;
   }
 
   if (req.method === "GET") {
-    if (await rateLimited(req, "telemetry-get", 60)) {
+    let limited = false;
+    let count = 0;
+    if (!(await withRedis(res, async () => {
+      limited = await rateLimited(req, "telemetry-get", 60);
+      if (!limited) count = (await redis.scard(currentMonthKey())) ?? 0;
+    }))) return;
+    if (limited) {
       res.status(429).json({ error: "rate limit exceeded, try again later" });
       return;
     }
-    const count = await redis.scard(currentMonthKey());
-    res.status(200).json({ unique_installs_this_month: count ?? 0 });
+    res.status(200).json({ unique_installs_this_month: count });
     return;
   }
 
@@ -81,7 +56,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  if (await rateLimited(req, "telemetry-post", 30)) {
+  let limited = false;
+  if (!(await withRedis(res, async () => { limited = await rateLimited(req, "telemetry-post", 30); }))) return;
+  if (limited) {
     res.status(429).json({ error: "rate limit exceeded, try again later" });
     return;
   }
@@ -94,6 +71,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  await redis.sadd(currentMonthKey(), id);
+  if (!(await withRedis(res, async () => { await redis.sadd(currentMonthKey(), id); }))) return;
   res.status(200).json({ ok: true });
 }

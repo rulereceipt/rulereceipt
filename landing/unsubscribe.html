@@ -67,7 +67,7 @@
   <div class="wrap">
     <a class="back" href="/">&larr; RuleReceipt</a>
     <h1>Unsubscribe</h1>
-    <p>Type the email you signed up with. It will be removed from our list immediately — no confirmation email, no further contact.</p>
+    <p>Use the unsubscribe link from one of our emails and click the button below — you'll be removed immediately, no further contact. If you reached this page without that link, email <a href="mailto:hello@rulereceipt.dev">hello@rulereceipt.dev</a> and we'll remove you right away.</p>
 
     <form id="unsub-form">
       <input type="email" id="unsub-email" placeholder="you@example.com" required>
@@ -81,41 +81,54 @@
   </div>
 
 <script>
-  var form = document.getElementById('unsub-form');
-  form.addEventListener('submit', function (e) {
-    e.preventDefault();
+  (function () {
+    var params = new URLSearchParams(location.search);
+    var urlEmail = params.get('email') || '';
+    var token = params.get('token') || '';
+    var form = document.getElementById('unsub-form');
     var emailInput = document.getElementById('unsub-email');
     var note = document.getElementById('unsub-note');
     var button = form.querySelector('button');
-    var email = emailInput.value.trim();
+    if (urlEmail) emailInput.value = urlEmail;
 
-    button.disabled = true;
-    note.textContent = '';
-    note.className = 'note';
+    function show(msg, cls) { note.textContent = msg; note.className = 'note ' + cls; }
 
-    fetch('/api/unsubscribe', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: email }),
-    })
-      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
-      .then(function (result) {
-        button.disabled = false;
-        if (!result.ok) {
-          note.textContent = result.data.error || 'Something went wrong. Try again.';
-          note.className = 'note err';
-          return;
-        }
-        note.textContent = "Done — you've been removed.";
-        note.className = 'note ok';
-        emailInput.value = '';
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var email = emailInput.value.trim();
+
+      // Removal needs the per-email token that only the email's unsubscribe link
+      // carries. Without it the server removes nothing, so don't pretend it did —
+      // point the person at the secure link or email instead.
+      if (!token) {
+        show('To remove you automatically we need the secure link from one of our emails. Please email hello@rulereceipt.dev and we will remove you right away.', 'err');
+        return;
+      }
+
+      button.disabled = true;
+      show('', '');
+
+      fetch('/api/unsubscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email, token: token }),
       })
-      .catch(function () {
-        button.disabled = false;
-        note.textContent = 'Could not reach the server. Try again, or email hello@rulereceipt.dev directly.';
-        note.className = 'note err';
-      });
-  });
+        .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
+        .then(function (result) {
+          button.disabled = false;
+          if (!result.ok) {
+            show(result.data.error || 'Something went wrong. Try again.', 'err');
+            return;
+          }
+          show("Done — you've been removed.", 'ok');
+          emailInput.value = '';
+        })
+        .catch(function () {
+          button.disabled = false;
+          show('Could not reach the server. Try again, or email hello@rulereceipt.dev directly.', 'err');
+        });
+    });
+  })();
 </script>
 </body>
 </html>

@@ -61,6 +61,10 @@ export function createMockRedis() {
       return next;
     }),
     expire: vi.fn(async () => 1),
+    // Pretend keys already carry a TTL, so the rateLimited() TTL-guard's extra
+    // branch is a no-op in tests; the count logic (what the tests assert) is
+    // unaffected either way.
+    ttl: vi.fn(async () => 100),
     incrby: vi.fn(async (key: string, amount: number) => {
       const next = (store.get(key) ?? 0) + amount;
       store.set(key, next);

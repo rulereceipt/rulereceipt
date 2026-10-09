@@ -1,48 +1,12 @@
 import type { VercelRequest, VercelResponse } from "./vercel-types.js";
-import { Redis } from "@upstash/redis";
+import { redis, rateLimited, withRedis, tooLarge } from "./_shared.js";
 
 // Opt-in usage counter. Receives only aggregate PASS/FAIL/UNCLEAR counts from
 // `rulereceipt check --share` — never rule text, file paths, or session content.
 // The CLI makes zero network calls unless the user explicitly passes --share.
 
-// Vercel's marketplace Redis connector sets KV_-prefixed vars, not the
-// UPSTASH_REDIS_REST_* names Redis.fromEnv() looks for — confirmed via
-// `vercel env ls` against the real connected database, not assumed.
-const redis = new Redis({
-  url: process.env.KV_REST_API_URL!,
-  token: process.env.KV_REST_API_TOKEN!,
-});
-
 function isCount(value: unknown): value is number {
   return typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= 1000;
-}
-
-function clientIp(req: VercelRequest): string {
-  // Vercel sets x-real-ip to the true client IP and OVERWRITES any caller value,
-  // so it can't be spoofed to dodge the rate limit. Prefer it. Fall back to the
-  // RIGHTMOST x-forwarded-for entry (appended by the trusted proxy), NEVER the
-  // leftmost — the leftmost is caller-controlled, so keying on it let an attacker
-  // rotate buckets with a forged header and bypass the limit entirely.
-  const real = req.headers["x-real-ip"];
-  const realIp = (Array.isArray(real) ? real[0] : real)?.trim();
-  if (realIp) return realIp;
-  const fwd = req.headers["x-forwarded-for"];
-  const fwdStr = Array.isArray(fwd) ? fwd[fwd.length - 1] : fwd;
-  const parts = (fwdStr ?? "").split(",").map((s) => s.trim()).filter(Boolean);
-  return parts.length ? parts[parts.length - 1] : "unknown";
-}
-
-// Fixed-window rate limit, keyed by IP, stored in the same Redis instance.
-// Generous enough for real repeated use (many `check --share` runs a day),
-// tight enough to block scripted counter inflation. Confirmed via the
-// security audit that the endpoint had zero throttling before this.
-async function rateLimited(req: VercelRequest, bucket: string, max: number): Promise<boolean> {
-  const key = `rulereceipt:ratelimit:${bucket}:${clientIp(req)}`;
-  const count = await redis.incr(key);
-  if (count === 1) {
-    await redis.expire(key, 3600);
-  }
-  return count > max;
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -55,29 +19,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  const contentLength = Number(req.headers["content-length"] ?? 0);
-  if (contentLength > 2048) {
+  if (tooLarge(req)) {
     res.status(413).json({ error: "payload too large" });
     return;
   }
 
   if (req.method === "GET") {
-    if (await rateLimited(req, "get", 60)) {
+    let limited = false;
+    let out = { total_runs: 0, total_pass: 0, total_fail: 0, total_unclear: 0 };
+    if (!(await withRedis(res, async () => {
+      limited = await rateLimited(req, "get", 60);
+      if (limited) return;
+      const [runs, pass, fail, unclear] = await Promise.all([
+        redis.get<number>("rulereceipt:total_runs"),
+        redis.get<number>("rulereceipt:total_pass"),
+        redis.get<number>("rulereceipt:total_fail"),
+        redis.get<number>("rulereceipt:total_unclear"),
+      ]);
+      out = { total_runs: runs ?? 0, total_pass: pass ?? 0, total_fail: fail ?? 0, total_unclear: unclear ?? 0 };
+    }))) return;
+    if (limited) {
       res.status(429).json({ error: "rate limit exceeded, try again later" });
       return;
     }
-    const [runs, pass, fail, unclear] = await Promise.all([
-      redis.get<number>("rulereceipt:total_runs"),
-      redis.get<number>("rulereceipt:total_pass"),
-      redis.get<number>("rulereceipt:total_fail"),
-      redis.get<number>("rulereceipt:total_unclear"),
-    ]);
-    res.status(200).json({
-      total_runs: runs ?? 0,
-      total_pass: pass ?? 0,
-      total_fail: fail ?? 0,
-      total_unclear: unclear ?? 0,
-    });
+    res.status(200).json(out);
     return;
   }
 
@@ -86,7 +51,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  if (await rateLimited(req, "post", 20)) {
+  let limited = false;
+  if (!(await withRedis(res, async () => { limited = await rateLimited(req, "post", 20); }))) return;
+  if (limited) {
     res.status(429).json({ error: "rate limit exceeded, try again later" });
     return;
   }
@@ -99,12 +66,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  await Promise.all([
-    redis.incr("rulereceipt:total_runs"),
-    redis.incrby("rulereceipt:total_pass", pass),
-    redis.incrby("rulereceipt:total_fail", fail),
-    redis.incrby("rulereceipt:total_unclear", unclear),
-  ]);
+  if (!(await withRedis(res, async () => {
+    await Promise.all([
+      redis.incr("rulereceipt:total_runs"),
+      redis.incrby("rulereceipt:total_pass", pass),
+      redis.incrby("rulereceipt:total_fail", fail),
+      redis.incrby("rulereceipt:total_unclear", unclear),
+    ]);
+  }))) return;
 
   res.status(200).json({ ok: true });
 }

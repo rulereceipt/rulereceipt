@@ -13,7 +13,7 @@
         { "key": "Cross-Origin-Resource-Policy", "value": "same-origin" },
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'sha256-QQoqnnwzjzSOtfP4rF8/9bdTtQ7vIXPf7XpW/7i26gg=' 'sha256-39NmTXT8olampPS7lAKVNIi/Qj5/EDOX9hjmvdnxgnU=' 'sha256-ID47MKoOKB4rCrV0cKqh5KOcSrib4T51h5qvYSSSeKE=' 'sha256-uQfZR871MPEGACkDnnsFl+S+iMmmpBtJxJ8nlaWG3kM=' 'sha256-UPMu/PWRJ/2EmDk9HIqIqFI7xIkIc+jDu8NqXqTBfE0=' 'sha256-pi1exb57CVuzsZ2YOUU1VVnLO18dDAR4mWvYStbdZPA=' 'sha256-LW9tJtXrMeRupIkBSBuRLQIa4K+uKKYsNKCr2m7U8BY=' https://us-assets.i.posthog.com; connect-src 'self' https://us.i.posthog.com https://rulereceipt.dev; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+          "value": "default-src 'self'; script-src 'self' 'sha256-QQoqnnwzjzSOtfP4rF8/9bdTtQ7vIXPf7XpW/7i26gg=' 'sha256-39NmTXT8olampPS7lAKVNIi/Qj5/EDOX9hjmvdnxgnU=' 'sha256-ID47MKoOKB4rCrV0cKqh5KOcSrib4T51h5qvYSSSeKE=' 'sha256-uQfZR871MPEGACkDnnsFl+S+iMmmpBtJxJ8nlaWG3kM=' 'sha256-UPMu/PWRJ/2EmDk9HIqIqFI7xIkIc+jDu8NqXqTBfE0=' 'sha256-pi1exb57CVuzsZ2YOUU1VVnLO18dDAR4mWvYStbdZPA=' 'sha256-9qAhM70iKDr2WoA0y1w7Y2YGP5Avma056A6yRojVVOM=' https://us-assets.i.posthog.com; connect-src 'self' https://us.i.posthog.com https://rulereceipt.dev; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
         }
       ]
     }

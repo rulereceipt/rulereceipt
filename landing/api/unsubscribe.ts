@@ -1,15 +1,18 @@
 import type { VercelRequest, VercelResponse } from "./vercel-types.js";
-import { Redis } from "@upstash/redis";
+import { createHmac, timingSafeEqual } from "node:crypto";
+import { redis, rateLimited, withRedis, tooLarge } from "./_shared.js";
 
-// Removes an email from the same signup list /api/signup.ts adds to
-// (rulereceipt:signups). This is the real, automated deletion path referenced
-// in privacy.html — without it, removal could only ever happen by someone
-// manually running a Redis command by hand.
-
-const redis = new Redis({
-  url: process.env.KV_REST_API_URL!,
-  token: process.env.KV_REST_API_TOKEN!,
-});
+// Removes an email from the signup list /api/signup.ts adds to
+// (rulereceipt:signups) — the automated deletion path referenced in privacy.html.
+//
+// Security (2026-10-09): removal now requires a per-email HMAC token that only
+// the recipient's own unsubscribe link carries. Before this, anyone who knew (or
+// harvested) an address could POST it and silently remove that person. The token
+// is HMAC-SHA256(secret, normalized-email); the secret lives only in the Vercel
+// env (UNSUBSCRIBE_HMAC_SECRET, production), never in the repo. A request with no
+// valid token removes NOTHING, and the response is uniform either way so it is
+// still not an enumeration oracle. Old links with no token are handled by the
+// confirm page (unsubscribe.html), which routes them to a manual request.
 
 const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -17,28 +20,21 @@ function isValidEmail(email: unknown): email is string {
   return typeof email === "string" && email.length <= 254 && EMAIL_SHAPE.test(email.trim());
 }
 
-function clientIp(req: VercelRequest): string {
-  // Vercel sets x-real-ip to the true client IP and OVERWRITES any caller value,
-  // so it can't be spoofed to dodge the rate limit. Prefer it. Fall back to the
-  // RIGHTMOST x-forwarded-for entry (appended by the trusted proxy), NEVER the
-  // leftmost — the leftmost is caller-controlled, so keying on it let an attacker
-  // rotate buckets with a forged header and bypass the limit entirely.
-  const real = req.headers["x-real-ip"];
-  const realIp = (Array.isArray(real) ? real[0] : real)?.trim();
-  if (realIp) return realIp;
-  const fwd = req.headers["x-forwarded-for"];
-  const fwdStr = Array.isArray(fwd) ? fwd[fwd.length - 1] : fwd;
-  const parts = (fwdStr ?? "").split(",").map((s) => s.trim()).filter(Boolean);
-  return parts.length ? parts[parts.length - 1] : "unknown";
+/** The unsubscribe token for an email: HMAC-SHA256(secret, normalized-email), hex.
+ * Exported so the email-sending flow (and tests) build the same link token. */
+export function unsubscribeToken(email: string): string {
+  const secret = process.env.UNSUBSCRIBE_HMAC_SECRET ?? "";
+  return createHmac("sha256", secret).update(email.trim().toLowerCase()).digest("hex");
 }
 
-async function rateLimited(req: VercelRequest, bucket: string, max: number): Promise<boolean> {
-  const key = `rulereceipt:ratelimit:${bucket}:${clientIp(req)}`;
-  const count = await redis.incr(key);
-  if (count === 1) {
-    await redis.expire(key, 3600);
-  }
-  return count > max;
+/** Constant-time check that `token` is the valid unsubscribe token for `email`.
+ * Fails closed when the secret is unset or the shapes don't match. */
+export function verifyUnsubscribeToken(email: string, token: unknown): boolean {
+  if (!process.env.UNSUBSCRIBE_HMAC_SECRET) return false; // no secret -> nothing verifies
+  if (typeof token !== "string" || !/^[0-9a-f]{64}$/i.test(token)) return false;
+  const expected = Buffer.from(unsubscribeToken(email), "hex");
+  const given = Buffer.from(token.toLowerCase(), "hex");
+  return expected.length === given.length && timingSafeEqual(expected, given);
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -51,8 +47,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  const contentLength = Number(req.headers["content-length"] ?? 0);
-  if (contentLength > 2048) {
+  if (tooLarge(req)) {
     res.status(413).json({ error: "payload too large" });
     return;
   }
@@ -62,24 +57,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  if (await rateLimited(req, "unsubscribe-post", 10)) {
+  let limited = false;
+  if (!(await withRedis(res, async () => { limited = await rateLimited(req, "unsubscribe-post", 10); }))) return;
+  if (limited) {
     res.status(429).json({ error: "rate limit exceeded, try again later" });
     return;
   }
 
   const body = req.body ?? {};
-  const { email } = body as { email?: unknown };
+  const { email, token } = body as { email?: unknown; token?: unknown };
 
   if (!isValidEmail(email)) {
     res.status(400).json({ error: "expected a valid email address" });
     return;
   }
 
-  const normalized = email.trim().toLowerCase();
-  await redis.srem("rulereceipt:signups", normalized);
+  // Remove ONLY when the request carries this email's valid token. A tokenless or
+  // forged request removes nothing — closing the "anyone can unsubscribe anyone"
+  // hole — but the response below is uniform regardless, so it reveals neither
+  // whether the email was on the list nor whether the token was valid.
+  if (verifyUnsubscribeToken(email, token)) {
+    const normalized = email.trim().toLowerCase();
+    if (!(await withRedis(res, async () => { await redis.srem("rulereceipt:signups", normalized); }))) return;
+  }
 
-  // Same uniform-response reasoning as signup.ts: whether the email was
-  // actually on the list is never revealed, so this can't be used to check
-  // if a given address signed up.
   res.status(200).json({ ok: true });
 }
