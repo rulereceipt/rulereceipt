@@ -24,7 +24,7 @@ export interface AgentCapability {
 
 // Tools whose end-to-end behaviour we have NOT yet validated on a real personal
 // session — kept explicit so "we can parse it" is never shown as "we validated it".
-const UNVALIDATED = new Set<string>(["cline"]); // cline reader run on a real cli v3.0.70 session (2026-10-09); pending Shilpa's sign-off
+const UNVALIDATED = new Set<string>([]); // all auto-detected adapters validated on a real session
 const NOTES: Record<string, string> = {
   "claude-code": "full support — parsed and validated end-to-end",
   codex: "supported — validated on a real end-to-end rollout (CLI 0.160.1, 2026-10-07); reads rollout-*.jsonl and compressed .jsonl.zst (zst needs Node 22.15+), incl. the 0.160 exec-harness (exec_command / apply_patch)",
@@ -33,7 +33,7 @@ const NOTES: Record<string, string> = {
   antigravity: "supported — validated on a real session (CLI 1.3.1, 2026-10-08); reads ~/.gemini/antigravity-cli/brain/<id>/.system_generated/logs/transcript.jsonl (PLANNER_RESPONSE tool_calls + GENERIC outputs), incl. an approved push to main (user said yes -> git push ran, exit 0 -> Followed)",
   cursor: "supported — validated on a real session (agent v2026.10.01, 2026-10-08); reads the agent-transcripts JSONL (message-wrapped lines, JSON-string tool input, <user_query> unwrap)",
   opencode: "supported — validated on a real session (1.18.35, 2026-10-08); reads the SQLite opencode.db (OpenCode 1.18+, via built-in node:sqlite on Node 22.5+; older Node skips it, noted once) and the legacy JSON file store. Rules scoped to what OpenCode loads (AGENTS.md/CLAUDE.md, ~/.config/opencode/AGENTS.md, and ~/.claude/CLAUDE.md for Claude Code compat, off via OPENCODE_DISABLE_CLAUDE_CODE)",
-  cline: "in testing — reader run against a real session (CLI v3.0.70, 2026-10-09), pending validation; reads ~/.cline/data/sessions/<id>/ (meta + .messages.json), maps ask_question to the user's approval (an authorised push reads as Followed). Rules scoped to what Cline loads (.clinerules, .cline/rules, .cursorrules, .windsurfrules, AGENTS.md — not CLAUDE.md/GEMINI.md)",
+  cline: "supported — validated on a real session (CLI v3.0.70, 2026-10-09); reads ~/.cline/data/sessions/<id>/ (meta + .messages.json), maps ask_question to the user's approval (an authorised push reads as Followed). Rules scoped to what Cline loads (.clinerules, .cline/rules, .cursorrules, .windsurfrules, AGENTS.md — not CLAUDE.md/GEMINI.md)",
 };
 
 export function agentCapabilities(): AgentCapability[] {

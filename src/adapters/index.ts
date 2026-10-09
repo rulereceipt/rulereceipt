@@ -126,8 +126,8 @@ export const antigravityAdapter: SessionAdapter = {
  * (cli v3.0.70, 2026-10-09): ~/.cline/data/sessions/<id>/<id>.json meta +
  * <id>.messages.json transcript. ask_question → the user's selection is mapped
  * as their approval (like Copilot's ask-user), so an authorised push reads as
- * Followed. Held pending Shilpa's validation. Read-only; never opens settings/,
- * providers.json, oauth, or the db/*.db stores. See adapters/cline.ts.
+ * Followed. Validated on that session (2026-10-09). Read-only; never opens
+ * settings/, providers.json, oauth, or the db/*.db stores. See adapters/cline.ts.
  */
 export const clineAdapter: SessionAdapter = {
   tool: "cline",

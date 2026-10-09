@@ -19,7 +19,7 @@ npx rulereceipt
 Runs entirely on your machine. Plain `rulereceipt check` makes zero network
 calls — [Trust, privacy and licensing](#trust-privacy-and-licensing) has the full
 detail, including the three off-by-default opt-ins. Sessions it reads: Claude
-Code (supported), OpenAI Codex CLI (supported, tested on 0.160.1), GitHub Copilot CLI (supported, tested on 1.0.92), Cursor (supported, tested on v2026.10.01), Antigravity (supported, tested on 1.3.1), other agents experimental. It
+Code (supported), OpenAI Codex CLI (supported, tested on 0.160.1), GitHub Copilot CLI (supported, tested on 1.0.92), Cursor (supported, tested on v2026.10.01), Antigravity (supported, tested on 1.3.1), OpenCode (supported, tested on 1.18.35), Cline (supported, tested on v3.0.70), other agents experimental. It
 also reads Cursor, Copilot and Windsurf rules files (and CLAUDE.md, AGENTS.md,
 Gemini `GEMINI.md`, Google's `.agents/rules`, and Claude Code memory).
 [Accuracy](https://rulereceipt.dev/accuracy)
@@ -96,7 +96,8 @@ memory — are read far more broadly; this table is about reading a *session*):
 | Antigravity CLI (Google) | **Supported** | reads ~/.gemini/antigravity-cli/brain/<id>/…/transcript.jsonl; validated on a real session (CLI 1.3.1) — PLANNER_RESPONSE tool_calls + GENERIC outputs, incl. an approved push to main (Followed) |
 | Gemini CLI | **Legacy / untested** | the standalone Gemini CLI refuses a personal Google login ("client no longer supported, migrate to Antigravity") — use Antigravity |
 | OpenCode | **Supported** | reads the SQLite `opencode.db` (OpenCode 1.18+, via built-in `node:sqlite` on Node ≥ 22.5; older Node skips it) and the legacy JSON store; validated on a real session (1.18.35). Rules scoped to what OpenCode loads (AGENTS.md/CLAUDE.md, `~/.config/opencode/AGENTS.md`, and `~/.claude/CLAUDE.md` for Claude Code compat) |
-| Cline, Aider, Windsurf | Not yet | — |
+| Cline | **Supported** | reads `~/.cline/data/sessions/<id>/` (meta + `.messages.json`); validated on a real session (CLI v3.0.70) — maps `ask_question` to the user's approval (an authorised push reads as Followed). Rules scoped to what Cline loads (`.clinerules`, `.cline/rules`, `.cursorrules`, `.windsurfrules`, AGENTS.md — not CLAUDE.md/GEMINI.md) |
+| Aider, Windsurf | Not yet | — |
 
 Auto-detection picks the newest session across supported tools.
 
