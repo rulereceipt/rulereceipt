@@ -51,11 +51,28 @@ function storageDir(): string { return join(baseDir(), "storage"); }
 function openCodeDbPath(): string { return join(baseDir(), "opencode.db"); }
 
 /* ── SQLite store (opencode.db) ─────────────────────────────────────────────
- * node:sqlite is Node 22.5+. Load it through createRequire so an older Node
- * degrades (db sessions skipped, noted once) instead of crashing the module —
- * exactly how codex.ts treats zstd. */
+ * node:sqlite is Node 22.5+. Loaded LAZILY (only when an opencode.db actually
+ * needs reading), so a plain Claude Code `check`/`doctor` never touches it —
+ * and the one-time "SQLite is an experimental feature" ExperimentalWarning that
+ * Node 22/23 prints on first require is suppressed, since it would otherwise
+ * leak onto stderr for every run once this module is imported. An older Node
+ * (<22.5) that lacks node:sqlite degrades (db sessions skipped, noted once)
+ * instead of crashing — the same graceful-degrade pattern codex.ts uses for
+ * zstd. */
 interface SqliteDb { all(sql: string, ...params: unknown[]): Record<string, unknown>[]; close(): void; }
-const openSqlite: ((path: string) => SqliteDb) | undefined = (() => {
+
+/** Require node:sqlite, muting ONLY its own experimental warning. */
+function loadSqlite(): ((path: string) => SqliteDb) | undefined {
+  const origEmit = process.emitWarning.bind(process);
+  // Swallow exactly "SQLite is an experimental feature" (ExperimentalWarning);
+  // every other warning still passes straight through.
+  (process as unknown as { emitWarning: typeof process.emitWarning }).emitWarning = ((warning: string | Error, ...rest: unknown[]): void => {
+    const opt = rest[0];
+    const type = typeof opt === "string" ? opt : (opt && typeof opt === "object" ? (opt as { type?: string }).type : undefined);
+    const msg = typeof warning === "string" ? warning : warning?.message;
+    if (type === "ExperimentalWarning" && typeof msg === "string" && /sqlite/i.test(msg)) return;
+    (origEmit as (...a: unknown[]) => void)(warning, ...rest);
+  }) as typeof process.emitWarning;
   try {
     const req = createRequire(import.meta.url);
     const { DatabaseSync } = req("node:sqlite") as { DatabaseSync: new (p: string, o?: { readOnly?: boolean }) => { prepare(sql: string): { all(...p: unknown[]): unknown[] }; close(): void } };
@@ -68,13 +85,32 @@ const openSqlite: ((path: string) => SqliteDb) | undefined = (() => {
     };
   } catch {
     return undefined;
+  } finally {
+    process.emitWarning = origEmit;
   }
-})();
+}
+
+let sqliteResolved = false;
+let sqliteOpener: ((path: string) => SqliteDb) | undefined;
+/** Lazy, memoised node:sqlite opener. `RR_FORCE_NO_SQLITE=1` forces the
+ * old-Node degraded path (used by tests, and a usable escape hatch). */
+function getSqlite(): ((path: string) => SqliteDb) | undefined {
+  if (/^(1|true|yes)$/i.test(process.env.RR_FORCE_NO_SQLITE ?? "")) return undefined;
+  if (sqliteResolved) return sqliteOpener;
+  sqliteResolved = true;
+  sqliteOpener = loadSqlite();
+  return sqliteOpener;
+}
+
+/** The exact stderr line shown when this Node can't read an agent's db. */
+export function sqliteUnavailableWarning(agent: string): string {
+  return `rulereceipt: reading ${agent} sessions needs Node 22.5+ (this is Node ${process.versions.node}); skipping ${agent}'s database. Upgrade Node to include them.`;
+}
 let warnedNoSqlite = false;
-function warnNoSqlite(): void {
+function warnNoSqlite(agent = "OpenCode"): void {
   if (warnedNoSqlite) return;
   warnedNoSqlite = true;
-  process.stderr.write("rulereceipt: OpenCode's SQLite store (opencode.db) needs Node >= 22.5 for node:sqlite; skipping it. Upgrade Node to include those sessions.\n");
+  process.stderr.write(sqliteUnavailableWarning(agent) + "\n");
 }
 
 const DB_FRAG = "#";
@@ -93,9 +129,10 @@ function withDb<T>(dbPath: string, fn: (db: SqliteDb) => T, fallback: T): T {
   // (and runs an old Node) is not nagged on every `check`. Warn only when an
   // opencode.db actually exists but this Node is too old to open it.
   if (!existsSync(dbPath)) return fallback;
-  if (!openSqlite) { warnNoSqlite(); return fallback; }
+  const open = getSqlite();
+  if (!open) { warnNoSqlite(); return fallback; }
   let db: SqliteDb | undefined;
-  try { db = openSqlite(dbPath); return fn(db); } catch { return fallback; } finally { try { db?.close(); } catch { /* ignore */ } }
+  try { db = open(dbPath); return fn(db); } catch { return fallback; } finally { try { db?.close(); } catch { /* ignore */ } }
 }
 
 /** db session handles for this cwd, paired with the session's own update time. */
