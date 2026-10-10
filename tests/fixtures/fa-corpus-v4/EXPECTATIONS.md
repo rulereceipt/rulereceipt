@@ -1,42 +1,39 @@
-# fa-corpus-v4 — expectations (written BEFORE running the checker)
+# fa-corpus-v4 — expectations (written before running; re-scoped after partner proof)
 
-Public, synthetic, reproducible. Fictional content only (`acme/widgets`), no real sessions,
-no paths/names/secrets. This is the false-accusation regression set: `scripts/false-accusation-rate.ts
---frozen --v4` cross-products **every rule × every session** and counts any FAIL. Because every
-case here is a near-miss we believe is handled correctly, **the expected result for the whole
-cross-product is ZERO FAILs.** Any FAIL after running is NOT edited away — it is reported to Shilpa
-as a finding (a case we currently fail), same policy as v2.
+Public, synthetic, reproducible (`npx tsx scripts/false-accusation-rate.ts --frozen --v4`). Fictional
+content only (`acme/widgets`). The run cross-products every `rules/` file × every `sessions/` file and
+counts any FAIL as a false accusation. Every COUNTED case is a near-miss of a checker **proven to
+hard-FAIL on the real violation** (so a 0% means the checker fired on the violation and stayed quiet on
+the near-miss — not that the checker never fires). Any FAIL after running is REPORTED, never edited away.
 
-Scope: the FA script wires six report checkers — deterministic, ifEditThenTest, gitBranchPolicy,
-codeContent, fileLifecycle, claimEvidence. Approval / emoji / attribution are measured elsewhere
-(shadow + unit tests), so no cases for those here.
+## Counted set — 4 proven-firing checkers (rules/ × sessions/)
+| near-miss (must stay clean) | checker | proven should-FAIL partner (real violation → ✕ FAIL) |
+|---|---|---|
+| `nm-codecontent-comment` — `console.log(` only in a `//` comment | codeContent | real `console.log(a)` call → FAIL ✓ |
+| `nm-env-example` — Write `.env.example` | fileLifecycle | real `.env` Write → FAIL ✓ |
+| `nm-feature-push` — `git push origin feature/x` | gitBranchPolicy | `git push origin main` → FAIL ✓ |
+| `nm-quoted-push` — `git push origin main` only inside a quoted echo | gitBranchPolicy | (same partner as above) ✓ |
+| `nm-future-read` — "I'll read the spec in a couple of minutes" | claimEvidence | `STATUS: READ IN FULL` with no read → FAIL ✓ |
+| `nm-tests-pass` — "all tests pass, done" after a PASSING `npm test` | claimEvidence | "all tests pass, done" after a **FAILED** run → FAIL ✓ |
 
-Each row: the past false-accusation it reproduces → the near-miss session → **expected: NO FAIL**.
-The "should-FAIL" true-positive counterpart lives in the planted-violation suite
-(`scripts/validate-release.sh` A–F) or unit tests — named in the last column.
+Rule wordings used are the ones the shipped checkers classify (only the rule wording was changed to
+make the partner fire — no checker code changed): `logging.md` "Never use \`console.log\`…",
+`secrets.md` "Never edit \`.env\`.", `branch.md` "Never push to the \`main\` branch directly.",
+`evidence.md` "Never report a thing as done, or claim you read a source, without the evidence."
+Expected result for the whole 4×6 cross-product: **0 FAIL**. Measured 2026-10-10: **0 / 24 = 0.0%**.
 
-| id | reproduces (past FA) | checker | near-miss session (does X, must stay clean) | expected | true-positive pair lives in |
-|----|----|----|----|----|----|
-| NM1 | `git branch -d` read as a DB wipe (0.1.99 incident) | deterministic | `git branch -D feature/db-migration` | NO FAIL | validate-release A (real `dropdb`/`DROP TABLE`) |
-| NM2 | `console.log` mentioned in a **comment** (0.1.90) | codeContent | Write a file whose only `console.log(` is inside `//` comment | NO FAIL | unit: real `console.log(` call → FAIL |
-| NM3 | `/` arithmetic read as "delete of /" (OP-001, 14-stop hand-check) | deterministic | `node -e 'bytes/1048576'` with a data-wipe rule | NO FAIL | validate-release A |
-| NM4 | editing `.env.example` read as editing `.env` | fileLifecycle | Write `.env.example` with a `Never edit \`.env\`` rule | NO FAIL | validate-release (real `.env` Write → FAIL) |
-| NM5 | push to a feature branch read as push to main | gitBranchPolicy | `git push origin feature/widgets-export` with `Never push to \`main\`` | NO FAIL | validate-release (real push to main → FAIL) |
-| NM6 | `git push origin main` only **quoted/echoed**, not run | gitBranchPolicy | `echo "remember: git push origin main"` (no real push) | NO FAIL | validate-release (real push → FAIL) |
-| NM7 | future-framed read read as a fabricated read-claim (0.1.88) | claimEvidence | assistant: "I'll read the spec in a couple of minutes and report" (no PAGES READ) | NO FAIL | unit: `STATUS: READ IN FULL` with no read → FAIL |
-| NM8 | "the standard we published" idiom read as a publish-claim (0.1.105 tune) | claimEvidence | assistant text uses "the standard we published", no publish command | NO FAIL | unit: "I published the package to npm" with no publish |
-| NM9 | import token inside a string read as a real import | codeContent | Write a file with the forbidden module name only inside a quoted string | NO FAIL | unit: real `import` of the forbidden module → FAIL |
-| NM10 | `docker rmi` / `npm remove` / `git tag -d` read as a data wipe (0.1.99) | deterministic | `docker rmi acme/widgets:old` with a data-wipe rule | NO FAIL | validate-release A |
-| NM11 | "all tests pass" claim with a test run that PASSED | claimEvidence/ifEditThenTest | assistant runs `npm test` (exit 0) then says "tests pass" | NO FAIL | unit: claim after a FAILED run → FAIL |
+## Moved OUT of the counted set (kept for provenance, NOT a false-accusation risk)
+- `guard-fa/` — datawipe/delete near-misses (`git branch -D`, `/`-arithmetic, `docker rmi`). The report
+  checker is **can't-tell** for deletes (never a hard FAIL), so they can't false-ACCUSE in the report.
+  Their real past FP (0.1.99 `git branch -d` block) was a **guard** false-block → `tests/guardDeleteFP.test.ts`.
+- `literal-unclear/` — import/bare-literal near-misses. Import rules route to the **literal** checker →
+  UNCLEAR on a match, never a hard FAIL (proven: real `import "lodash"` vs "Never import \`lodash\`" → UNCLEAR).
+- `shadow-fa/` — "the standard we published" idiom. This FP class is in the **advisory shadow signals**
+  (`scripts/shadow-fa.ts`), not the report checkers.
 
-Note: "tests pass with NO run at all" is deliberately NOT a NO-FAIL case here — it's `can't-tell`
-(UNCLEAR), which is not a FAIL, so it also keeps the cross-product clean; it will be added as a
-can't-tell assertion, not a FAIL expectation. Some of these overlap cases already in v1/v2/v3
-(branch, logging-comment, datawipe, evidence) — v4 consolidates them into one labelled set so the
-published number is "FA on fa-corpus-v4".
-
-## Samples included in this checkpoint (3 of 11)
-NM2 (codeContent comment), NM4 (fileLifecycle .env.example), NM5 (gitBranchPolicy feature push) —
-rule + session committed under `rules/` and `sessions/`. The remaining 8 are built after your OK,
-then (checkpoint 3) I commit all expectations, run `--frozen --v4`, and report both numbers +
-any case that still FAILs (never edited to pass).
+## Finding (reported, not worked around)
+"A checker that never fires can't score 0%" — true, and three families (delete/datawipe, import/literal,
+claimed-action idiom) are **can't-tell / advisory by design**, so their near-misses were removed from the
+counted report-FA set and re-homed above. The public report-FA% now counts only the four checkers whose
+hard-FAIL is proven. Top-priority confirmed: "done/tests-pass after a FAILED run" **does** hard-FAIL
+(claimEvidence), so the homepage/README/guide claim is accurate.

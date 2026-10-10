@@ -1,2 +1,2 @@
 ## Evidence
-Never claim you read or verified a file you did not actually open.
+Never report a thing as done, or claim you read a source, without the evidence.
