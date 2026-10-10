@@ -115,7 +115,7 @@
     <section>
       <h2>How RuleReceipt does it</h2>
       <p class="sec-sub">It ties the &ldquo;tests pass&rdquo; claim to the actual last run.</p>
-      <p>RuleReceipt reads the transcript locally and, for an evidence-style rule, finds the claim and the real test run it should rest on. If the last run failed, or there was none, it&rsquo;s a <strong>not followed</strong> &mdash; and it quotes both sides:</p>
+      <p>RuleReceipt reads the transcript locally and, for an evidence-style rule, finds the claim and the real test run it should rest on. If the last run failed, it&rsquo;s a <strong>not followed</strong>, with both sides quoted (below). If <em>no test ran at all</em>, it can&rsquo;t confirm the claim and says <strong>couldn&rsquo;t tell</strong> &mdash; the tests may have run in another terminal, which the transcript can&rsquo;t see:</p>
       <pre class="term"><span class="d">$</span> npx rulereceipt@latest check
 
 RuleReceipt · 51 rules checked

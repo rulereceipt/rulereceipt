@@ -6,7 +6,7 @@
 [![npm](https://img.shields.io/npm/v/rulereceipt)](https://www.npmjs.com/package/rulereceipt)
 [![provenance](https://img.shields.io/badge/npm-provenance%20signed-blue)](https://www.npmjs.com/package/rulereceipt#provenance)
 
-**Did your agent push without asking? Say tests pass when none ran? RuleReceipt shows you, with the exact line as proof.**
+**Did it push straight to main? Touch a file you told it never to? RuleReceipt checks the finished session against your rules file (CLAUDE.md, AGENTS.md, .cursor/rules) and marks each rule followed, broken, or can't tell — with the exact line as proof.**
 
 [![RuleReceipt checking an agent session against your rules — three rules broken, each with the quoted line](https://raw.githubusercontent.com/rulereceipt/rulereceipt/main/docs/screenshot.png)](https://rulereceipt.dev)
 

@@ -115,7 +115,7 @@
     <section>
       <h2>How RuleReceipt does it</h2>
       <p class="sec-sub">It finds the push and checks whether anything in the session approved it.</p>
-      <p>RuleReceipt reads the transcript locally and, for an approval-style rule, looks for the action <em>and</em> for approval ahead of it in the conversation. If the action ran with nothing approving it, that&rsquo;s a <strong>not followed</strong> &mdash; with the command quoted:</p>
+      <p>RuleReceipt reads the transcript locally. A hard branch rule &mdash; &ldquo;never push to <code>main</code>&rdquo; &mdash; is settled from the command itself: if a push targeted <code>main</code>, that&rsquo;s a <strong>not followed</strong>, with the command quoted (below). An approval-style rule &mdash; &ldquo;never push <em>without asking</em>&rdquo; &mdash; is different: a click on Claude Code&rsquo;s permission prompt leaves no trace in the transcript, so RuleReceipt reports <strong>couldn&rsquo;t tell</strong> there rather than guessing. If you want pushes to main blocked outright, use <code>protect --git</code>.</p>
       <pre class="term"><span class="d">$</span> npx rulereceipt@latest check
 
 RuleReceipt · 51 rules checked
