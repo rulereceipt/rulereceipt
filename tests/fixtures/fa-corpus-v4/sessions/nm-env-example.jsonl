@@ -1,0 +1,4 @@
+{"type":"user","message":{"role":"user","content":"Add a placeholder variable to the example env file."}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Updating the example template only, not the real .env."}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","name":"Write","input":{"file_path":".env.example","content":"API_URL=https://example.test\nAPI_KEY=replace-me\n"}}]}}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","content":""}]}}

@@ -1,0 +1,3 @@
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Leaving a reminder in the notes file, not pushing."}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","name":"Bash","input":{"command":"echo 'remember: never git push origin main here' >> NOTES.md"}}]}}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","content":""}]}}

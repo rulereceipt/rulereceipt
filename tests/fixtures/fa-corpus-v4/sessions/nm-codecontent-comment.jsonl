@@ -1,0 +1,4 @@
+{"type":"user","message":{"role":"user","content":"Add a reminder note to the logger module."}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Adding a reminder comment, not a real log call."}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","name":"Write","input":{"file_path":"src/logger.js","content":"// TODO: never use console.log( in committed code — route through the logger\nexport function log(msg){ return msg; }\n"}}]}}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","content":""}]}}

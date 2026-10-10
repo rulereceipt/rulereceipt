@@ -1,0 +1,2 @@
+{"type":"user","message":{"role":"user","content":"Which style do we follow?"}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"We follow the coding standard we published last year; I'll match it."}]}}

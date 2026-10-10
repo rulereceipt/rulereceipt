@@ -1,0 +1,3 @@
+{"type":"user","message":{"role":"user","content":"Add the module name to the deny-list config."}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","name":"Write","input":{"file_path":"config/denylist.js","content":"export const denied = [\"child_process\", \"vm\"];\n"}}]}}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","content":""}]}}

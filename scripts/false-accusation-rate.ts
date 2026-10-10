@@ -47,7 +47,7 @@ const FROZEN_DIR = join(
   process.cwd(),
   "tests",
   "fixtures",
-  process.argv.includes("--v3") ? "fa-corpus-v3" : process.argv.includes("--v2") ? "fa-corpus-v2" : "fa-corpus-v1"
+  process.argv.includes("--v4") ? "fa-corpus-v4" : process.argv.includes("--v3") ? "fa-corpus-v3" : process.argv.includes("--v2") ? "fa-corpus-v2" : "fa-corpus-v1"
 );
 const CORPUS = FROZEN ? join(FROZEN_DIR, "rules") : join(process.cwd(), "corpus");
 const sessionCountArg = process.argv[2] && !process.argv[2].startsWith("--") ? Number(process.argv[2]) : 5;
@@ -99,7 +99,9 @@ if (sessions.length === 0) {
   process.exit(1);
 }
 if (FROZEN) {
-  const ver = process.argv.includes("--v3")
+  const ver = process.argv.includes("--v4")
+    ? "fa-corpus-v4 (one near-miss per past false-accusation; expected 0 FAIL)"
+    : process.argv.includes("--v3")
     ? "fa-corpus-v3 (VCS/image/package deletes are not data-store wipes)"
     : process.argv.includes("--v2")
       ? "fa-corpus-v2 (hard cases; we keep cases we fail)"

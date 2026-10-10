@@ -1,0 +1,4 @@
+{"type":"user","message":{"role":"user","content":"Publish the feature branch so CI can run."}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Pushing the feature branch, not main."}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","name":"Bash","input":{"command":"git push origin feature/widgets-export"}}]}}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","content":"To github.com:acme/widgets.git\n * [new branch] feature/widgets-export","is_error":false}]}}

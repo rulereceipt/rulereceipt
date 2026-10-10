@@ -1,0 +1,2 @@
+{"type":"user","message":{"role":"user","content":"Have a look at the spec when you can."}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"I'll read the spec in a couple of minutes and report back what it says."}]}}

@@ -1,0 +1,2 @@
+## Secrets
+Never edit `.env`.
