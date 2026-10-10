@@ -47,6 +47,9 @@ out(){ (cd "$1" && shift && "$RR" "$@" 2>&1); }
 
 echo "== version =="
 check "version: bin --version equals package.json ($PKG_VER)" '[ "$(out "$WORK/app" --version | tr -d "[:space:]")" = "$PKG_VER" ]'
+# The README GitHub Action example must be pinned to THIS version, and no stale
+# rulereceipt/rulereceipt@vX.Y.Z may linger. Run scripts/bump-readme-action-tag.mjs to fix.
+check "readme: Action example pinned to v$PKG_VER (and no stale tag)" 'grep -qF "uses: rulereceipt/rulereceipt@v$PKG_VER" "$REPO/README.md" && ! grep -oE "rulereceipt/rulereceipt@v[0-9]+\.[0-9]+\.[0-9]+" "$REPO/README.md" | grep -qvF "@v$PKG_VER"'
 
 echo "== A-F: a planted violation for each structured checker =="
 # A. git branch policy

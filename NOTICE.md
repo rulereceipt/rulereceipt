@@ -32,4 +32,4 @@ we did not copy the code):
   from **Pilan-AI/mnemo** (MIT). Our reader is `src/adapters/copilot.ts`.
 - **Gemini CLI** session format (`~/.gemini/tmp/<hash>/chats/*.{jsonl,json}`, legacy `~/.gemini/sessions/*.json`): documented by **yigitkonur/cli-continues** (MIT, pinned `e486cd2`; from mnemo MIT). Our reader is `src/adapters/gemini.ts`.
 - **Cursor** agent-transcripts (`~/.cursor/projects/<slug>/agent-transcripts/**/*.jsonl`, Anthropic-API shaped): documented by **yigitkonur/cli-continues** (MIT, pinned `e486cd2`). Our reader `src/adapters/cursor.ts`. (Old `state.vscdb` SQLite path deferred.)
-- **OpenCode** JSON file store (`$XDG_DATA_HOME/opencode/storage/{session,message,part}/*.json`): documented by **yigitkonur/cli-continues** (MIT, pinned `e486cd2`). Our reader `src/adapters/opencode.ts`. (opencode.db SQLite path deferred.)
+- **OpenCode** session store — the SQLite `opencode.db` (read via `node:sqlite`, Node 22.5+) and the legacy JSON file store (`$XDG_DATA_HOME/opencode/storage/{session,message,part}/*.json`): format documented by **yigitkonur/cli-continues** (MIT, pinned `e486cd2`). Our reader `src/adapters/opencode.ts`.

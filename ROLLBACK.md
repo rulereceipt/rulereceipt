@@ -22,36 +22,32 @@ npm login          # authenticate as the rulereceipt npm account (personal, NOT 
 npm whoami         # confirm it says the rulereceipt account before touching dist-tags
 ```
 
-## If 0.1.75 is bad — exact steps
+## If the current release is bad — exact steps
 
-Published 2026-09-30. Last known-good before it: **0.1.74** (but 0.1.74 has the
-session-discovery bug for dotted paths and the false-accusation classes 0.1.75
-fixed — rolling back to it trades bugs, so prefer roll-forward to a 0.1.76 patch).
+Placeholders: `<bad>` is the version now on `latest`; `<last-good>` is the newest version
+you have actually verified is good (usually the previous patch). **Prefer rolling forward**
+(next section) — repoint `latest` only to bridge the gap while a fix is prepared, and only
+to a `<last-good>` whose own known bugs you accept.
 
-If you must roll `latest` back right now while a fix is prepared:
+If you must roll `latest` back right now:
 
 ```bash
-npm login                                        # as the rulereceipt account
-npm dist-tag add rulereceipt@0.1.74 latest       # point latest back at 0.1.74
-npm deprecate rulereceipt@0.1.75 "Regression in 0.1.75: <one line>. Use 0.1.74, fix incoming."
-npm dist-tag ls rulereceipt                       # confirm latest -> 0.1.74
+npm login                                          # as the rulereceipt account
+npm dist-tag add rulereceipt@<last-good> latest    # point latest back
+npm deprecate rulereceipt@<bad> "Regression in <bad>: <one line>. Use <last-good>, fix incoming."
+npm dist-tag ls rulereceipt                        # confirm latest -> <last-good>
 ```
 
-Then roll forward: fix on main (red-first test), bump to 0.1.76, push a `v0.1.76`
-tag (Actions publishes it to `latest`), and undeprecate is not needed — 0.1.76
-supersedes. Do NOT `npm unpublish` (see below).
+Then roll forward: fix on main (red-first test), bump the patch, push the matching
+`v<x.y.z>` tag (Actions publishes it to `latest`); it supersedes `<bad>`, so undeprecate is
+not needed. Do NOT `npm unpublish` (see below).
 
 ## First: decide roll forward vs roll back
 
-**Prefer rolling forward.** Ship a fixed patch rather than repointing `latest` at
-an older version — older versions carry their own known bugs. In particular, do
-**not** roll `latest` back to **0.1.74 or earlier**: those have the
-false-accusation classes fixed in 0.1.75 and the session-discovery bug (projects
-with a dot/underscore/space in their path find zero sessions). Rolling back to
-them trades one problem for a worse one.
-
-Roll back only when a fix will take longer than you can leave the bad version as
-`latest`, and only to the newest version you have actually verified is good.
+**Prefer rolling forward.** Ship a fixed patch rather than repointing `latest` at an older
+version — older versions carry their own known bugs, so a rollback can trade one problem for
+a worse one. Roll back only to the newest version you have actually verified is good, and
+only when a fix will take longer than you can leave the bad version as `latest`.
 
 ## Repoint `latest` to a known-good version (temporary)
 
@@ -87,8 +83,10 @@ and mirrors re-pull each release). Repoint `latest` and deprecate instead.
 
 1. Fix on `main`, with a red-first test that reproduces the bad behaviour.
 2. Full suite green, `tsc` clean, `eslint` clean.
-3. Pack the tarball and run the reviewer's `validate-release.sh <tarball>` — it must
-   pass, including the dot/underscore/space paths, monorepo, @AGENTS.md import.
+3. Run the release gate — `npm run gates` (which runs `bash scripts/validate-release.sh`:
+   it packs the real tarball, installs it in a throwaway prefix, and exercises the shipped
+   CLI, including dot/underscore/space paths, monorepo, @AGENTS.md import, and the
+   README Action-tag check).
 4. Clean-room install from the tarball, zero-network trap, `selftest`.
 5. Bump the patch version, tag `v<x.y.z>`, push the tag — GitHub Actions publishes
    with npm provenance (there is no local publish token to steal or misuse).

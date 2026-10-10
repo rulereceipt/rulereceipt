@@ -56,11 +56,13 @@ npx rulereceipt protect
 Adds a PreToolUse guard and a Stop hook to `.claude/settings.json` — after
 showing you exactly what it will add and asking.
 
-**Scope:** *checking* (`check`/`report`) works across **Claude Code, Codex and
-Copilot CLI**. *Blocking* with these guard hooks is **Claude Code only** — they
-are Claude Code hooks; equivalent hooks for Codex, Copilot CLI and Cursor are on
-the roadmap. (`rulereceipt protect --git` installs a git `pre-push` hook, which
-works with any agent because it runs at the git level, not the agent's.)
+**Scope:** *checking* (`check`/`report`) works across **all eight supported
+agents** — Claude Code, OpenAI Codex, GitHub Copilot CLI, Cursor, Antigravity,
+OpenCode, Cline and Devin Desktop (see the table below). *Blocking* with these
+guard hooks is **Claude Code only** — they are Claude Code hooks; equivalent
+hooks for other agents are on the roadmap. (`rulereceipt protect --git` installs
+a git `pre-push` hook, which works with any agent because it runs at the git
+level, not the agent's.)
 
 `protect --undo` restores the
 file byte-for-byte. It's the only place RuleReceipt writes settings, and only
@@ -98,7 +100,7 @@ memory — are read far more broadly; this table is about reading a *session*):
 | OpenCode | **Supported** | reads the SQLite `opencode.db` (OpenCode 1.18+, via built-in `node:sqlite` on Node ≥ 22.5; older Node skips it) and the legacy JSON store; validated on a real session (1.18.35). Rules scoped to what OpenCode loads (AGENTS.md/CLAUDE.md, `~/.config/opencode/AGENTS.md`, and `~/.claude/CLAUDE.md` for Claude Code compat) |
 | Cline | **Supported** | reads `~/.cline/data/sessions/<id>/` (meta + `.messages.json`); validated on a real session (CLI v3.0.70) — maps `ask_question` to the user's approval (an authorised push reads as Followed). Rules scoped to what Cline loads (`.clinerules`, `.cline/rules`, `.cursorrules`, `.windsurfrules`, AGENTS.md — not CLAUDE.md/GEMINI.md) |
 | Devin Desktop (Windsurf / Codeium) | **Supported** | reads the SQLite `~/.local/share/devin/cli/sessions.db` (via built-in `node:sqlite` on Node ≥ 22.5; older Node skips it), walking each session's main chain so retry branches are deduped; validated on a real session (Devin Desktop 3.10.48, backend windsurf, model swe-1-6-slow). Rules scoped to what Devin loads (project AGENTS.md + CLAUDE.md, `~/.claude/CLAUDE.md` and `~/.codeium/windsurf/memories/global_rules.md` — not GEMINI.md) |
-| Aider | Not yet | history is a Markdown transcript, not structured events — needs a prose parser |
+| Aider | Not supported | history is Markdown only, no tool record |
 | Windsurf IDE | Not yet | the editor itself is IDE-embedded; its Devin Desktop CLI *is* read (row above) |
 
 Auto-detection picks the newest session across supported tools.
@@ -108,9 +110,11 @@ Auto-detection picks the newest session across supported tools.
 1. Reads your rules and extracts individual ones — from CLAUDE.md / AGENTS.md,
    Cursor / Copilot / Windsurf rule files, and Claude Code memory, across the
    current project directory and your global rules file.
-2. Reads your most recent agent session transcript — Claude Code today
-   (including hosted/enterprise variants under a different directory), and
-   OpenAI Codex CLI (supported, tested on 0.160.1); newest session across tools wins.
+2. Reads your most recent agent session transcript — across all supported
+   tools (Claude Code, including hosted/enterprise variants under a different
+   directory, plus OpenAI Codex, GitHub Copilot CLI, Cursor, Antigravity,
+   OpenCode, Cline and Devin Desktop; see the table above). The newest
+   session across tools wins.
 3. Routes each rule to the narrowest check that can actually answer it:
    - **Structured checks** read what the session really did — an actual
      git command's branch argument, actual file edits, actual file
@@ -317,10 +321,11 @@ if your count differs from 559, that is why, and the routing percentages move
 by a rounding error rather than meaningfully.
 
 Two of these print a sha256 for every session they read. That is deliberate:
-"the largest sessions on this machine" is a selection rule, not a pin, and the
-largest include the session doing the measuring. Two runs of identical code
-four days apart returned 14,033 and 9,605 tool calls. Numbers are comparable
-only when those hashes match.
+the false-accusation rate is measured on the maintainer's own sessions — a
+moving set, not a fixed benchmark. "The largest sessions on this machine" is a
+selection rule, not a pin, and the largest include the session doing the
+measuring. Two runs of identical code four days apart returned 14,033 and 9,605
+tool calls. Numbers are comparable only when those hashes match.
 
 ## Which rules actually have teeth
 
@@ -432,7 +437,7 @@ rulereceipt check --json > .rulereceipt/receipt.json   # commit this file
 In CI (no session), verify the committed receipt with the Action:
 
 ```yaml
-- uses: rulereceipt/rulereceipt@main   # pin to a release tag once one is cut
+- uses: rulereceipt/rulereceipt@v0.1.105   # or pin a commit SHA
   with:
     receipt: .rulereceipt/receipt.json
     max-age-days: "7"                  # optional: reject a stale receipt
@@ -609,8 +614,8 @@ installed anywhere on your system.
 The CLI is free and runs locally, forever. A separate **Team plan** — an
 org-wide, hosted view with trends over time, history, cross-repo dashboards and
 compliance-ready exports — is a genuinely different product from the local
-check. It's in **early access** while we finish setting it up; email
-hello@rulereceipt.dev if you want it early. The local check (and the free
+check. It's **in development**; email hello@rulereceipt.dev if you want to be
+told when it's ready. The local check (and the free
 `rulereceipt team <folder>` snapshot of exports you already have) stays free.
 
 ## Contact

@@ -7,10 +7,10 @@ evidence runs out. When the tool hits one of these gaps it should say **Can't te
 not guess. If you ever see it guess instead, that is a bug: please report it with
 `rulereceipt wrong <rule>`.
 
-_Last reviewed: 2026-09-29, against 0.1.75 (one engine for check, hook and report;
-per-action approval check; `rulereceipt wrong` with `--submit`/`--email`; audit load
-graph; `why`; session discovery matched on the stored cwd; `@import` following as
-Claude Code documents it). Update this file with every release._
+_Last reviewed: 2026-10-10, against 0.1.105 (session reading for eight agents —
+Claude Code, OpenAI Codex, GitHub Copilot CLI, Cursor, Antigravity, OpenCode, Cline,
+Devin Desktop; bounded streaming reads for very large sessions; six advisory shadow
+signals, none promoted to Broken). Update this file with every release._
 
 ---
 
@@ -37,13 +37,16 @@ invisible to it.
   prove the file wasn't edited before the check ran.
 - Anyone (or any agent) with access to your machine can edit a session file. Tamper-evident
   logging is planned; tamper-proof is not a promise we can make for a local tool.
-- **The agent can edit the rules it is judged by.** If CLAUDE.md or `.claude/settings.json`
-  changed during the session, RuleReceipt does not yet warn you. Planned.
+- **The agent can edit the rules it is judged by.** A session that edits a
+  hooks/`settings.json` file is now flagged (`guardTamper`, advisory — see §6), and
+  editing a file governed by an unloaded rule surfaces the `edited-rule-not-loaded`
+  signal. A CLAUDE.md rule whose *content* changed mid-session is not yet diffed
+  before/after — that part is still planned.
 
 ## 3. Which session is checked
 
 - By default RuleReceipt checks the **most recently modified** session for the current
-  folder, across Claude Code and Codex.
+  folder, across all supported agents (see §5).
 - With parallel sessions, worktrees or several agents at once, that may not be the one you
   meant. Use `--transcript <path>` to choose.
 - Sessions are matched by the real `cwd` stored inside the session file, so a project path
@@ -56,7 +59,7 @@ invisible to it.
 
 ## 4. Rules it cannot judge well
 
-Measured on 903 public rules files, 2026-09-28:
+Measured on 903 public rules files, 2026-09-28 (a larger 2026-09-28 sample; the frozen published corpus is 559 files — see README):
 
 | | Share of real rules |
 |---|---|
@@ -93,13 +96,18 @@ Specific limits:
 | Agent | Rules files read | Session log read | Live hooks |
 |---|---|---|---|
 | Claude Code | Yes | Yes | Yes (Stop hook, PreToolUse guard) |
-| Codex CLI | Yes | Yes (tested on 0.160.1) | No |
-| Cursor | Yes | Yes (tested on v2026.10.01) | No |
-| Antigravity | Yes | Yes (tested on 1.3.1) | No |
-| Gemini CLI | Legacy/untested (login refused) | No | No |
+| OpenAI Codex CLI | Yes | Yes (tested on 0.160.1) | No |
 | GitHub Copilot CLI | Yes | Yes (tested on 1.0.92) | No |
-| Windsurf | Yes | No | No |
-| Gemini CLI / agy | Yes | No | No |
+| Cursor CLI | Yes | Yes (tested on v2026.10.01) | No |
+| Antigravity (Google) | Yes | Yes (tested on 1.3.1) | No |
+| OpenCode | Yes | Yes (tested on 1.18.35) | No |
+| Cline | Yes | Yes (tested on v3.0.70) | No |
+| Devin Desktop (Windsurf / Codeium) | Yes | Yes (tested on 3.10.48) | No |
+| Gemini CLI | Yes | No (login refused — use Antigravity) | No |
+| Aider | No (Markdown only, no tool record) | No | No |
+| Windsurf IDE (old editor) | Yes | No — use Devin Desktop | No |
+
+`rulereceipt protect --git` (git pre-push hook) works with every agent.
 
 For agents without a readable session log, RuleReceipt can audit the rules file
 (`rulereceipt audit`), but it **cannot** say whether those rules were followed.
@@ -352,7 +360,7 @@ approval gate must NOT be changed to address them without a fresh FA v1+v2 run.
   sessions FIRST): match a "pushed/committed/deployed" claim with no matching
   tool_use that ran and succeeded → **Broken**. Until then it shows as can't-tell.
 - **Shadow signals — IMPLEMENTED + FA MEASURED 2026-10-08 (none promoted to Broken).**
-  Four contradictions are now detected as ADVISORY shadow signals (printed under
+  Six contradictions are now detected as ADVISORY shadow signals (printed under
   "Shadow signals"/"Guard integrity", never counted, never in the exit code), with
   their false-accusation rate measured on the frozen corpus via `npx tsx
   scripts/shadow-fa.ts`:
@@ -364,8 +372,16 @@ approval gate must NOT be changed to address them without a fresh FA v1+v2 run.
     - `env-strict` — a plain-text (no-backtick) `.env`/`dist/` protect rule + a real
       mutation of that file (the gap where a real .env edit shows needs-human). Fires
       ONLY on a real mutation, so a bare `.env` mentioned in prose does not.
+    - `approved-in-prompt` — a gated push/commit whose only "approval" was an
+      instruction in the opening prompt (advisory only; the gate still reports
+      can't-tell — it is NOT credited as a Followed verdict).
+    - `edited-rule-not-loaded` — the session edited a file governed by a rule whose
+      rules file was never loaded into context (reported Can't-tell, never Broken).
     - `hooks-disabled` / `no-verify` / `hook-config-edit` (guardTamper, below).
-  **MEASURED FA = 0** across fa-corpus-v1+v2+v3 (146 clean reports, 0 fires).
+  **MEASURED FA = 0** across fa-corpus-v1+v2+v3 (frozen). A real-session survey of
+  the maintainer's own ~194 sessions (item 7) found at least one false positive for
+  every signal, which is why **none is promoted to Broken** — synthetic FA=0 alone
+  is not sufficient.
   TRUE-POSITIVE confirmed on real sessions: zero-tests fires on the Antigravity
   bd6563b3 re-run ("tested" + `node --test` 0 tests); hooks-disabled fires on the
   real OpenCode `git -c core.hooksPath=/dev/null commit`. Promotion to Broken still
