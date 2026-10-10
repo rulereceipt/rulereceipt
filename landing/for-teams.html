@@ -284,7 +284,7 @@
       <div class="pr-stage">
         <div class="pr">
           <div class="pr-top">
-            <span>pull request #214 &middot; rulereceipt check</span>
+            <span>Example &middot; pull request #214 &middot; rulereceipt check</span>
             <span class="live"><span class="led"></span>on the dev's machine</span>
           </div>
           <div class="pr-body">
@@ -300,7 +300,7 @@
       </div>
 
       <div style="height:22px"></div>
-      <div class="security-note"><strong>The reviewer can trust it without the raw log.</strong> Hand them the receipt and, if they ask, the session file: every report is hashed to the exact bytes it read, so they can confirm it describes <em>that</em> session, unaltered &mdash; an edited session produces a different fingerprint. The transcript itself never has to travel for the verdict to hold up.</div>
+      <div class="security-note"><strong>Honest about trust.</strong> The receipt is self-reported &mdash; the developer runs the check and attaches the result, the same as any status update. Its sha256 fingerprint proves the report matches a session file <em>only if the reviewer has that file to check it against</em>; on its own it is not independent proof. For the honest everyday case that is enough; when it has to be airtight, ask for the session file and run <code>rulereceipt verify</code>.</div>
     </div>
   </section>
 
@@ -325,7 +325,7 @@
           <p><code>rulereceipt verify-receipt</code> and the GitHub Action fail a PR when a session broke a rule you marked a hard error in a committed <code>.rulereceipt/config.json</code>. You choose which rules block and which only warn.</p>
         </div>
       </div>
-      <p class="step-note"><code>rulereceipt report</code> rolls several recent sessions into one local summary &mdash; which rules broke, where, with the evidence &mdash; so a lead gets a weekly read without touching anyone's raw logs.</p>
+      <p class="step-note"><code>rulereceipt report</code> rolls several recent sessions into one local summary &mdash; which rules broke, where, with the evidence &mdash; so each developer can produce a weekly summary to share, with no raw logs leaving their machine.</p>
     </div>
   </section>
 
@@ -340,11 +340,11 @@
         </div>
         <div class="trust-cell">
           <h3>Block &mdash; Claude Code only</h3>
-          <p>An optional <code>Stop</code> hook can refuse to let a session finish on a broken rule, and a <code>guard</code> hook can decline a file-or-branch action before it runs. Both are Claude Code only, both are narrow, and you install them yourself. Everywhere else it is after the fact.</p>
+          <p>An optional <code>Stop</code> hook can refuse to let a session finish on a broken rule, and a <code>guard</code> hook can decline a file-or-branch action before it runs. Both are Claude Code only, both are narrow, and you install them yourself. Everywhere else it is after the fact &mdash; with one exception that works with <em>every</em> agent: <code>rulereceipt protect --git</code> installs a git <code>pre-push</code> hook that blocks a push at the git level, whichever agent produced the commit.</p>
         </div>
         <div class="trust-cell">
           <h3>It won't cry wolf</h3>
-          <p>A FAIL comes only from hard evidence &mdash; a forbidden action that happened, or a claim the session's own logs contradict. Judgment rules are marked, not guessed. Measured false-accusation rate: 0.8%. What the transcript never recorded &mdash; another terminal, a permission-prompt click &mdash; comes back &ldquo;couldn't tell,&rdquo; never a fail.</p>
+          <p>A FAIL comes only from hard evidence &mdash; a forbidden action that happened, or a claim the session's own logs contradict. Judgment rules are marked, not guessed. On the maintainer's own sessions, 0.8% (a moving set); on the frozen test sets, 0. What the transcript never recorded &mdash; another terminal, a permission-prompt click &mdash; comes back &ldquo;couldn't tell,&rdquo; never a fail.</p>
         </div>
       </div>
     </div>
