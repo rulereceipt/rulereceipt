@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="en">
+<head>
+<script>
+    !function(t,e){var o,n,p,r;e.__SV||(window.posthog && window.posthog.__loaded)||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}p||((p=t.createElement("script")).type="text/javascript",p.crossOrigin="anonymous",p.async=!0,p.src=s.api_host.replace(".i.posthog.com","-assets.i.posthog.com")+"/static/array.js",p.onerror=function(){p=null},(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r));var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+".people (stub)"},o="Sn Cn init Hn Un Gn Yi zn Kn qn capture Vn kn calculateEventProperties es register register_once register_for_session unregister unregister_for_session os Bn ss getFeatureFlag getFeatureFlagPayload getFeatureFlagResult getAllFeatureFlags isFeatureEnabled reloadFeatureFlags updateFlags updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures on onFeatureFlags onSurveysLoaded onSessionId getSurveys getActiveMatchingSurveys renderSurvey displaySurvey cancelPendingSurvey canRenderSurvey canRenderSurveyAsync ls identify setPersonProperties unsetPersonProperties group resetGroups setPersonPropertiesForFlags resetPersonPropertiesForFlags setGroupPropertiesForFlags resetGroupPropertiesForFlags reset us shutdown setIdentity clearIdentity get_distinct_id getGroups get_session_id get_session_replay_url alias set_config startSessionRecording stopSessionRecording sessionRecordingStarted captureException addExceptionStep captureLog startExceptionAutocapture stopExceptionAutocapture loadToolbar get_property getSessionProperty rs Xn createPersonProfile setInternalOrTestUser ns $n vs opt_in_capturing opt_out_capturing has_opted_in_capturing has_opted_out_capturing get_explicit_consent_status is_capturing clear_opt_in_out_capturing Jn debug tr At getPageViewId captureTraceFeedback captureTraceMetric Ln".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
+    posthog.init('phc_A4TBtMr58tNcGFEnoC82pPqzrKxXRGw84B8RVd8JK2nW', {
+        api_host: 'https://us.i.posthog.com',
+        defaults: '2026-05-30',
+        person_profiles: 'identified_only',
+        autocapture: false,
+        disable_session_recording: true,
+        capture_pageview: true,
+        capture_pageleave: true,
+        persistence: 'localStorage+cookie',
+        mask_all_text: true,
+        mask_all_element_attributes: true,
+    })
+    ;(function(){try{var q=new URLSearchParams(location.search);if(q.get('internal')==='1'){try{localStorage.setItem('rr_internal','1')}catch(e){}}var f=false;try{f=localStorage.getItem('rr_internal')==='1'}catch(e){}if(f&&window.posthog&&posthog.register){posthog.register({internal:true})}}catch(e){}})();
+</script>
+<script src="/analytics.js" defer></script>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>RuleReceipt — for team leads</title>
+<link rel="canonical" href="https://rulereceipt.dev/for-teams" />
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23FAFAF7'/%3E%3Cpath d='M9 8h14v17l-3-2-3 2-3-2-3 2-2-2z' fill='none' stroke='%2317191C' stroke-width='1.6'/%3E%3Cpath d='M12 14h8M12 18h6' stroke='%2317805F' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E" />
+<meta name="description" content="See what your team's AI agents actually did — a per-pull-request verdict against your own CLAUDE.md / AGENTS.md rules, with one line of evidence, while every session stays on each developer's laptop. Local-first, free CLI. Blocking is Claude Code only; everything else is detect-and-report." />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="https://rulereceipt.dev/for-teams" />
+<meta property="og:title" content="RuleReceipt — for team leads" />
+<meta property="og:description" content="A per-pull-request verdict on what your team's agents did against your own rules — one line of evidence per rule, sessions never leave each laptop." />
+<meta property="og:image" content="https://rulereceipt.dev/og-image.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:image" content="https://rulereceipt.dev/og-image.png" />
+<meta name="twitter:title" content="RuleReceipt — for team leads" />
+<meta name="twitter:description" content="A per-pull-request verdict on what your team's agents did against your own rules — sessions never leave each laptop." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap" />
+<style>
+  :root {
+    --bg: #FAF9F5;
+    --bg-deep: #F0EEE6;
+    --panel: #FFFFFF;
+    --panel-line: #E8E6DC;
+    --panel-line-strong: #DEDCD1;
+    --paper: #141413;
+    --paper-dim: #55534E;
+    --paper-faint: #7A756E;
+    --amber: #C4551F;
+    --amber-dim: #AD4A17;
+    --cyan: #17805F;
+    --red: #C2402C;
+    --judge: #7A756E;
+    --font-display: 'Newsreader', 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+  }
+
+  /* Green and red are reserved for verdicts only (see index.html). Terracotta
+     does all interface work. One deliberate light look, painted explicitly. */
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    background-image:
+      radial-gradient(1100px 500px at 50% -8%, rgba(255,158,67,0.08), transparent 60%),
+      repeating-linear-gradient(180deg, rgba(255,255,255,0.012) 0px, rgba(255,255,255,0.012) 1px, transparent 1px, transparent 3px);
+    color: var(--paper);
+    font-family: var(--font-sans);
+    font-size: 17px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--amber-dim); }
+
+  .wrap { max-width: 760px; margin: 0 auto; padding: 0 24px; }
+  .wrap-wide { max-width: 1000px; margin: 0 auto; padding: 0 24px; }
+
+  header.top {
+    position: sticky;
+    top: 0;
+    z-index: 60;
+    background: rgba(250, 249, 245, 0.9);
+    -webkit-backdrop-filter: saturate(1.7) blur(14px);
+    backdrop-filter: saturate(1.7) blur(14px);
+    border-bottom: 1px solid var(--panel-line);
+  }
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    header.top { background: var(--bg); }
+  }
+  .top-inner { display: flex; align-items: center; justify-content: space-between; padding: 15px 24px; }
+  .wordmark {
+    font-family: var(--font-sans);
+    font-weight: 800;
+    font-size: 1.2rem;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--paper);
+    text-decoration: none;
+  }
+  .wordmark .led { width: 8px; height: 8px; border-radius: 50%; background: var(--amber); }
+  .top-cta {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    color: var(--paper-dim);
+    border: 1px solid var(--panel-line-strong);
+    padding: 7px 14px;
+    border-radius: 999px;
+    text-decoration: none;
+  }
+
+  .hero { padding: 64px 0 10px; text-align: center; }
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--amber-dim);
+    margin-bottom: 18px;
+  }
+  h1 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: clamp(2.1rem, 5.4vw, 3.4rem);
+    line-height: 1.08;
+    letter-spacing: -0.02em;
+    margin: 0 0 22px;
+    text-wrap: balance;
+    color: var(--paper);
+  }
+  h1 span { color: var(--amber); }
+  .sub { font-size: 1.1rem; color: var(--paper-dim); max-width: 640px; margin: 0 auto 10px; text-wrap: balance; }
+
+  section.band { padding: 54px 0; border-top: 1px solid var(--panel-line); }
+  h2 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: clamp(1.55rem, 2.6vw, 1.95rem);
+    letter-spacing: -0.015em;
+    margin: 0 0 10px;
+    text-wrap: balance;
+  }
+  .band-sub { color: var(--paper-dim); margin: 0 0 34px; max-width: 760px; }
+
+  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; }
+  .step .n { font-family: var(--font-mono); color: var(--amber-dim); font-size: 0.85rem; margin-bottom: 10px; }
+  .step h3 { font-family: var(--font-sans); font-weight: 600; font-size: 1.02rem; margin: 0 0 8px; color: var(--paper); }
+  .step p { color: var(--paper-dim); margin: 0; font-size: 0.95rem; }
+  .step code, .band-sub code, .security-note code, .step-note code {
+    font-family: var(--font-mono); background: var(--bg-deep); padding: 1px 6px; border-radius: 4px; font-size: 0.88em; color: var(--paper);
+  }
+
+  .trust-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--panel-line); border: 1px solid var(--panel-line); border-radius: 16px; overflow: hidden; }
+  .trust-cell { background: var(--bg-deep); padding: 26px 22px; }
+  .trust-cell h3 { font-family: var(--font-sans); font-weight: 600; font-size: 1.02rem; margin: 0 0 10px; color: var(--amber-dim); }
+  .trust-cell p { margin: 0; color: var(--paper-dim); font-size: 0.95rem; }
+  .trust-cell code { font-family: var(--font-mono); background: var(--panel); padding: 1px 6px; border-radius: 4px; font-size: 0.88em; color: var(--paper); }
+
+  .security-note {
+    background: var(--panel);
+    border: 1px solid var(--panel-line-strong);
+    border-left: 3px solid var(--amber);
+    padding: 20px 24px;
+    font-size: 0.95rem;
+    color: var(--paper-dim);
+    border-radius: 14px;
+  }
+  .security-note strong { color: var(--paper); }
+
+  .step-note { color: var(--paper-dim); font-size: 0.92rem; margin: 22px 0 0; }
+
+  /* Install command — shown as a code block, not a copy button, because this
+     page carries no inline copy script (keeps the CSP to its existing hashes). */
+  .install {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    font-family: var(--font-mono);
+    font-size: 0.95rem;
+    background: var(--panel);
+    border: 1px solid var(--panel-line-strong);
+    padding: 13px 18px;
+    border-radius: 12px;
+  }
+  .install .prompt { color: var(--amber); }
+  .install .cmd { color: var(--paper); }
+
+  /* The pull-request verdict mock: rule + pass/fail + one evidence line. */
+  .pr-stage { display: flex; justify-content: center; margin-top: 8px; }
+  .pr {
+    width: min(100%, 560px);
+    background: var(--panel);
+    border: 1px solid var(--panel-line-strong);
+    border-radius: 16px;
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    color: var(--paper-dim);
+    box-shadow: 0 1px 2px rgba(23,25,28,0.04), 0 12px 28px -18px rgba(23,25,28,0.18);
+    overflow: hidden;
+  }
+  .pr-top {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--panel-line);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .pr-top .live { color: var(--amber-dim); display: flex; align-items: center; gap: 6px; }
+  .pr-top .live .led { width: 6px; height: 6px; border-radius: 50%; background: var(--amber); }
+  .pr-body { padding: 16px 18px 18px; }
+  .pr-line { display: flex; gap: 10px; margin-bottom: 4px; align-items: baseline; }
+  .pr-mark { width: 14px; flex: none; font-weight: 700; }
+  .pr-mark.pass { color: var(--cyan); }
+  .pr-mark.fail { color: var(--red); }
+  .pr-mark.unclear { color: var(--judge); }
+  .pr-rule { color: var(--paper); }
+  .pr-ev { margin: 2px 0 14px 24px; color: var(--paper-dim); font-size: 0.74rem; }
+  .pr-foot {
+    padding: 12px 18px;
+    border-top: 1px solid var(--panel-line);
+    font-size: 0.7rem;
+    color: var(--paper-dim);
+    display: flex;
+    justify-content: center;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .link-cta {
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    color: var(--amber-dim);
+    background: var(--panel);
+    border: 1px solid var(--amber);
+    padding: 12px 20px;
+    border-radius: 12px;
+    display: inline-block;
+    text-decoration: none;
+    font-weight: 600;
+    margin-top: 18px;
+  }
+  .link-cta:hover { background: #FBF0E8; }
+  .link-cta .arw { color: var(--amber); }
+
+  footer { padding: 54px 0 68px; text-align: center; border-top: 1px solid var(--panel-line); }
+  footer .cmd-repeat { font-family: var(--font-mono); font-size: 1rem; color: var(--paper); margin-bottom: 10px; }
+  footer .fine { color: var(--paper-dim); font-size: 0.85rem; }
+  footer .fine a { color: var(--amber-dim); }
+
+  @media (max-width: 720px) {
+    .steps, .trust-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+  <header class="top">
+    <div class="wrap top-inner">
+      <a class="wordmark" href="/"><span class="led"></span> RuleReceipt</a>
+      <a class="top-cta" href="https://github.com/rulereceipt/rulereceipt" target="_blank" rel="noopener">source on GitHub</a>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <div class="hero">
+      <div class="eyebrow">for team leads &middot; the check runs on every laptop, not on our servers</div>
+      <h1>See what your team's agents did.<br><span>Without collecting anyone's transcripts.</span></h1>
+      <p class="sub">You're accountable for what the agents ship; you can't read every session. RuleReceipt gives you a per-pull-request verdict — which of your rules a session followed or broke, with one line of evidence — while every transcript stays on the developer's own machine.</p>
+    </div>
+  </div>
+
+  <section class="band">
+    <div class="wrap-wide">
+      <h2>Share the verdict, not the transcript</h2>
+      <p class="band-sub">The transcript is private, long, and full of code you don't need to re-read. The verdict is small and portable. Each developer runs the check locally and attaches the result to the pull request: the rule, pass or fail, and one line of evidence. Nothing is uploaded, and no session leaves the laptop.</p>
+
+      <div class="pr-stage">
+        <div class="pr">
+          <div class="pr-top">
+            <span>pull request #214 &middot; rulereceipt check</span>
+            <span class="live"><span class="led"></span>on the dev's machine</span>
+          </div>
+          <div class="pr-body">
+            <div class="pr-line"><span class="pr-mark pass">&check;</span><span class="pr-rule">Rule: never commit directly to <code style="font-family:inherit">main</code></span></div>
+            <div class="pr-ev">evidence: branch was <code style="font-family:inherit">feat/export</code> throughout; no push to main</div>
+            <div class="pr-line"><span class="pr-mark fail">&times;</span><span class="pr-rule">Rule: run the tests before saying it's done</span></div>
+            <div class="pr-ev">evidence: reply said &ldquo;all green&rdquo; &mdash; no test command ran this session</div>
+            <div class="pr-line"><span class="pr-mark unclear">?</span><span class="pr-rule">Rule: flag risky changes first</span></div>
+            <div class="pr-ev">needs a person: a judgment rule, left for the reviewer rather than guessed</div>
+          </div>
+          <div class="pr-foot"><span>1 followed &middot; 1 not followed &middot; 1 needs a person &mdash; sha256 on the exact session read</span></div>
+        </div>
+      </div>
+
+      <div style="height:22px"></div>
+      <div class="security-note"><strong>The reviewer can trust it without the raw log.</strong> Hand them the receipt and, if they ask, the session file: every report is hashed to the exact bytes it read, so they can confirm it describes <em>that</em> session, unaltered &mdash; an edited session produces a different fingerprint. The transcript itself never has to travel for the verdict to hold up.</div>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap-wide">
+      <h2>The setup that works today</h2>
+      <p class="band-sub">No server of ours, no account, no rollout. Three steps a lead can put in place this week with the free CLI.</p>
+      <div class="steps">
+        <div class="step">
+          <div class="n">01</div>
+          <h3>One rules file, committed</h3>
+          <p>Your <code>CLAUDE.md</code> / <code>AGENTS.md</code> lives in the repo &mdash; one policy every agent on the team reads, versioned with the code and reviewed like code.</p>
+        </div>
+        <div class="step">
+          <div class="n">02</div>
+          <h3>Each developer checks locally</h3>
+          <p><code>npx rulereceipt check --html</code> after a session writes a self-contained receipt on that developer's machine. No account, no server, nothing uploaded.</p>
+        </div>
+        <div class="step">
+          <div class="n">03</div>
+          <h3>Gate the pull request</h3>
+          <p><code>rulereceipt verify-receipt</code> and the GitHub Action fail a PR when a session broke a rule you marked a hard error in a committed <code>.rulereceipt/config.json</code>. You choose which rules block and which only warn.</p>
+        </div>
+      </div>
+      <p class="step-note"><code>rulereceipt report</code> rolls several recent sessions into one local summary &mdash; which rules broke, where, with the evidence &mdash; so a lead gets a weekly read without touching anyone's raw logs.</p>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap-wide">
+      <h2>What it will and won't do</h2>
+      <p class="band-sub">The honest boundary, up front &mdash; because a checker a lead can't trust is worse than none.</p>
+      <div class="trust-grid">
+        <div class="trust-cell">
+          <h3>Detect and report &mdash; every agent</h3>
+          <p>It reads the finished session and reports, per rule, followed / broken / can't-tell with the quoted line &mdash; across Claude Code, OpenAI Codex, GitHub Copilot CLI, Cursor, Google Antigravity, OpenCode, Cline and Devin Desktop. One receipt, whichever agent a developer used.</p>
+        </div>
+        <div class="trust-cell">
+          <h3>Block &mdash; Claude Code only</h3>
+          <p>An optional <code>Stop</code> hook can refuse to let a session finish on a broken rule, and a <code>guard</code> hook can decline a file-or-branch action before it runs. Both are Claude Code only, both are narrow, and you install them yourself. Everywhere else it is after the fact.</p>
+        </div>
+        <div class="trust-cell">
+          <h3>It won't cry wolf</h3>
+          <p>A FAIL comes only from hard evidence &mdash; a forbidden action that happened, or a claim the session's own logs contradict. Judgment rules are marked, not guessed. Measured false-accusation rate: 0.8%. What the transcript never recorded &mdash; another terminal, a permission-prompt click &mdash; comes back &ldquo;couldn't tell,&rdquo; never a fail.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap-wide" style="text-align:center;">
+      <h2>Want it on your pull requests?</h2>
+      <p class="band-sub" style="margin: 0 auto 6px; max-width: 60ch;">A hosted view across repos and people is on the roadmap. The local setup above is free and works today. If you run a 5&ndash;50 engineer team and want to try the per-PR verdict, we're taking on a few design partners.</p>
+      <a class="link-cta" href="mailto:hello@rulereceipt.dev?subject=RuleReceipt%20design%20partner">Get in touch <span class="arw">&rarr;</span></a>
+    </div>
+  </section>
+
+  <footer>
+    <div class="wrap">
+      <div class="cmd-repeat">npx rulereceipt check</div>
+      <div class="fine">Your machine. Your rules. Your receipt.</div>
+      <div class="fine" style="margin-top:16px">
+        <a href="/">Home</a> · <a href="/about">About</a> · <a href="/compare">Compare</a> · <a href="/pricing">Pricing</a> · <a href="/why">Why an outside check</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a>
+      </div>
+    </div>
+  </footer>
+
+</body>
+</html>
