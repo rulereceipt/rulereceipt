@@ -81,12 +81,14 @@ export function memoryGraphEntry(cwd: string): { path: string; ruleCount: number
   return null;
 }
 
-export function loadMemoryRules(cwd: string): Rule[] {
+export function loadMemoryRules(cwd: string, homes?: string[]): Rule[] {
   const rules: Rule[] = [];
   const seenIds = new Set<string>();
   const encoded = cwd.replace(/\//g, "-");
 
-  for (const base of claudeHomes()) {
+  // `homes`, when given, restricts to the session's own home (see
+  // homeOwningSession) so memory from another configured home is not applied.
+  for (const base of homes ?? claudeHomes()) {
     const memoryDir = join(base, "projects", encoded, "memory");
 
     let files: string[];

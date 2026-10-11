@@ -1,6 +1,6 @@
 {
   "name": "rulereceipt",
-  "version": "0.1.106",
+  "version": "0.1.107",
   "description": "Did it push straight to main? Touch a file you told it never to? RuleReceipt checks the finished session against your CLAUDE.md / AGENTS.md rules and marks each followed, broken, or can't-tell, with the exact line as proof. Reads sessions from Claude Code, OpenAI Codex, GitHub Copilot CLI, Cursor, Google Antigravity, OpenCode, Cline and Devin Desktop; also reads Cursor, Copilot, Windsurf and Gemini rules files. Runs locally, nothing uploaded.",
   "repository": {
     "type": "git",

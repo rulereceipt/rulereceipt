@@ -6,7 +6,7 @@ import { join, dirname, resolve, isAbsolute, basename } from "node:path";
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { parseClaudeMd } from "./parsers/readClaudeMd.js";
-import { subagentNote, sessionCwdOf, readBoundedText, maxTranscriptBytes } from "./parsers/transcriptParser.js";
+import { subagentNote, sessionCwdOf, readBoundedText, maxTranscriptBytes, homeOwningSession } from "./parsers/transcriptParser.js";
 import { findLatestSession, sessionSourceNote, parseSessionFile } from "./adapters/index.js";
 import { sessionCwd as codexSessionCwd } from "./adapters/codex.js";
 import { copilotFormatIsKnown, workspaceCwd as copilotWorkspaceCwd } from "./adapters/copilot.js";
@@ -293,7 +293,13 @@ async function runCheck(opts: CheckOptions) {
   } else if (latestSession) {
     agentTool = latestSession.adapter.tool;
   }
-  const rules = loadRules(cwd, agentTool);
+  // A session's global rules come only from the home that session belongs to,
+  // never from another configured ~/.claude* home. Unknown owner (e.g.
+  // --transcript to a copy, or a non-Claude session) → every configured home,
+  // unchanged. Removing another home's globals can only drop a rule that never
+  // applied, so this can never add a verdict.
+  const ownerHome = homeOwningSession(transcriptOverride ?? latestSession?.file ?? null);
+  const rules = loadRules(cwd, agentTool, ownerHome ? { claudeHomes: [ownerHome] } : undefined);
   // Did the subfolder-rules descendant walk stop at its dir/time cap? Captured
   // right after loadRules (before any other call can overwrite the module stat).
   const ruleScan = lastRuleScanInfo();

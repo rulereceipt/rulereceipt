@@ -549,7 +549,11 @@ function scopedRuleFilesBelow(cwd: string, pi: ProjectInstructions, agentTool = 
  * guessing at their location would be the kind of unverified assumption
  * this project has already been bitten by twice.
  */
-export function loadRules(cwd: string, agentTool = "claude-code"): Rule[] {
+export function loadRules(
+  cwd: string,
+  agentTool = "claude-code",
+  opts?: { claudeHomes?: string[] }
+): Rule[] {
   const rules: Rule[] = [];
   const isCodex = agentTool === "codex";
   const isClaude = agentTool === "claude-code";
@@ -581,7 +585,10 @@ export function loadRules(cwd: string, agentTool = "claude-code"): Rule[] {
   if (isCodex) {
     read(join(homedir(), ".codex", "AGENTS.md"), "global");
   } else if (isClaude) {
-    for (const base of claudeHomes()) {
+    // When the session's own home is known (opts.claudeHomes), read globals ONLY
+    // from it — never from another configured ~/.claude* home the session does
+    // not belong to. Absent that, fall back to every configured home (unchanged).
+    for (const base of opts?.claudeHomes ?? claudeHomes()) {
       read(join(base, "CLAUDE.md"), "global");
       for (const file of markdownFilesIn(join(base, "rules"))) read(file, "global");
     }
@@ -626,7 +633,7 @@ export function loadRules(cwd: string, agentTool = "claude-code"): Rule[] {
   // tool does not go stale against it. Non-office homes only; ids are
   // "memory:<name>", distinct from file-rule ids, so no dedup collision.
   // Only Claude Code reads Claude memory.
-  if (isClaude) rules.push(...loadMemoryRules(cwd));
+  if (isClaude) rules.push(...loadMemoryRules(cwd, opts?.claudeHomes));
   return dedupeRuleText(rules);
 }
 

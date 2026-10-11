@@ -44,7 +44,30 @@ const GIT_COMMIT = /\bgit\s+commit\b/;
 const GIT_PUSH_ARGS = /\bgit\s+(?:\S+\s+){0,4}?push(?![\w-])\s*(.*)$/;
 const GIT_BRANCH_ARGS = /\bgit\s+(?:\S+\s+){0,4}?branch(?![\w-])\s*(.*)$/;
 
-type BranchHit = { branch: string; kind: "push" | "create" | "switch" };
+type BranchHit = { branch: string; kind: "push" | "create" | "switch"; segment: string };
+
+// The single shell segment of a (possibly multi-line) command that actually
+// contains the matched git sub-command, trimmed for quoting. A guarded-push
+// block runs `gh auth switch … / cd … / NAME=$(…) / git push origin main`;
+// the evidence must quote the `git push origin main` line, not the block's
+// first line. Evidence only — detection is unchanged. Falls back to the whole
+// command if no single segment contains the match.
+function segmentContaining(command: string, matched: string): string {
+  for (const seg of segments(command)) {
+    if (seg.includes(matched)) return seg.trim();
+  }
+  return command.trim();
+}
+
+// The segment that actually runs `git commit` (the checkout-then-commit
+// violation), for the evidence quote. Evidence only; detection is in
+// findCheckoutCommitViolation and is unchanged.
+function commitSegment(command: string): string {
+  for (const seg of segments(command)) {
+    if (leadingCommand(seg) === "git" && GIT_COMMIT.test(seg)) return seg.trim();
+  }
+  return command.trim();
+}
 
 /**
  * The branch(es) a `git push` actually writes to. Parses the args instead of
@@ -53,8 +76,8 @@ type BranchHit = { branch: string; kind: "push" | "create" | "switch" };
  * remote-branch delete (`origin :main`, `origin --delete main`), and a
  * `local:remote` refspec (the TARGET is the remote side).
  */
-function pushTargets(command: string): string[] {
-  const out: string[] = [];
+function pushTargets(command: string): { branch: string; segment: string }[] {
+  const out: { branch: string; segment: string }[] = [];
   for (const seg of segments(command)) {
     if (leadingCommand(seg) !== "git") continue;
     const m = seg.match(GIT_PUSH_ARGS);
@@ -66,7 +89,7 @@ function pushTargets(command: string): string[] {
       const spec = ref.replace(/^\+/, ""); // `+local:remote` force refspec
       const colon = spec.indexOf(":");
       const target = colon >= 0 ? spec.slice(colon + 1) : spec; // remote side
-      if (target.length > 0) out.push(target);
+      if (target.length > 0) out.push({ branch: target, segment: seg.trim() });
     }
   }
   return out;
@@ -78,8 +101,8 @@ function pushTargets(command: string): string[] {
  * into `main` overwrites `main`); `-d/-D/--delete` targets every named branch;
  * a plain `git branch <name> [<start>]` targets only the created <name>.
  */
-function branchTargets(command: string): string[] {
-  const out: string[] = [];
+function branchTargets(command: string): { branch: string; segment: string }[] {
+  const out: { branch: string; segment: string }[] = [];
   for (const seg of segments(command)) {
     if (leadingCommand(seg) !== "git") continue;
     const m = seg.match(GIT_BRANCH_ARGS);
@@ -88,12 +111,13 @@ function branchTargets(command: string): string[] {
     const flags = tokens.filter((t) => t.startsWith("-"));
     const positionals = tokens.filter((t) => !t.startsWith("-"));
     if (positionals.length === 0) continue;
+    const s = seg.trim();
     if (flags.some((f) => /^(?:--move|-m|-M)$/.test(f))) {
-      out.push(positionals[positionals.length - 1]);
+      out.push({ branch: positionals[positionals.length - 1], segment: s });
     } else if (flags.some((f) => /^(?:--delete|-d|-D)$/.test(f))) {
-      out.push(...positionals);
+      for (const b of positionals) out.push({ branch: b, segment: s });
     } else {
-      out.push(positionals[0]);
+      out.push({ branch: positionals[0], segment: s });
     }
   }
   return out;
@@ -102,11 +126,11 @@ function branchTargets(command: string): string[] {
 function extractGitBranchTargets(command: string): BranchHit[] {
   const hits: BranchHit[] = [];
   const create = command.match(GIT_CHECKOUT_CREATE);
-  if (create) hits.push({ branch: create[1], kind: "create" });
+  if (create) hits.push({ branch: create[1], kind: "create", segment: segmentContaining(command, create[0]) });
   const switchOnly = command.match(GIT_CHECKOUT_SWITCH_ONLY);
-  if (switchOnly) hits.push({ branch: switchOnly[1], kind: "switch" });
-  for (const b of branchTargets(command)) hits.push({ branch: b, kind: "create" });
-  for (const b of pushTargets(command)) hits.push({ branch: b, kind: "push" });
+  if (switchOnly) hits.push({ branch: switchOnly[1], kind: "switch", segment: segmentContaining(command, switchOnly[0]) });
+  for (const b of branchTargets(command)) hits.push({ branch: b.branch, kind: "create", segment: b.segment });
+  for (const b of pushTargets(command)) hits.push({ branch: b.branch, kind: "push", segment: b.segment });
   return hits;
 }
 
@@ -150,13 +174,13 @@ export function runGitBranchPolicyChecks(
   events: TranscriptEvent[]
 ): CheckResult[] {
   const commands: string[] = [];
-  const allTargets: { branch: string; command: string; kind: BranchHit["kind"] }[] = [];
+  const allTargets: { branch: string; command: string; segment: string; kind: BranchHit["kind"] }[] = [];
   for (const event of events) {
     const command = commandFromEvent(event);
     if (!command) continue;
     commands.push(command);
     for (const hit of extractGitBranchTargets(command)) {
-      allTargets.push({ branch: hit.branch, command, kind: hit.kind });
+      allTargets.push({ branch: hit.branch, command, segment: hit.segment, kind: hit.kind });
     }
   }
 
@@ -189,11 +213,15 @@ export function runGitBranchPolicyChecks(
       (t) => t.branch === branchName && (t.kind === "push" || t.kind === "create")
     );
     const commitViolationCommand = findCheckoutCommitViolation(commands, branchName);
-    const hit = pushOrCreateHit ?? (commitViolationCommand ? { branch: branchName, command: commitViolationCommand } : undefined);
+    const hit =
+      pushOrCreateHit ??
+      (commitViolationCommand
+        ? { branch: branchName, command: commitViolationCommand, segment: commitSegment(commitViolationCommand) }
+        : undefined);
 
     if (polarity === "forbid") {
       if (hit) {
-        return violation(rule, polarity, `a git command actually targeted the "${branchName}" branch: ${hit.command}`, { method: "git_events", polarityInferred });
+        return violation(rule, polarity, `a git command actually targeted the "${branchName}" branch: ${hit.segment}`, { method: "git_events", polarityInferred });
       }
         // Trigger evaluated and absent: the rule never applied. Not
         // "followed" — that word claims something the check cannot show.
@@ -221,7 +249,7 @@ export function runGitBranchPolicyChecks(
         ruleTitle: rule.title,
         ruleSource: rule.source,
         status: "PASS",
-        evidence: `a git command targeted the required "${branchName}" branch: ${hit.command}`,
+        evidence: `a git command targeted the required "${branchName}" branch: ${hit.segment}`,
       };
     }
     return {

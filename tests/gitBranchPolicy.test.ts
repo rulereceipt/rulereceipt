@@ -256,3 +256,45 @@ describe("git-command detection is robust to heredocs and mentions", () => {
     expect(r.status).not.toBe("FAIL");
   });
 });
+
+describe("evidence quotes the matched git sub-command, not the whole command block (gitbranch-evidence-attribution, 0.1.107)", () => {
+  // Real finding: gitBranchPolicy correctly DETECTED `git push origin main`
+  // inside a multi-line guarded-push block, but the evidence quoted the block's
+  // FIRST line (`gh auth switch …`), which reads as "how did gh auth switch
+  // target main?". Detection was always right; this fixes the evidence text so
+  // it quotes the line that actually matched. No verdict change.
+  const forbidMain: GitBranchPolicyClassification = {
+    kind: "gitBranchPolicy",
+    rule: { id: "1", title: "No direct push to main", text: "Never push to the `main` branch.", source: "project" },
+    branchName: "main",
+    polarity: "forbid",
+  };
+
+  it("quotes `git push origin main`, not the `gh auth switch` first line of a multi-line block", () => {
+    const block = [
+      "gh auth switch --hostname github.com --user rulereceipt",
+      "cd /repo",
+      "NAME=$(git config user.name)",
+      "git push origin main",
+    ].join("\n");
+    const [result] = runGitBranchPolicyChecks([forbidMain], [bash(block)]);
+    expect(result.status).toBe("FAIL"); // detection unchanged
+    expect(result.evidence).toContain("git push origin main");
+    expect(result.evidence).not.toContain("gh auth switch");
+    expect(result.evidence).not.toContain("NAME=$(git config");
+  });
+
+  it("quotes only the matched push segment when chained after other commands", () => {
+    const block = "echo start && git -c core.pager=cat push origin main";
+    const [result] = runGitBranchPolicyChecks([forbidMain], [bash(block)]);
+    expect(result.status).toBe("FAIL");
+    expect(result.evidence).toContain("git -c core.pager=cat push origin main");
+    expect(result.evidence).not.toContain("echo start");
+  });
+
+  it("a single-line push still quotes that line verbatim (no regression)", () => {
+    const [result] = runGitBranchPolicyChecks([forbidMain], [bash("git push origin main")]);
+    expect(result.status).toBe("FAIL");
+    expect(result.evidence).toContain("git push origin main");
+  });
+});

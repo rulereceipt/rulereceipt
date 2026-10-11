@@ -120,6 +120,31 @@ export function claudeHomes(): string[] {
   return [...out];
 }
 
+/**
+ * The single configured Claude home a recorded session belongs to, or null.
+ *
+ * A Claude session lives at `<home>/projects/<encoded-cwd>/<id>.jsonl`, so the
+ * owning home is the configured home whose `projects/` directory is an ancestor
+ * of the file. Used so a session's GLOBAL rules are read only from ITS OWN home,
+ * never from another configured `~/.claude*` home (a separate or employer home a
+ * different session belongs to). Scoping this way can only REMOVE a global rule
+ * that was never the session's to begin with — it can never add one — so it
+ * cannot manufacture a verdict.
+ *
+ * Returns null for a file outside every configured home (e.g. `--transcript`
+ * pointed at a copy, or a non-Claude session under ~/.codex), leaving the caller
+ * on its existing default of every configured home.
+ */
+export function homeOwningSession(sessionFile: string | null | undefined): string | null {
+  if (!sessionFile) return null;
+  const file = realpathOr(sessionFile);
+  for (const base of claudeHomes()) {
+    const projects = realpathOr(join(base, "projects"));
+    if (file === projects || file.startsWith(projects + sep)) return base;
+  }
+  return null;
+}
+
 function listSessionFiles(projectDir: string): string[] {
   let entries: string[];
   try {
