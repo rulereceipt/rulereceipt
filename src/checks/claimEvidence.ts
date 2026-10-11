@@ -228,12 +228,70 @@ function outcomeFromOutput(output: string): boolean | null {
   return null;
 }
 
+// A claim scoped to ONE named test ("the 300MB test passes") vs a claim about the whole suite
+// ("all tests pass", "the unit tests pass"). A PARTIAL run (some passed, one failed) cannot tell
+// whether the NAMED test was the one that failed, so a scoped claim over a partial run is
+// can't-tell, not a FAIL. claimevidence-named-test, 2026-10-11: a real FP where "The 300MB test
+// passes" was flagged because a *different* sub-test ("a tiny maxBytes…") failed in the same run.
+const GLOBAL_TEST_CLAIM =
+  /\b(?:all\s+tests?|the\s+tests\b|the\s+(?:unit|integration|e2e|end-to-end|smoke|regression|whole|entire|full)\s+(?:tests?|suite|test\s+suite)|the\s+suite|everything|full\s+suite|tests?\s+are\s+(?:all\s+)?green)\b/i;
+const SCOPED_TEST_CLAIM =
+  /\bthe\s+[\w][\w.+/-]*(?:\s+[\w][\w.+/-]*){0,2}\s+tests?\s+(?:pass(?:es|ed)?|is|was|now|works?|green)/i;
+function isScopedTestClaim(s: string): boolean {
+  return SCOPED_TEST_CLAIM.test(s) && !GLOBAL_TEST_CLAIM.test(s);
+}
+// A run where at least one test passed alongside the failure — the failure was NOT total.
+function isPartialRun(output: string): boolean {
+  if (OUTPUT_PASSED.test(output)) return true;
+  const m = output.match(/\((\d+)\s+tests?\s*\|\s*([1-9]\d*)\s+(?:failed|fail)\)/i);
+  return m !== null && Number(m[1]) > Number(m[2]);
+}
+
+// The per-test lines shown FAILING. A line carrying a fail glyph (✕/✗/×) or a `FAIL` label names a
+// failing test; a passing line (✓) is deliberately excluded, so "✓ reads a 300MB session" never looks
+// like a failure. Capped so a giant log can't blow up the evidence string.
+function failingTestText(fullOutput: string): string {
+  return fullOutput
+    .split(/\n/)
+    .filter((l) => /[✕✗×]/.test(l) || /\bFAIL\b/.test(l))
+    .join(" ")
+    .slice(0, 600);
+}
+// The subject of a scoped claim: the qualifier between "the" and "test" ("the 300MB test" -> "300MB").
+// null when the claim isn't scoped or the subject is too generic to match on safely (matching a
+// generic word in a failing line would MANUFACTURE an accusation, the exact failure to avoid).
+const SCOPED_SUBJECT =
+  /\bthe\s+([\w][\w.+/-]*(?:\s+[\w][\w.+/-]*){0,2})\s+tests?\s+(?:pass(?:es|ed)?|is|was|now|works?|green)/i;
+const GENERIC_SUBJECT = new Set(["new", "old", "one", "two", "that", "this", "last", "next", "main", "whole", "first"]);
+function scopedTestSubject(claim: string): string | null {
+  const m = claim.match(SCOPED_SUBJECT);
+  if (!m) return null;
+  const subject = m[1].trim();
+  if (subject.length < 3) return null;
+  if (GENERIC_SUBJECT.has(subject.toLowerCase())) return null;
+  return subject;
+}
+// The failing line that names this subject, or null. Case-insensitive, whitespace-collapsed.
+function failingLineNaming(failingText: string, subject: string): string | null {
+  const needle = subject.toLowerCase().replace(/\s+/g, " ");
+  for (const line of failingText.split(/\s{2,}|(?=[✕✗×])/)) {
+    if (line.toLowerCase().replace(/\s+/g, " ").includes(needle)) return line.trim();
+  }
+  return failingText.toLowerCase().includes(needle) ? failingText.trim().slice(0, 200) : null;
+}
+
 interface TestRun {
   command: string;
   failed: boolean;
   /** False when a pipe means the exit code belongs to something else. */
   outcomeReadable: boolean;
   output: string;
+  /**
+   * The per-test lines that are shown FAILING (fail glyph or a `FAIL` label), from the FULL
+   * output — not the 200-char `output` slice. Used to tell whether a scoped claim's OWN named
+   * test is the one that failed (→ a real contradiction) or a different test did (→ can't-tell).
+   */
+  failingText: string;
   /**
    * A non-default VARIANT run — a leading env-var assignment
    * (`DISABLE_LOCKS=1 npm test`) that deliberately changes behaviour. Found on
@@ -325,6 +383,8 @@ export function runClaimEvidenceChecks(
   // same-scope) passing re-run. A subset pass afterward leaves this standing.
   let unresolvedFailure: string | null = null;
   let partialPass: { claim: string; failing: string } | null = null;
+  let scopedPartial: { claim: string; run: TestRun } | null = null;
+  let namedFail: { claim: string; command: string; line: string } | null = null;
 
   for (const event of events) {
     // A read through Read/Grep/Glob never reaches the shell, so it has to be
@@ -374,6 +434,7 @@ export function runClaimEvidenceChecks(
           failed: stated !== null ? stated : event.isError,
           outcomeReadable: oneRun && (stated !== null || trustExitCode),
           output: event.content.slice(0, 200),
+          failingText: failingTestText(event.content),
           variant: isVariantRun(pendingRun),
         };
         pendingRuns.delete(resultId);
@@ -430,6 +491,17 @@ export function runClaimEvidenceChecks(
         // contradict a claim about the DEFAULT suite — the honest case where
         // "npm test" passes and "DISABLE_LOCKS=1 npm test" is reported failing in
         // the same breath. Not a contradiction; leave it can't-tell.
+      } else if (lastRun.failed && isScopedTestClaim(sentence) && isPartialRun(lastRun.output) && scopedPartial === null && namedFail === null) {
+        // The claim names ONE specific test and the run was partial (some passed). If the CLAIMED
+        // test is itself shown failing, that is a direct contradiction — FAIL, quoting both lines.
+        // Only when a DIFFERENT test is the one that failed can the run not settle it → can't-tell.
+        const subject = scopedTestSubject(sentence);
+        const line = subject ? failingLineNaming(lastRun.failingText, subject) : null;
+        if (line !== null) {
+          namedFail = { claim: sentence.trim(), command: lastRun.command, line };
+        } else {
+          scopedPartial = { claim: sentence.trim(), run: lastRun };
+        }
       } else if (lastRun.failed && contradiction === null) {
         contradiction = { claim: sentence.trim(), run: lastRun };
       } else if (!lastRun.failed && unresolvedFailure !== null && partialPass === null) {
@@ -477,6 +549,27 @@ export function runClaimEvidenceChecks(
         rule,
         `the session stated: "${partialPass.claim}", but the earlier failing run \`${short(partialPass.failing)}\` ` +
           `was only re-run in part — no full-suite pass covered it, so this claim isn't backed (nor disproven) here`
+      );
+    }
+    if (namedFail) {
+      return {
+        ruleId: rule.id,
+        ruleTitle: rule.title,
+        ruleSource: rule.source,
+        status: "FAIL" as const,
+        evidence:
+          `the session stated: "${namedFail.claim}"\n` +
+          `  but the run of \`${short(namedFail.command)}\` showed that very test failing: ` +
+          `${namedFail.line.replace(/\s+/g, " ").trim()}`,
+      };
+    }
+    if (scopedPartial && !contradiction && !namedFail) {
+      return unclear(
+        rule,
+        `the session stated: "${scopedPartial.claim}" — a claim about ONE named test, but the run ` +
+          `\`${short(scopedPartial.run.command)}\` had other tests pass alongside the failure ` +
+          `(${scopedPartial.run.output.replace(/\s+/g, " ").trim()}), so whether the NAMED test failed can't be ` +
+          `read from the run — a human has to look`
       );
     }
     if (contradiction) {

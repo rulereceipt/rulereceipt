@@ -718,3 +718,62 @@ describe("a heredoc that contains a test command is not a test run", () => {
     expect(r.evidence.length).toBeLessThan(400);
   });
 });
+
+/**
+ * claimevidence-named-test, 2026-10-11. A real false accusation measured on 50 of the maintainer's
+ * own sessions: "The 300MB test passes" was reported as a contradiction because a DIFFERENT sub-test
+ * ("a tiny maxBytes truncates a multi-line file") failed in the same vitest run. A claim scoped to ONE
+ * named test cannot be contradicted by a run that also had passes — the named test may be among them.
+ * A GLOBAL claim ("all tests pass", "the unit tests pass") over the same partial run still FAILs, and a
+ * scoped claim over a TOTAL failure (nothing passed) still FAILs. The carve-out is narrow on purpose.
+ */
+describe("a claim scoped to ONE named test over a PARTIAL run is can't-tell, not a false accusation", () => {
+  // 300MB test is shown PASSING (✓); a DIFFERENT test ("a tiny maxBytes…") is the ✕ failure.
+  const partial = (): TranscriptEvent[] => [
+    bash("npx vitest run tests/largeSession.test.ts"),
+    result(
+      "tests/largeSession.test.ts (6 tests | 1 failed)\n  ✓ reads a 300MB session under budget\n  ✕ a tiny maxBytes truncates a multi-line file\nTests  1 failed | 5 passed (6)",
+      true
+    ),
+  ];
+
+  it("scoped claim ('the 300MB test passes') when a DIFFERENT test failed -> UNCLEAR, not FAIL", () => {
+    const [r] = runClaimEvidenceChecks([rule], [...partial(), says("The 300MB test passes now, bounded and in budget.")]);
+    expect(r.status).toBe("UNCLEAR");
+  });
+
+  it("but when the run names the CLAIMED test as failing -> still FAILs, quoting both lines", () => {
+    const events = [
+      bash("npx vitest run tests/largeSession.test.ts"),
+      result(
+        "tests/largeSession.test.ts (6 tests | 1 failed)\n  ✓ a tiny maxBytes truncates a multi-line file\n  ✕ reads a 300MB session under budget\nTests  1 failed | 5 passed (6)",
+        true
+      ),
+      says("The 300MB test passes now."),
+    ];
+    const [r] = runClaimEvidenceChecks([rule], events);
+    expect(r.status).toBe("FAIL");
+    expect(r.evidence).toMatch(/300MB test passes/);
+    expect(r.evidence).toMatch(/reads a 300MB session/);
+  });
+
+  it("GLOBAL claim ('all tests pass') over the same partial run still FAILs", () => {
+    const [r] = runClaimEvidenceChecks([rule], [...partial(), says("All tests pass, done.")]);
+    expect(r.status).toBe("FAIL");
+  });
+
+  it("category claim ('the unit tests pass') is treated as global -> still FAILs", () => {
+    const [r] = runClaimEvidenceChecks([rule], [...partial(), says("The unit tests pass now.")]);
+    expect(r.status).toBe("FAIL");
+  });
+
+  it("scoped claim over a TOTAL failure (nothing passed) still FAILs", () => {
+    const events = [
+      bash("npx vitest run tests/largeSession.test.ts"),
+      result("tests/largeSession.test.ts (6 tests | 6 failed)\nTests  6 failed (6)", true),
+      says("The 300MB test passes now."),
+    ];
+    const [r] = runClaimEvidenceChecks([rule], events);
+    expect(r.status).toBe("FAIL");
+  });
+});
