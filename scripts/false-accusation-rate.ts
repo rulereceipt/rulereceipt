@@ -19,7 +19,7 @@
  *
  * Usage: npx tsx scripts/false-accusation-rate.ts [sessionCount] [--all]
  */
-import { readdirSync, statSync, existsSync, readFileSync } from "node:fs";
+import { readdirSync, statSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { join } from "node:path";
 import { homedir } from "node:os";
@@ -91,7 +91,11 @@ function check(rulesFilePath: string, events: TranscriptEvent[]): CheckResult[] 
   ];
 }
 
-const sessions = FROZEN
+const MANIFEST_IDX = process.argv.indexOf("--manifest");
+const MANIFEST = MANIFEST_IDX >= 0 ? process.argv[MANIFEST_IDX + 1] : null;
+const sessions = MANIFEST
+  ? readFileSync(MANIFEST, "utf8").split("\n").map((s) => s.trim()).filter((s) => s.length > 0 && !s.startsWith("#"))
+  : FROZEN
   ? readdirSync(join(FROZEN_DIR, "sessions")).filter((f) => f.endsWith(".jsonl")).sort().map((f) => join(FROZEN_DIR, "sessions", f))
   : pinnedSessions(sessionCount);
 if (sessions.length === 0) {
@@ -138,16 +142,22 @@ let withFail = 0;
 let failVerdicts = 0;
 const texts = new Map<string, number>();
 
+const dump: string[] = [];
 for (const f of files) {
-  for (const events of parsed) {
+  for (let si = 0; si < parsed.length; si++) {
+    const events = parsed[si];
     const results = check(join(CORPUS, f), events);
     reports += 1;
     const fails = results.filter((r) => r.status === "FAIL");
     if (fails.length > 0) withFail += 1;
     failVerdicts += fails.length;
-    for (const fail of fails) texts.set(fail.evidence, (texts.get(fail.evidence) ?? 0) + 1);
+    for (const fail of fails) {
+      texts.set(fail.evidence, (texts.get(fail.evidence) ?? 0) + 1);
+      if (MANIFEST) dump.push(`SESSION: ${(sessions[si].split("/").pop() ?? "")}\nRULE-FILE: ${f}\nTITLE: ${(fail.ruleTitle ?? "").replace(/\s+/g, " ")}\nEVIDENCE: ${fail.evidence.replace(/\s+/g, " ")}\n`);
+    }
   }
 }
+if (MANIFEST && dump.length) writeFileSync(join(process.cwd(), "local", "fa-private", "fails-full.txt"), dump.join("\n"));
 
 console.log(`\nCorpus: ${files.length} rules files x ${sessions.length} sessions = ${reports} reports`);
 console.log(`Reports carrying at least one FAIL: ${withFail}  (${((withFail / reports) * 100).toFixed(1)}%)`);
