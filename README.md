@@ -19,7 +19,7 @@ npx rulereceipt
 Runs entirely on your machine. Plain `rulereceipt check` makes zero network
 calls — [Trust, privacy and licensing](#trust-privacy-and-licensing) has the full
 detail, including the three off-by-default opt-ins. Sessions it reads: Claude
-Code (supported), OpenAI Codex CLI (supported, tested on 0.160.1), GitHub Copilot CLI (supported, tested on 1.0.92), Cursor (supported, tested on v2026.10.01), Antigravity (supported, tested on 1.3.1), OpenCode (supported, tested on 1.18.35), Cline (supported, tested on v3.0.70), Devin Desktop (supported, tested on 3.10.48), other agents experimental. It
+Code (supported), OpenAI Codex CLI (supported, tested on 0.160.1), GitHub Copilot CLI (supported, tested on 1.0.92), Cursor (supported, tested on v2026.10.01), Antigravity (supported, tested on 1.3.1), OpenCode (supported, tested on 1.18.35), Cline (supported, tested on v3.0.70), Devin Desktop (supported, tested on 3.10.48); any agent not in those eight is experimental. It
 also reads Cursor, Copilot and Windsurf rules files (and CLAUDE.md, AGENTS.md,
 Gemini `GEMINI.md`, Google's `.agents/rules`, and Claude Code memory).
 [Accuracy](https://rulereceipt.dev/accuracy)
@@ -101,7 +101,7 @@ memory — are read far more broadly; this table is about reading a *session*):
 | Cline | **Supported** | reads `~/.cline/data/sessions/<id>/` (meta + `.messages.json`); validated on a real session (CLI v3.0.70) — maps `ask_question` to the user's approval (an authorised push reads as Followed). Rules scoped to what Cline loads (`.clinerules`, `.cline/rules`, `.cursorrules`, `.windsurfrules`, AGENTS.md — not CLAUDE.md/GEMINI.md) |
 | Devin Desktop (Windsurf / Codeium) | **Supported** | reads the SQLite `~/.local/share/devin/cli/sessions.db` (via built-in `node:sqlite` on Node ≥ 22.5; older Node skips it), walking each session's main chain so retry branches are deduped; validated on a real session (Devin Desktop 3.10.48, backend windsurf, model swe-1-6-slow). Rules scoped to what Devin loads (project AGENTS.md + CLAUDE.md, `~/.claude/CLAUDE.md` and `~/.codeium/windsurf/memories/global_rules.md` — not GEMINI.md) |
 | Aider | Not supported | history is Markdown only, no tool record |
-| Windsurf IDE | Not yet | the editor itself is IDE-embedded; its Devin Desktop CLI *is* read (row above) |
+| Windsurf IDE | No, use Devin Desktop | the editor itself is IDE-embedded; its Devin Desktop CLI *is* read (row above) |
 
 Auto-detection picks the newest session across supported tools.
 

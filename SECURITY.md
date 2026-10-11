@@ -14,8 +14,9 @@ could actually do with it. You'll get a reply acknowledging the report.
 
 Worth knowing when assessing risk:
 
-- It **reads** your CLAUDE.md / AGENTS.md files and your local Claude Code
-  session transcripts. It does not write to them.
+- It **reads** your CLAUDE.md / AGENTS.md (and the other supported rules
+  formats) and your local agent session transcripts — Claude Code and the
+  seven other supported agents. It does not write to them.
 - It never modifies `.claude/settings.json` and installs no hooks.
 - It writes only to `~/.rulereceipt/` (its own config and, if you opt in,
   a random telemetry ID), with owner-only permissions.
