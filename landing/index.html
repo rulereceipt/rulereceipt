@@ -794,9 +794,6 @@
         <div class="issue"><span class="num">#24318</span><span>Claude ignores explicit user instructions and acts without approval</span></div>
         <div class="issue"><span class="num">→</span><span>A known limit of how LLMs process long instruction files, not a Claude-specific flaw — in Claude Code specifically, content starts getting selectively skipped after around 80 lines</span></div>
       </div>
-      <div class="evidence-divider"></div>
-      <div class="evidence-label">Sometimes the cost isn't a bug report — it's real data</div>
-      <p style="color:var(--paper-dim); font-size:0.92rem; margin:0 0 16px;">A developer told Claude explicitly: <em>"Don't deploy. No cp to /opt/proxypilot, no service restarts."</em> Claude ran a <code>cp</code> command over the live production directory anyway, corrupting the database — then deleted it entirely trying to "fix" the corruption. Recoverable only because a daily backup happened to exist. <a href="https://tim-schipper.nl/en/blog/the-day-claude-deleted-my-database" target="_blank" rel="noopener">Read the full account &rarr;</a></p>
     </div>
   </div>
 
@@ -829,86 +826,6 @@
         </div>
         <p class="fp-foot">That is the real fingerprint of <a href="/example-session.jsonl" download>the session file published on this site</a>. Download it and run <code>shasum -a 256</code> &mdash; you should get exactly the string above.</p>
       </div>
-      <div style="height:14px"></div>
-      <div class="security-note"><strong>Still written locally, still nothing uploaded.</strong> The file lands in your working directory and goes only where you choose to send it. Same as every other part of this tool — no server of ours is involved.</div>
-    </div>
-  </section>
-
-  <section class="band" style="padding-top:0;">
-    <div class="wrap-wide">
-      <h2 style="text-align:center;">In their own words</h2>
-      <p class="band-sub" style="text-align:center;">Real quotes, real links — click through and read the full thing yourself.</p>
-    </div>
-    <div class="quote-marquee-wrap">
-      <div class="quote-marquee">
-        <a class="quote-card" href="https://github.com/anthropics/claude-code/issues/28158" target="_blank" rel="noopener">
-          <p>"The file is confirmed present in context, agents acknowledge reading it, but 100% now ignore its directives."</p>
-          <span>&mdash; Promethean-Pty-Ltd, on a CLAUDE.md rule that had worked reliably for two months</span>
-        </a>
-        <a class="quote-card" href="https://github.com/anthropics/claude-code/issues/43463" target="_blank" rel="noopener">
-          <p>"Claude Code consistently fails to follow its own verification rules... This is not a one-time mistake &mdash; it's a recurring pattern observed across multiple sessions."</p>
-          <span>&mdash; rsluman, on an agent that wrote verification rules then ignored them in the very next task</span>
-        </a>
-        <a class="quote-card" href="https://forum.cursor.com/t/catastrophic-damage-and-chaos-in-plan-mode/145523" target="_blank" rel="noopener">
-          <p>"...acknowledged this instruction, then immediately proceeded to: Run <code>pkill</code> commands, Attempt to start processes, Continue making changes."</p>
-          <span>&mdash; art_m, after instructing Cursor "DO NOT RUN ANYTHING" &mdash; not Claude, the same failure</span>
-        </a>
-        <a class="quote-card" href="https://github.com/anthropics/claude-code/issues/15443" target="_blank" rel="noopener">
-          <p>"I took shortcuts... I read the words but didn't actually follow them."</p>
-          <span>— Claude, quoted in mattmizell's bug report, after overwriting production code despite the rule being stated 3 times</span>
-        </a>
-        <a class="quote-card" href="https://github.com/anthropics/claude-code/issues/18660" target="_blank" rel="noopener">
-          <p>"I rely on documented rules being followed as my QA process... CLAUDE.md isn't a nice-to-have — it's how I maintain engineering standards without being an engineer."</p>
-          <span>— Jason L. Williams, who built an 82,000-line app through Claude Code alone</span>
-        </a>
-        <a class="quote-card" href="https://github.com/anthropics/claude-code/issues/24318" target="_blank" rel="noopener">
-          <p>"Claude interpreted this as a go-ahead signal and immediately started executing... The user had only been asked 'shall I proceed?' and never answered yes."</p>
-          <span>— from a bug report on Claude treating frustration as approval</span>
-        </a>
-        <a class="quote-card" href="https://dev.to/minatoplanb/i-wrote-200-lines-of-rules-for-claude-code-it-ignored-them-all-4639" target="_blank" rel="noopener">
-          <p>"CLAUDE.md is a wish list, not a contract."</p>
-          <span>— minatoplanb, after 200 lines of rules, each tied to a real past incident</span>
-        </a>
-        <a class="quote-card" href="https://dev.to/mikeadolan/i-wrote-500-lines-of-rules-for-claude-code-heres-how-i-made-it-actually-follow-them-3c8" target="_blank" rel="noopener">
-          <p>"Rules in a text file are suggestions, and the AI decides whether to follow them based on how important they seem relative to the current task."</p>
-          <span>— Mike Dolan, after growing a CLAUDE.md from 50 to 500+ lines</span>
-        </a>
-        <!-- duplicated for the seamless scroll loop only; hidden from assistive tech and scrapers so the testimonials are not counted twice -->
-        <span class="quote-dup" aria-hidden="true" style="display:contents">
-        <a class="quote-card" href="https://github.com/anthropics/claude-code/issues/28158" target="_blank" rel="noopener" tabindex="-1">
-          <p>"The file is confirmed present in context, agents acknowledge reading it, but 100% now ignore its directives."</p>
-          <span>&mdash; Promethean-Pty-Ltd, on a CLAUDE.md rule that had worked reliably for two months</span>
-        </a>
-        <a class="quote-card" href="https://github.com/anthropics/claude-code/issues/43463" target="_blank" rel="noopener">
-          <p>"Claude Code consistently fails to follow its own verification rules... This is not a one-time mistake &mdash; it's a recurring pattern observed across multiple sessions."</p>
-          <span>&mdash; rsluman, on an agent that wrote verification rules then ignored them in the very next task</span>
-        </a>
-        <a class="quote-card" href="https://forum.cursor.com/t/catastrophic-damage-and-chaos-in-plan-mode/145523" target="_blank" rel="noopener">
-          <p>"...acknowledged this instruction, then immediately proceeded to: Run <code>pkill</code> commands, Attempt to start processes, Continue making changes."</p>
-          <span>&mdash; art_m, after instructing Cursor "DO NOT RUN ANYTHING" &mdash; not Claude, the same failure</span>
-        </a>
-        <a class="quote-card" href="https://github.com/anthropics/claude-code/issues/15443" target="_blank" rel="noopener" aria-hidden="true">
-          <p>"I took shortcuts... I read the words but didn't actually follow them."</p>
-          <span>— Claude, quoted in mattmizell's bug report, after overwriting production code despite the rule being stated 3 times</span>
-        </a>
-        <a class="quote-card" href="https://github.com/anthropics/claude-code/issues/18660" target="_blank" rel="noopener" aria-hidden="true">
-          <p>"I rely on documented rules being followed as my QA process... CLAUDE.md isn't a nice-to-have — it's how I maintain engineering standards without being an engineer."</p>
-          <span>— Jason L. Williams, who built an 82,000-line app through Claude Code alone</span>
-        </a>
-        <a class="quote-card" href="https://github.com/anthropics/claude-code/issues/24318" target="_blank" rel="noopener" aria-hidden="true">
-          <p>"Claude interpreted this as a go-ahead signal and immediately started executing... The user had only been asked 'shall I proceed?' and never answered yes."</p>
-          <span>— from a bug report on Claude treating frustration as approval</span>
-        </a>
-              <a class="quote-card" href="https://dev.to/minatoplanb/i-wrote-200-lines-of-rules-for-claude-code-it-ignored-them-all-4639" target="_blank" rel="noopener">
-          <p>"CLAUDE.md is a wish list, not a contract."</p>
-          <span>— minatoplanb, after 200 lines of rules, each tied to a real past incident</span>
-        </a>
-        <a class="quote-card" href="https://dev.to/mikeadolan/i-wrote-500-lines-of-rules-for-claude-code-heres-how-i-made-it-actually-follow-them-3c8" target="_blank" rel="noopener">
-          <p>"Rules in a text file are suggestions, and the AI decides whether to follow them based on how important they seem relative to the current task."</p>
-          <span>— Mike Dolan, after growing a CLAUDE.md from 50 to 500+ lines</span>
-        </a>
-        </span>
-</div>
     </div>
   </section>
 
@@ -940,8 +857,6 @@
       </div>
 
       <div style="height:20px"></div>
-      <div class="security-note"><strong>Why this exists.</strong> A rules file is advice the model may narrate its way around. Someone running a multi-agent lab put numbers on it publicly: an agent auto-acknowledged 107 dispatched orders and performed none of them, and 69 of 664 records marked complete turned out to be plans to do the thing rather than the thing. Their conclusion was that rules living only in context are advisory by construction. This is the same tool, moved to where that stops being true.</div>
-      <div style="height:14px"></div>
       <div class="security-note"><strong>The report and the gate disagree in exactly one place, on purpose.</strong> When a session claims work is done and nothing recorded verifies it, the report says &ldquo;couldn&rsquo;t tell&rdquo; &mdash; the tests may genuinely have run in another terminal, and a transcript cannot see that. The gate refuses the exit anyway, because it is not saying the claim is false. It is declining to let &ldquo;done&rdquo; end a session with nothing behind it, and the way out is one sentence saying which parts were actually checked.</div>
       <div style="height:14px"></div>
       <div class="security-note"><strong>And one that refuses before the command runs.</strong> <code>rulereceipt guard</code> is a <code>PreToolUse</code> hook: it declines a call outright, for rules naming a file or a branch &mdash; &ldquo;never modify <code>.env</code>&rdquo;, &ldquo;never commit to <code>main</code>&rdquo;. It will not block a banned <em>command</em> on its own, and that is a measurement rather than a limitation of effort: doing so automatically refused 62.8% of 16,336 real commands, because nothing in a rules file marks which backtick is the prohibition. One rule refused <code>npm run build</code> 112 times &mdash; it forbids running Playwright unprompted and <em>recommends</em> the build. So you mark the clause yourself, once, with <code>rulereceipt rules --forbid</code>, and only what you marked can ever refuse anything.</div>
@@ -952,8 +867,8 @@
 
   <section class="band">
     <div class="wrap-wide">
-      <h2>What we don't do</h2>
-      <p class="band-sub">The privacy story, stated plainly, not buried in a policy page.</p>
+      <h2>Private by default</h2>
+      <p class="band-sub">The privacy story, stated plainly, not buried in a policy page. <a href="/privacy">Full detail &rarr;</a></p>
       <div class="trust-grid">
         <div class="trust-cell"><h3>Offline by default</h3><p><code>--llm</code>, <code>--share</code> and <code>--telemetry</code> are opt-in and off until you turn them on. <a href="/privacy">Full detail</a>.</p></div>
         <div class="trust-cell"><h3>No account, no server, no login</h3><p>Nothing of ours sits in the path of a check &mdash; so there is nothing of ours to breach.</p></div>
@@ -961,52 +876,13 @@
       </div>
       <div style="height:20px"></div>
       <div class="security-note"><strong>You can verify the package you install came from the code you read.</strong> Every release is built and published by GitHub Actions and signed with npm provenance — no publishing token exists on anyone's laptop to be stolen. After installing, run <code>npm audit signatures</code> and npm will confirm the package was built from this public repository, at a specific commit. That's the appropriate standard for a tool whose whole job is verification, and it's checkable by you, not asserted by us.</div>
-      <div style="height:14px"></div>
-      <div class="security-note"><strong>And it can show you what IS enforced.</strong> A rules file is instructions the agent may ignore; a <em>hook</em> is a script Claude Code always runs &mdash; it can block a command outright. <code>rulereceipt doctor</code> lists every hook and auto-run task configured on your machine and in the project, flags ones invoking a non-absolute binary path (hijackable via <code>PATH</code>), and tells you which appeared since you last checked. Read-only: it never adds or changes a hook.</div>
-      <div style="height:14px"></div>
-      <div class="security-note"><strong>Worth saying directly, given the year it's been:</strong> malicious npm packages have specifically targeted Claude Code's hook system — planting code in <code>.claude/settings.json</code> that runs automatically on every session. RuleReceipt does none of that. It runs only when you type the command. Nothing automatic, nothing silent.</div>
-      <div style="height:14px"></div>
-      <div class="security-note"><strong>This isn't hypothetical.</strong> In July 2026, independent researchers found that a competing terminal coding agent was packaging entire codebases — including files never explicitly opened — into archives and uploading them to the vendor's cloud storage, with reports that the opt-out setting didn't reliably stop it. That's the blind spot this tool closes: don't trust the agent &mdash; check what it actually did.</div>
-    </div>
-  </section>
-
-  <section class="band">
-    <div class="wrap-wide">
-      <div style="text-align:center;">
-        <h2 style="margin-bottom:10px;">Why an outside check</h2>
-        <p class="band-sub" style="margin:0 auto; max-width:60ch;">An agent grading its own work has the same problem a company auditing its own books does. That's structural &mdash; it doesn't go away as models improve.</p>
-        <a href="/why" class="link-cta">The evidence, and how we know this is accurate <span class="arw">&rarr;</span></a>
-      </div>
-    </div>
-  </section>
-
-  <section class="band">
-    <div class="wrap-wide">
-      <div class="dpa-card">
-        <div>
-          <div class="dpa-eyebrow">for teams closing bigger deals</div>
-          <h2>Signing a deal with a bigger company?</h2>
-          <p class="band-sub">Vendor security reviews ask how you develop. Here's an answer you can back up.</p>
-          <p style="color:var(--paper-dim); font-size:0.88rem; margin-top:16px; font-style:italic;">A public repo, a forgotten <code>.env</code>, one deploy is all it takes to expose client data — and nobody finds out until it's too late.</p>
-        </div>
-        <div class="dpa-side">
-          <p>Secrets. PII. Input validation. Auth checks. Encryption in transit. What reviewers ask — checked against the session, whenever you run it.</p>
-          <p>A starting point we built, not a certification. Adjust it to your reviewer.</p>
-          <p>Protects the company from what a session did silently — and protects the dev, too. Evidence, not blame.</p>
-          <a href="/templates/security-focused-CLAUDE.md" class="dpa-cta">view the template &rarr;</a>
-        </div>
-      </div>
     </div>
   </section>
 
   <section class="band">
     <div class="wrap-wide">
       <h2>Pricing</h2>
-      <p class="band-sub">The CLI is free and runs locally. Team features are coming later; the free CLI stays free. <a href="/pricing">Full pricing &rarr;</a></p>
-      <div class="pricing">
-        <div class="price-card accent"><div>The CLI</div><div class="amount">Free</div><p>Unlimited checks, no card, no account &mdash; the whole tool, not a cut-down trial. You&rsquo;ll hear well before that changes.</p></div>
-        <div class="price-card"><div>For teams</div><div class="amount">Talk to us</div><p>A compliance report across <em>every</em> session &mdash; which rules were broken, with the evidence, for audits and vendor reviews. <code>rulereceipt report</code> does this locally today, free in the CLI. The org-wide, hosted version &mdash; reading every agent session via the Claude Compliance API &mdash; is in development for Enterprise. <a href="mailto:hello@rulereceipt.dev">Get in touch</a>.</p></div>
-      </div>
+      <p class="band-sub">The CLI is free and runs locally &mdash; unlimited checks, no card, no account. A paid Team tier (org-wide dashboards, compliance exports) is in development; the free CLI stays free. <a href="/pricing">Full pricing &rarr;</a> &middot; <a href="/for-teams">For teams &rarr;</a></p>
     </div>
   </section>
 
@@ -1020,25 +896,12 @@
             <p>Two halves, answered honestly. Your <em>rules</em>: yes — it reads CLAUDE.md, AGENTS.md, Cursor's <code>.cursor/rules</code> (and legacy <code>.cursorrules</code>), GitHub Copilot's <code>copilot-instructions.md</code>, Windsurf's <code>.windsurfrules</code>, Gemini's <code>GEMINI.md</code> and Google's <code>.agents/rules</code>. Your <em>sessions</em> — what the agent actually did — eight agents are supported, each validated on a real session: Claude Code, OpenAI Codex, GitHub Copilot CLI, Cursor, Google Antigravity, OpenCode, Cline and Devin Desktop. Not supported: Aider (it keeps no record of tool calls). For the old Windsurf editor, use Devin Desktop. Gemini CLI is legacy only, since it refuses a personal login. Blocking works in Claude Code only; <code>protect --git</code> works with every agent.</p>
           </details>
           <details class="faq-item">
-            <summary>Does this work if my team runs Claude Code through AWS Bedrock or Google Vertex, not the Anthropic API directly?</summary>
-            <p>Yes, no extra setup. RuleReceipt only reads the session transcript Claude Code already writes to your disk — that storage is the same regardless of which backend serves the actual model calls (Anthropic API, AWS Bedrock, Google Vertex, Microsoft Foundry). If your org already routes through one of those, this just works.</p>
-          </details>
-          <details class="faq-item">
             <summary>Do I need my own Anthropic API key?</summary>
             <p>For the rules that need judgment, yes — the same key your Claude Code setup already uses. Rules naming something concrete — a branch, a file, a code call — are checked locally against what the session actually did, with no key and no cost.</p>
           </details>
           <details class="faq-item">
-            <summary>Why not just use an in-session Skill for this instead?</summary>
-            <p>Because it's grading its own homework. A Skill runs inside the same session that just did the work — same model, same context, same blind spots that caused it to miss a rule the first time. RuleReceipt is a separate process: it reads the transcript Claude Code already saved to disk, after the session ends, and hashes the exact bytes it checked. That's the difference between an agent self-reporting and an independent receipt.</p>
-          </details>
-          <details class="faq-item">
             <summary>Does this touch my CLAUDE.md or Claude Code settings?</summary>
             <p>Read-only. It reads your rules files (CLAUDE.md, AGENTS.md, and Cursor/Copilot/Windsurf rules) and your session transcript, and writes nothing back. No hooks get installed, no settings get modified — not automatically, not ever, without you explicitly asking.</p>
-          </details>
-          <details class="faq-item">
-            <summary>Will the CLI start costing money later?</summary>
-            <p><code>rulereceipt check</code> is free, forever &mdash; the whole tool, not a cut-down trial. We make money from a paid Team tier (org-wide dashboards, compliance exports), never from the CLI itself. No paywall part-way through a command.</p>
-            <p>A paid team tier is coming either way. That is a hosted view of trends across people and repos over time, which is a genuinely different product from the local check &mdash; and it will be announced with a real price when it exists. We are not quoting a number for something that is not built.</p>
           </details>
           <details class="faq-item">
             <summary>Could someone edit the transcript before running the check?</summary>
@@ -1046,28 +909,12 @@
             <p>What that means in practice: this is solid for the honest case — catching what an agent actually did when nobody's trying to hide anything, which is nearly every real session. It is not, today, tamper-evident against someone deliberately covering their tracks. Making it so would need the record signed where it's written, not where it's read — that's not something a tool reading a local file after the fact can do alone. We'd rather say that clearly than let "receipt" imply more than it delivers.</p>
           </details>
           <details class="faq-item">
-            <summary>Can this help with a vendor security review or DPA?</summary>
-            <p>It can give you real evidence for the "how do you develop securely" questions — not certify you compliant. We put together a <a href="/templates/security-focused-CLAUDE.md">starting-point rule set</a> covering common asks (secrets, PII, input validation, auth checks); use it as a base and adjust it to what your actual reviewer asks for.</p>
-          </details>
-          <details class="faq-item">
             <summary>How do I know it won't just cry wolf?</summary>
-            <p>Because that's the thing it's built against. An early version did cry wolf — across 559 real rules files, about one report in six carried a false accusation. Most of the work since has gone into fixing that, not into catching more: measured over those same 559 rules files run against 10 real sessions, it's down to <strong>0.8%</strong>, and a "FAIL" comes only from hard evidence — a forbidden action that actually happened, or the agent's own claim contradicted by the session's own logs — enforced at build time, not left to hope. An AI opinion (with <code>--llm</code>) is labelled as an opinion and never counted as a verdict. When the evidence doesn't settle it, the answer is "couldn't tell," never a guess. A checker that accuses you wrongly is worse than no checker, so it's optimised to stay quiet unless it's sure. You don't have to take our word for it — <code>rulereceipt selftest</code> runs the checkers on bundled examples with known answers, on your machine, with zero network calls. Full numbers and method: <a href="/accuracy">the accuracy page</a>.</p>
-          </details>
-          <details class="faq-item">
-            <summary>Can it check every session, not just one?</summary>
-            <p>Yes. <code>rulereceipt report</code> audits your recent sessions into one summary — which rules were broken, where, with the evidence — deterministic and local, today. For a whole organisation, the same report is designed to run against a session feed like Anthropic's Compliance API (covering agent sessions across a team). That org-wide, hosted version is in development for Enterprise — <a href="mailto:hello@rulereceipt.dev">get in touch</a> if you need it.</p>
-          </details>
-          <details class="faq-item">
-            <summary>How is this different from Anthropic's Compliance API or built-in guardrails?</summary>
-            <p>They're complementary — RuleReceipt sits on top of them. Anthropic's Compliance API hands you the raw session transcripts; hooks let you block specific tool calls before they run. Neither one tells you, in plain terms, which of <em>your</em> CLAUDE.md rules a given session actually followed or broke, with the quoted evidence. That's the gap RuleReceipt fills: it reads those transcripts — yours locally today, or org-wide via a session feed like their Compliance API once the hosted version ships — and turns them into a pass/fail receipt against your own policy. Anthropic gives you the data and the enforcement primitives; this gives you the verdict.</p>
+            <p>Because that's the thing it's built against. On the frozen public test sets (v1&ndash;v4), there are <strong>0 false accusations</strong>. On 44 of the maintainer's own sessions (mostly building RuleReceipt itself), 5 of 26 &ldquo;broken&rdquo; verdicts were wrong before 0.1.106; the cause is fixed, and a fresh re-measure on new sessions is coming. A "FAIL" comes only from hard evidence — a forbidden action that actually happened, or the agent's own claim contradicted by the session's own logs — enforced at build time, not left to hope. An AI opinion (with <code>--llm</code>) is labelled as an opinion and never counted as a verdict. When the evidence doesn't settle it, the answer is "couldn't tell," never a guess. A checker that accuses you wrongly is worse than no checker, so it's optimised to stay quiet unless it's sure. You don't have to take our word for it — <code>rulereceipt selftest</code> runs the checkers on bundled examples with known answers, on your machine, with zero network calls. Full numbers and method: <a href="/accuracy">the accuracy page</a>.</p>
           </details>
           <details class="faq-item">
             <summary>Can I gate my CI on it?</summary>
             <p>Yes. <code>rulereceipt check</code> exits non-zero when a rule is broken, and there's a <code>verify-receipt</code> command plus a GitHub Action so a pull request fails if a session broke policy. You mark which rules are hard errors versus warnings in a committed <code>.rulereceipt/config.json</code>, so CI gates on what actually matters instead of going red on day one.</p>
-          </details>
-          <details class="faq-item">
-            <summary>Who's behind this, and is it maintained?</summary>
-            <p>The maintainer is pseudonymous by choice — but nothing here asks you to take that on faith. The code is source-available, so you can read every line it runs. Every release is built and published by GitHub Actions and signed with npm provenance, so you can verify the package came from this exact repository — there's no publishing token that could be stolen (check it yourself with <code>npm audit signatures</code>). It's actively maintained, with frequent signed releases. For a tool you run on your own machine against your own files, verifiable code and a verifiable release chain matter more than a name; and for anything enterprise, <a href="mailto:hello@rulereceipt.dev">hello@rulereceipt.dev</a> reaches a real person.</p>
           </details>
       </div>
     </div>
@@ -1092,7 +939,7 @@
       <div class="cmd-repeat" id="copy-footer" data-copy="npx rulereceipt check" data-loc="footer" role="button" tabindex="0" title="Click to copy">npx rulereceipt check</div>
       <div class="fine">Your machine. Your rules. Your receipt.</div>
       <div class="fine" style="margin-top:16px">
-        <a href="/about">About</a> · <a href="/guides/check-claude-code-followed-claude-md">Guides</a> · <a href="/compare">Compare</a> · <a href="/pricing">Pricing</a> · <a href="/for-teams">For teams</a> · <a href="/stats">Usage stats</a> · <a href="/postmortem">What we got wrong</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a> · <a href="/unsubscribe">Unsubscribe</a>
+        <a href="/why">Why an outside check</a> · <a href="/accuracy">Accuracy</a> · <a href="/about">About</a> · <a href="/guides/check-claude-code-followed-claude-md">Guides</a> · <a href="/compare">Compare</a> · <a href="/pricing">Pricing</a> · <a href="/for-teams">For teams</a> · <a href="/stats">Usage stats</a> · <a href="/postmortem">What we got wrong</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a> · <a href="/unsubscribe">Unsubscribe</a>
       </div>
       <div class="social-row">
         <a href="https://github.com/rulereceipt/rulereceipt" target="_blank" rel="noopener" aria-label="RuleReceipt on GitHub" title="Source on GitHub">

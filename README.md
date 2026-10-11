@@ -321,11 +321,13 @@ if your count differs from 559, that is why, and the routing percentages move
 by a rounding error rather than meaningfully.
 
 Two of these print a sha256 for every session they read. That is deliberate:
-the false-accusation rate is measured on the maintainer's own sessions — a
-moving set, not a fixed benchmark. "The largest sessions on this machine" is a
-selection rule, not a pin, and the largest include the session doing the
-measuring. Two runs of identical code four days apart returned 14,033 and 9,605
-tool calls. Numbers are comparable only when those hashes match.
+the local own-sessions spot-check uses "the largest sessions on this machine,"
+which is a selection rule, not a pin — and the largest once included the session
+doing the measuring, so two runs of identical code four days apart returned
+14,033 and 9,605 tool calls. The reproducible number is the frozen public corpus
+(fa-corpus v1-v4); for the own-sessions figure there is now a fixed, sha256-pinned
+44-session snapshot that excludes the measuring session. Numbers are comparable
+only when those hashes match.
 
 ## Which rules actually have teeth
 

@@ -344,7 +344,27 @@
         </div>
         <div class="trust-cell">
           <h3>It won't cry wolf</h3>
-          <p>A FAIL comes only from hard evidence &mdash; a forbidden action that happened, or a claim the session's own logs contradict. Judgment rules are marked, not guessed. On the maintainer's own sessions, 0.8% (a moving set); on the frozen test sets, 0. What the transcript never recorded &mdash; another terminal, a permission-prompt click &mdash; comes back &ldquo;couldn't tell,&rdquo; never a fail.</p>
+          <p>A FAIL comes only from hard evidence &mdash; a forbidden action that happened, or a claim the session's own logs contradict. Judgment rules are marked, not guessed. On the frozen public test sets (v1&ndash;v4), 0 false accusations; on 44 of the maintainer's own sessions, 5 of 26 &ldquo;broken&rdquo; verdicts were wrong before 0.1.106, now fixed. What the transcript never recorded &mdash; another terminal, a permission-prompt click &mdash; comes back &ldquo;couldn't tell,&rdquo; never a fail.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap-wide">
+      <h2>Questions teams ask</h2>
+      <div class="trust-grid">
+        <div class="trust-cell">
+          <h3>We run Claude Code through AWS Bedrock or Google Vertex, not the Anthropic API directly. Does it still work?</h3>
+          <p>Yes, no extra setup. RuleReceipt only reads the session transcript Claude Code already writes to disk &mdash; that storage is the same regardless of which backend serves the model calls (Anthropic API, AWS Bedrock, Google Vertex, Microsoft Foundry). If your org already routes through one of those, this just works.</p>
+        </div>
+        <div class="trust-cell">
+          <h3>Can it check every session, not just one?</h3>
+          <p><code>rulereceipt report</code> audits recent sessions into one local summary &mdash; which rules were broken, where, with the evidence &mdash; deterministic and local, today. The org-wide, hosted version (reading sessions across a team via a feed like Anthropic's Compliance API) is in development for Enterprise.</p>
+        </div>
+        <div class="trust-cell">
+          <h3>Does this help with a vendor security review or DPA?</h3>
+          <p>It gives you real evidence for the &ldquo;how do you develop securely&rdquo; questions &mdash; not a certification. There is a <a href="/templates/security-focused-CLAUDE.md">starting-point rule set</a> covering common asks (secrets, PII, input validation, auth checks); adjust it to what your reviewer actually asks for.</p>
         </div>
       </div>
     </div>

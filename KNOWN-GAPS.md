@@ -7,7 +7,7 @@ evidence runs out. When the tool hits one of these gaps it should say **Can't te
 not guess. If you ever see it guess instead, that is a bug: please report it with
 `rulereceipt wrong <rule>`.
 
-_Last reviewed: 2026-10-10, against 0.1.105 (session reading for eight agents —
+_Last reviewed: 2026-10-11, against 0.1.106 (session reading for eight agents —
 Claude Code, OpenAI Codex, GitHub Copilot CLI, Cursor, Antigravity, OpenCode, Cline,
 Devin Desktop; bounded streaming reads for very large sessions; six advisory shadow
 signals, none promoted to Broken). Update this file with every release._
