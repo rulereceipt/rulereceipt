@@ -3,6 +3,7 @@ import { TEST_COMMAND, withoutHeredocs } from "./testCommands.js";
 import { ACTION_CLAIMS, NOT_A_CLAIM, SUCCESS_CLAIM, sentences } from "./claimEvidence.js";
 import { approvalOccurrences } from "./approvalGate.js";
 import { ruleWasLoaded, touchedPaths, bashViewedPaths } from "./pathScope.js";
+import { classifyRule } from "./classify.js";
 import { basename } from "node:path";
 
 /**
@@ -52,7 +53,7 @@ import { basename } from "node:path";
  * shadow); the measurement script tallies those alongside these.
  */
 
-export type ShadowSignal = "zero-tests" | "claimed-action-no-command" | "env-strict" | "approved-in-prompt" | "edited-rule-not-loaded";
+export type ShadowSignal = "zero-tests" | "claimed-action-no-command" | "env-strict" | "approved-in-prompt" | "edited-rule-not-loaded" | "title-only-rule";
 export interface ShadowFinding {
   signal: ShadowSignal;
   evidence: string;
@@ -314,6 +315,49 @@ function editedRuleNotLoaded(rules: Rule[], events: TranscriptEvent[], transcrip
   return out;
 }
 
+/* ── title-only-rule ──────────────────────────────────────────────────────────
+ * A heading-style rule ("Evidence or it didn't happen.", "No AI co-authors") whose
+ * BODY is just a short phrase, not a full directive sentence, so the structured
+ * classifiers can't parse it and it falls through to judgment — yet its short form
+ * clearly reads as a checkable intent (claimEvidence / gitBranchPolicy / attribution
+ * / emojiOutput / fileLifecycle). Measures how often users' short/heading rules go
+ * unchecked, so the short form can later be handled WITHOUT widening any verdict.
+ * Rule-shape fact, session-independent. Advisory only. */
+const TITLE_ONLY_INTENTS: { checker: string; re: RegExp }[] = [
+  { checker: "claimEvidence", re: /\bevidence\b|\bproof\b|did\s*n'?t\s+happen|\btested\b|tests?\s+pass/i },
+  { checker: "gitBranchPolicy", re: /\b(?:push|commit)\b[^.]*\bmain\b|\bmain\b[^.]*\b(?:push|commit)\b|protected\s+branch/i },
+  { checker: "attribution", re: /\bco-?author/i },
+  { checker: "emojiOutput", re: /\bemoji/i },
+  { checker: "fileLifecycle", re: /\b(?:never|no|don'?t)\s+(?:delet|wip|drop|truncat|remov)/i },
+];
+// A full directive sentence the structured classifiers are meant to parse —
+// if the body reads like one AND is long, it is not "title-only".
+const DIRECTIVE_SENTENCE = /\b(?:never|always|do not|do n't|don'?t|must|should|only|before|after)\b/i;
+function titleOnlyRules(rules: Rule[]): ShadowFinding[] {
+  const out: ShadowFinding[] = [];
+  const fired = new Set<string>();
+  for (const r of rules) {
+    // Only rules that currently route NOWHERE structured (fall through to judgment).
+    if (classifyRule(r).kind !== "judgment") continue;
+    const text = r.text.trim();
+    const words = text.split(/\s+/).filter(Boolean);
+    if (words.length === 0) continue;
+    const isShort = words.length <= 8;
+    const looksLikeFullSentence = DIRECTIVE_SENTENCE.test(text) && words.length > 8;
+    if (!isShort || looksLikeFullSentence) continue;
+    for (const intent of TITLE_ONLY_INTENTS) {
+      if (intent.re.test(`${r.title} ${text}`)) {
+        if (!fired.has(r.id)) {
+          fired.add(r.id);
+          out.push({ signal: "title-only-rule", evidence: `heading-style rule "${short(r.title)}" falls through to judgment today; its short form reads as a ${intent.checker} rule` });
+        }
+        break;
+      }
+    }
+  }
+  return out;
+}
+
 export function detectShadowSignals(rules: Rule[], events: TranscriptEvent[], transcriptText?: string): ShadowFinding[] {
   return [
     ...zeroTests(events),
@@ -321,6 +365,7 @@ export function detectShadowSignals(rules: Rule[], events: TranscriptEvent[], tr
     ...envStrict(rules, events),
     ...approvedInPrompt(events),
     ...editedRuleNotLoaded(rules, events, transcriptText),
+    ...titleOnlyRules(rules),
   ];
 }
 
