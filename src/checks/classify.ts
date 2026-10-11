@@ -520,6 +520,35 @@ function looksLikeFilePathToken(literal: string): boolean {
   );
 }
 
+// A BARE single-identifier call (`run()`, `main()`) with no member/scope qualifier is too
+// generic to forbid from file CONTENT: codebases define run()/main()/handler() everywhere,
+// and a rule that only MENTIONS one as a location ("never a hidden default inside `run()`")
+// would false-accuse any file defining it. Dotted/scoped calls (`console.log(`, `obj.track(`)
+// and distinctive bare names stay. FP class found in the 50-session measurement (2026-10-10):
+// run()/main() matched in bash + test code against strangers' rules.
+const GENERIC_BARE_CALL = new Set([
+  "run", "main", "init", "setup", "teardown", "start", "stop", "handler", "handle", "exec",
+  "build", "render", "update", "app", "cb", "fn", "callback", "dispatch", "process", "execute",
+]);
+function isForbiddableCodeLiteral(literal: string): boolean {
+  const head = literal.slice(0, literal.indexOf("(")); // identifier chain before the first "("
+  if (/[.:>\-]/.test(head)) return true; // dotted/scoped member call — distinctive, keep
+  const m = head.match(/^\s*([A-Za-z_$][A-Za-z0-9_$]*)\s*$/);
+  if (!m) return true; // not a bare identifier-call shape — keep
+  return !GENERIC_BARE_CALL.has(m[1].toLowerCase());
+}
+
+// A git-ref ("origin/main", "refs/heads/x") or a trailing-colon key fragment ("scripts:") is
+// not code to search file content for — it names a branch ref or an object/YAML key the rule
+// merely discusses. Import specifiers ("lucide-react", "@scope/pkg") are NOT caught here.
+// FP class found in the 50-session measurement (2026-10-10).
+function isRefOrKeyFragment(literal: string): boolean {
+  if (literal.endsWith(":")) return true; // "scripts:", an object/YAML key fragment
+  if (/^(?:origin|upstream|refs)\//.test(literal)) return true; // a git ref
+  if (/\/(?:main|master|develop|dev)$/.test(literal)) return true; // "<remote>/main"
+  return false;
+}
+
 // Catches rules like "add tests for every change" or "every new function
 // needs a test" - no literal backtick token to pattern-match, so without
 // this they'd fall all the way through to judgment (an LLM call) even
@@ -979,7 +1008,7 @@ export function classifyRule(rule: Rule): Classification {
   // "name". Measured 2026-09-13: 456 of 2,871 code-content patterns were a
   // single bare word — name, OK, FAIL, ERROR, Description — and each could
   // fail any file containing it.
-  const codeLiterals = [...patterns].filter((p) => CODE_CONSTRUCT_PATTERN.test(p));
+  const codeLiterals = [...patterns].filter((p) => CODE_CONSTRUCT_PATTERN.test(p) && isForbiddableCodeLiteral(p));
   if (codeLiterals.length > 0) {
     return { kind: "codeContent", rule, patterns: codeLiterals, polarity , polarityInferred };
   }
@@ -998,7 +1027,7 @@ export function classifyRule(rule: Rule): Classification {
     // file content — routing it to codeContent produces "found `dist/` written
     // into a file" on any mention. Excluded here; it falls through to the
     // deterministic checker (UNCLEAR, never a fabricated FAIL).
-    const contentTokens = [...patterns].filter((p) => isContentToken(p) && !looksLikeFilePathToken(p));
+    const contentTokens = [...patterns].filter((p) => isContentToken(p) && !looksLikeFilePathToken(p) && !isRefOrKeyFragment(p));
     if (contentTokens.length > 0) {
       return { kind: "codeContent", rule, patterns: contentTokens, polarity, polarityInferred };
     }

@@ -23,11 +23,22 @@ const kindOf = (literal: string, verb = "Never use") =>
   classifyRule({ id: "1", title: "Code style", text: `${verb} \`${literal}\` anywhere.`, source: "project" }).kind;
 
 describe("content matching requires a literal that looks like a call", () => {
-  for (const good of ["console.log(", "new Date()", "run()", "analytics.track(", "std::cout("]) {
+  // Distinctive calls — dotted/scoped, or a non-generic name — are real code to search for.
+  for (const good of ["console.log(", "new Date()", "analytics.track(", "std::cout("]) {
     it(`still routes ${good}`, () => expect(kindOf(good)).toBe("codeContent"));
   }
 
   for (const bad of ["(in the", "(e.g.", "(soft)", "(new, durable).", "(project root)/.aider.conf.yml"]) {
     it(`does not route ${JSON.stringify(bad)}`, () => expect(kindOf(bad)).not.toBe("codeContent"));
+  }
+
+  // A BARE generic identifier-call (`run()`, `main()`) is NOT code to forbid from file content:
+  // every codebase defines run()/main()/handler(), so a rule that merely MENTIONS one as a
+  // location ("never a hidden default inside `run()`") would false-accuse any file defining it.
+  // The old test asserted run()->codeContent, which *encoded that bug* — it was a live false
+  // accusation found in the 50-session measurement (2026-10-10): a public rule's `run()`/`main()`
+  // matched the run()/main() in this repo's bash + test code. Dotted/scoped and distinctive names stay.
+  for (const generic of ["run()", "main()", "init()", "handler()", "setup()"]) {
+    it(`does not route generic bare call ${generic}`, () => expect(kindOf(generic)).not.toBe("codeContent"));
   }
 });
