@@ -134,7 +134,7 @@ export function extractGitBranchTargets(command: string): BranchHit[] {
   return hits;
 }
 
-function commandFromEvent(event: TranscriptEvent): string | null {
+export function commandFromEvent(event: TranscriptEvent): string | null {
   if (event.kind !== "tool_use" || event.toolName !== "Bash") return null;
   const input = event.input as { command?: unknown };
   return typeof input?.command === "string" ? input.command : null;

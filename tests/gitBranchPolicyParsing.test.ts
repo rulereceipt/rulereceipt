@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   pushTargets, branchTargets, extractGitBranchTargets, segmentContaining,
-  commitSegment, findCheckoutCommitViolation, runGitBranchPolicyChecks,
+  commitSegment, findCheckoutCommitViolation, commandFromEvent, runGitBranchPolicyChecks,
 } from "../src/checks/gitBranchPolicy.js";
 import type { GitBranchPolicyClassification } from "../src/checks/classify.js";
 import type { TranscriptEvent } from "../src/types.js";
@@ -160,5 +160,64 @@ describe("runGitBranchPolicyChecks: exact result objects (kills literal/object m
     const [r] = runGitBranchPolicyChecks([forbidMain], [bash("git checkout main"), bash("git commit -m ship")]);
     expect(r.status).toBe("FAIL");
     expect(r.evidence).toBe('a git command actually targeted the "main" branch: git commit -m ship');
+  });
+});
+
+describe("gitBranchPolicy parsing: edge cases that kill logic mutants", () => {
+  it("pushTargets skips a NON-git segment that merely mentions a git push", () => {
+    expect(pushTargets('echo "git push origin main"')).toEqual([]);
+  });
+  it("branchTargets skips a NON-git segment that merely mentions git branch", () => {
+    expect(branchTargets('echo "git branch main"')).toEqual([]);
+  });
+  it("pushTargets ignores a refspec whose REMOTE side is empty (local:)", () => {
+    expect(pushTargets("git push origin dev:")).toEqual([]);
+  });
+  it("segmentContaining trims surrounding whitespace of the matched segment", () => {
+    expect(segmentContaining("  git push origin main  ", "push")).toBe("git push origin main");
+  });
+  it("commitSegment does NOT treat a non-git 'commit' mention as the commit segment", () => {
+    expect(commitSegment('git checkout main\necho "about to commit"')).toBe('git checkout main\necho "about to commit"');
+  });
+  it("commitSegment finds the git commit even after a non-git line", () => {
+    expect(commitSegment('echo start\ngit commit -m x')).toBe("git commit -m x");
+  });
+  it("pushTargets reads only the git segment when a non-git segment also mentions push", () => {
+    expect(pushTargets('echo "please git push origin dev" && git push origin main')).toEqual([{ branch: "main", segment: "git push origin main" }]);
+  });
+  it("branchTargets -D with no positional (just the flag) yields nothing", () => {
+    expect(branchTargets("git branch -D")).toEqual([]);
+  });
+});
+
+describe("commandFromEvent + more parsing edges (kill remaining logic mutants)", () => {
+  it("commandFromEvent returns the command for a Bash tool_use", () => {
+    expect(commandFromEvent({ role: "assistant", kind: "tool_use", toolName: "Bash", input: { command: "git push origin main" }, timestamp: "t" })).toBe("git push origin main");
+  });
+  it("commandFromEvent is null for a non-Bash tool_use (Edit)", () => {
+    expect(commandFromEvent({ role: "assistant", kind: "tool_use", toolName: "Edit", input: { file_path: "x", content: "y" }, timestamp: "t" })).toBeNull();
+  });
+  it("commandFromEvent is null for a text event", () => {
+    expect(commandFromEvent({ role: "assistant", kind: "text", text: "git push origin main", timestamp: "t" })).toBeNull();
+  });
+  it("commandFromEvent is null for a Bash tool_use with no command field", () => {
+    expect(commandFromEvent({ role: "assistant", kind: "tool_use", toolName: "Bash", input: {}, timestamp: "t" })).toBeNull();
+  });
+  it("pushTargets filters a flag BEFORE the refspec (--force origin main → main only)", () => {
+    expect(pushTargets("git push --force origin main")).toEqual([{ branch: "main", segment: "git push --force origin main" }]);
+  });
+  it("branchTargets with only a non-create flag and no positional yields nothing", () => {
+    expect(branchTargets("git branch --list")).toEqual([]);
+  });
+});
+
+describe("commandFromEvent: precise guards (kill the kind/Bash and optional-chaining mutants)", () => {
+  it("is null for a NON-Bash tool_use that happens to carry a command field", () => {
+    // distinguishes `||` from `&&` and the kind/name conditionals: a Task tool with
+    // a command must NOT be read as a shell command.
+    expect(commandFromEvent({ role: "assistant", kind: "tool_use", toolName: "Task", input: { command: "git push origin main" }, timestamp: "t" })).toBeNull();
+  });
+  it("is null (no throw) for a Bash tool_use whose input is null", () => {
+    expect(commandFromEvent({ role: "assistant", kind: "tool_use", toolName: "Bash", input: null as unknown as Record<string, unknown>, timestamp: "t" })).toBeNull();
   });
 });
