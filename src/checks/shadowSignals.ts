@@ -349,7 +349,11 @@ const TITLE_ONLY_INTENTS: { checker: string; re: RegExp }[] = [
   { checker: "gitBranchPolicy", re: /\b(?:push|commit)\b[^.]*\bmain\b|\bmain\b[^.]*\b(?:push|commit)\b|protected\s+branch/i },
   { checker: "attribution", re: /\bco-?author/i },
   { checker: "emojiOutput", re: /\bemoji/i },
-  { checker: "fileLifecycle", re: /\b(?:never|no|don'?t)\s+(?:delet|wip|drop|truncat|remov)/i },
+  // fileLifecycle is a FILE checker, so the short rule must name a FILE-ish object
+  // (a path, an extension, a backticked token, or the words file/directory/folder)
+  // after the destroy verb. Without this, "Never wipe data storage databases" (about
+  // databases, not a file) matched — the fa-corpus-v3/v4 datawipe near-miss fixture.
+  { checker: "fileLifecycle", re: /\b(?:never|no|don'?t|do\s+not)\s+(?:delet|remov|overwrit|truncat|wip)\w*\b[^.\n]{0,40}?(?:`[^`]+`|\b[\w-]+\.\w{1,6}\b|\/|\bfiles?\b|\bdirector(?:y|ies)\b|\bfolders?\b|\bpath\b)/i },
 ];
 // A full directive sentence the structured classifiers are meant to parse —
 // if the body reads like one AND is long, it is not "title-only".

@@ -180,3 +180,12 @@ describe("shadow: handed-back (2026-10-12)", () => {
     expect(sigs([say("I ran the tests and they pass; the migration is applied.")])).not.toContain("handed-back");
   });
 });
+
+describe("shadow: title-only-rule fileLifecycle intent needs a FILE object (2026-10-12)", () => {
+  // "Never wipe data storage databases" is about databases, not a file, so it must
+  // NOT map to fileLifecycle (that was the fa-corpus-v3/v4 datawipe near-miss fixture
+  // firing). A file-ish object (path / extension / `backtick` / file|dir|folder) is required.
+  it("does NOT fire on a data-wipe rule with no file object", () => {
+    expect(sigs([], [rule("Never wipe data storage databases")])).not.toContain("title-only-rule");
+  });
+});
