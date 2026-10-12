@@ -63,7 +63,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "~0.131.0",
     "commander": "~15.0.0",
-    "nodemailer": "~10.0.1"
+    "nodemailer": "~10.0.16"
   },
   "devDependencies": {
     "@secretlint/secretlint-rule-preset-recommend": "^13.0.7",
