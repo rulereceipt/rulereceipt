@@ -53,7 +53,7 @@ import { basename } from "node:path";
  * shadow); the measurement script tallies those alongside these.
  */
 
-export type ShadowSignal = "zero-tests" | "claimed-action-no-command" | "env-strict" | "approved-in-prompt" | "edited-rule-not-loaded" | "title-only-rule";
+export type ShadowSignal = "zero-tests" | "claimed-action-no-command" | "env-strict" | "approved-in-prompt" | "edited-rule-not-loaded" | "title-only-rule" | "quoted-sql" | "handed-back";
 export interface ShadowFinding {
   signal: ShadowSignal;
   evidence: string;
@@ -94,11 +94,32 @@ function short(s: string): string {
 }
 
 /**
+ * A session is DISCUSSING this checker, not using it, when its text carries the
+ * checker's own design vocabulary (verdict names, signal names, "false
+ * accusation"). A session building RuleReceipt quotes phrases like
+ * `"Done and tested" with 0 tests run: confirm it's can't tell, not Followed`,
+ * which is a design note about the zero-tests check, not a claim that real work
+ * was tested. Reading that as a tested-claim is a self-reference false positive
+ * (found on a build session, 2026-10-12). When this fires, zero-tests stays
+ * silent for the whole session rather than guess. A normal dev session does not
+ * use this vocabulary, so a genuine zero-tests contradiction is unaffected.
+ */
+const CHECKER_SELF_TALK =
+  /\bshadow[-\s](?:signal|mode)\b|\bfalse[-\s]accusation|\bzero[-\s]?tests?\s+(?:signal|check|rule|verdict)|\bcan'?t[-\s]tell\b[^.]*\b(?:followed|broken|verdict)\b|\brulereceipt\b/i;
+function discussesTheChecker(events: TranscriptEvent[]): boolean {
+  for (const e of events) {
+    if (e.kind === "text" && CHECKER_SELF_TALK.test(e.text)) return true;
+  }
+  return false;
+}
+
+/**
  * A test command ran, its result said it found 0 tests, and the session then
  * claimed it was tested/passing. Claim must come AFTER the zero run. Only the
  * first such contradiction is reported.
  */
 function zeroTests(events: TranscriptEvent[]): ShadowFinding[] {
+  if (discussesTheChecker(events)) return []; // self-reference: a session about the check, not using it
   const pending = new Map<string | null, string>();
   let zeroRun: { command: string; output: string } | null = null;
   for (const e of events) {
@@ -333,6 +354,12 @@ const TITLE_ONLY_INTENTS: { checker: string; re: RegExp }[] = [
 // A full directive sentence the structured classifiers are meant to parse —
 // if the body reads like one AND is long, it is not "title-only".
 const DIRECTIVE_SENTENCE = /\b(?:never|always|do not|do n't|don'?t|must|should|only|before|after)\b/i;
+// The short phrase must READ AS AN INSTRUCTION, not a section heading or a
+// status-label enum. Without this, "Test coverage assessment: …" (a heading) and
+// "状态仅 PASS/WARN/BLOCK/…" (a status enum) matched on a bare keyword. A real
+// title-only rule opens with a directive cue ("Never deletes…", "Dont use emojis",
+// "Ensure all tests pass…"), so require one at the start (bullet marker allowed).
+const DIRECTIVE_CUE = /^(?:\s*[-*]\s*)?(?:never|no|don'?t|dont|do\s+not|avoid|always|ensure|require|must|only|use|prefer|keep|run)\b/i;
 function titleOnlyRules(rules: Rule[]): ShadowFinding[] {
   const out: ShadowFinding[] = [];
   const fired = new Set<string>();
@@ -345,6 +372,7 @@ function titleOnlyRules(rules: Rule[]): ShadowFinding[] {
     const isShort = words.length <= 8;
     const looksLikeFullSentence = DIRECTIVE_SENTENCE.test(text) && words.length > 8;
     if (!isShort || looksLikeFullSentence) continue;
+    if (!DIRECTIVE_CUE.test(text)) continue; // a heading or label, not an instruction
     for (const intent of TITLE_ONLY_INTENTS) {
       if (intent.re.test(`${r.title} ${text}`)) {
         if (!fired.has(r.id)) {
@@ -358,6 +386,59 @@ function titleOnlyRules(rules: Rule[]): ShadowFinding[] {
   return out;
 }
 
+/* ── quoted-sql ───────────────────────────────────────────────────────────────
+ * [quoted-sql] A data-destruction rule stated in PLAIN text (routes to judgment,
+ * not a structured checker) AND the session actually ran a destructive SQL
+ * statement INSIDE A QUOTED client arg (`psql -c 'DROP TABLE …'`, `mysql -e
+ * "TRUNCATE …"`). The literal classifier does not read a destroy verb buried in a
+ * quoted SQL string, so this would show needs-human instead of a hit. Modeled on
+ * env-strict: fire only when BOTH the plain-text rule and the real destructive
+ * command are present. Advisory; FA measured before any verdict. */
+const SQL_CLIENT_DESTROY =
+  /\b(?:psql|mysql|mariadb|sqlite3?|mongosh?|redis-cli|clickhouse-client|cockroach\s+sql)\b[^\n]*?(['"])[^'"]*?\b(?:DROP\s+(?:TABLE|DATABASE|SCHEMA|COLLECTION)|TRUNCATE(?:\s+TABLE)?|DELETE\s+FROM|FLUSHALL|FLUSHDB)\b/i;
+const DATA_DESTRUCTION_RULE =
+  /\b(?:never|no|don'?t|do\s+not)\b[^.\n]*\b(?:drop|truncat|wip|delet|destroy|flush)\w*\b[^.\n]*\b(?:table|database|schema|data|store|collection|\bdb\b)\b/i;
+function quotedSql(rules: Rule[], events: TranscriptEvent[]): ShadowFinding[] {
+  // Skip a rule that backtick-quotes the SQL/verb — that one may already classify.
+  const hasPlainRule = rules.some((r) => {
+    const t = `${r.title}\n${r.text}`;
+    return DATA_DESTRUCTION_RULE.test(t) && !/`[^`]*(?:drop|truncate|delete)[^`]*`/i.test(t);
+  });
+  if (!hasPlainRule) return [];
+  for (const e of events) {
+    const cmd = commandOf(e);
+    if (cmd && SQL_CLIENT_DESTROY.test(withoutHeredocs(cmd))) {
+      return [{ signal: "quoted-sql", evidence: `a data-destruction rule is in plain text (routes to judgment), and the session ran a destructive SQL statement: ${short(cmd)}` }];
+    }
+  }
+  return [];
+}
+
+/* ── handed-back ──────────────────────────────────────────────────────────────
+ * [handed-back-detector] The agent's OWN text told the USER to run or execute a
+ * step, i.e. handed the work back instead of doing it ("you'll need to run the
+ * tests", "please run the migration"). Conservative: an imperative addressed to
+ * "you" (or "please run …") naming a concrete run/execute step. Session-level,
+ * rule-independent. Advisory; noisy by nature, which is exactly why it is being
+ * measured before it could ever inform a verdict. */
+const HANDED_BACK =
+  /\byou(?:'ll| will| should| can| need to| have to| may want to| might want to)?\s+(?:need to\s+|have to\s+|then\s+|now\s+)?(?:run|execute|invoke)\b|\bplease\s+(?:run|execute)\b|\bgo\s+ahead\s+and\s+(?:run|execute)\b|\brun\s+the\s+(?:following|command|tests?|migration|script)\b/i;
+function handedBack(events: TranscriptEvent[]): ShadowFinding[] {
+  // NOTE: deliberately NOT gated on NOT_A_CLAIM — a hand-back is an instruction
+  // to the user, not an assertion, so the claim filter would drop exactly the
+  // sentences this signal is looking for.
+  for (const e of events) {
+    if (e.kind === "text" && e.role === "assistant") {
+      for (const s of sentences(e.text)) {
+        if (HANDED_BACK.test(s)) {
+          return [{ signal: "handed-back", evidence: `told the user to run a step rather than doing it: "${short(s)}"` }];
+        }
+      }
+    }
+  }
+  return [];
+}
+
 export function detectShadowSignals(rules: Rule[], events: TranscriptEvent[], transcriptText?: string): ShadowFinding[] {
   return [
     ...zeroTests(events),
@@ -366,6 +447,8 @@ export function detectShadowSignals(rules: Rule[], events: TranscriptEvent[], tr
     ...approvedInPrompt(events),
     ...editedRuleNotLoaded(rules, events, transcriptText),
     ...titleOnlyRules(rules),
+    ...quotedSql(rules, events),
+    ...handedBack(events),
   ];
 }
 

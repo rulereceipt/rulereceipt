@@ -167,7 +167,8 @@ export function parseCursorTranscript(file: string): TranscriptEvent[] {
   for (const line of raw.split("\n")) {
     if (!line.trim()) continue;
     let o: Record<string, unknown>;
-    try { o = JSON.parse(line) as Record<string, unknown>; } catch { continue; }
+    // Skip a line that parses to `null`/non-object rather than dereferencing it.
+    try { const p = JSON.parse(line); if (!p || typeof p !== "object") continue; o = p as Record<string, unknown>; } catch { continue; }
     const role = o.role === "assistant" ? "assistant" : o.role === "user" ? "user" : undefined;
     const content = cursorContent(o);
     if (!role || !content) continue;

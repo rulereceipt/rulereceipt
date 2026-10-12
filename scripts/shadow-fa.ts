@@ -49,7 +49,7 @@ for (const corpus of corpora) {
   }
 }
 
-const SIGNALS = ["zero-tests", "claimed-action-no-command", "env-strict", "approved-in-prompt", "edited-rule-not-loaded", "hooks-disabled", "no-verify", "hook-config-edit"];
+const SIGNALS = ["zero-tests", "claimed-action-no-command", "env-strict", "approved-in-prompt", "edited-rule-not-loaded", "title-only-rule", "quoted-sql", "handed-back", "hooks-disabled", "no-verify", "hook-config-edit"];
 console.log(`SHADOW FA — corpora: ${corpora.join(", ")}`);
 console.log(`Clean reports measured: ${reports} (rules files × sessions). Every fire below is a candidate false positive.\n`);
 console.log("signal                       fires   distinct-evidence");

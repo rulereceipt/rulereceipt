@@ -173,7 +173,9 @@ export function parseCopilotTranscript(sessionFile: string): TranscriptEvent[] {
   for (const line of raw.split("\n")) {
     if (!line.trim()) continue;
     let e: CopilotLine;
-    try { e = JSON.parse(line) as CopilotLine; } catch { continue; }
+    // A line that parses to `null` (or a non-object JSON value) must be skipped,
+    // not dereferenced — `null.timestamp` throws. Guard inside the try.
+    try { const p = JSON.parse(line); if (!p || typeof p !== "object") continue; e = p as CopilotLine; } catch { continue; }
     const ts = str(e.timestamp) ?? "";
     const d = e.data ?? {};
     switch (e.type) {

@@ -120,3 +120,63 @@ describe("shadow: edited-rule-not-loaded", () => {
     expect(sigs([edit("/proj/src/api/handler.ts")], [scoped()], REMINDER)).not.toContain("edited-rule-not-loaded");
   });
 });
+
+describe("shadow: zero-tests self-reference guard (2026-10-12)", () => {
+  // Real FP on a build session: the transcript DISCUSSED the 0-tests check
+  // ("'Done and tested' with 0 tests run: confirm it's can't tell, not Followed"),
+  // which zero-tests read as a tested-claim. A session carrying the checker's own
+  // design vocabulary is talking ABOUT the check, not using it, so stay silent.
+  it("does NOT fire when the session is discussing the checker itself", () => {
+    const ev = [
+      bash("node --test"),
+      result("ℹ tests 0\nℹ pass 0\n"),
+      say("Shadow signal note for the 0-tests check: \"Done and tested\" with 0 tests run: confirm it's can't tell, not Followed."),
+    ];
+    expect(sigs(ev)).not.toContain("zero-tests");
+  });
+  it("STILL fires on a genuine zero-tests contradiction with no checker vocabulary", () => {
+    const ev = [bash("node --test"), result("ℹ tests 0\nℹ pass 0\n"), say("All green, the work is done and tested.")];
+    expect(sigs(ev)).toContain("zero-tests");
+  });
+});
+
+describe("shadow: title-only-rule directive-cue guard (2026-10-12)", () => {
+  // Fires only on a SHORT rule that reads as an instruction (directive cue) and
+  // falls through to judgment. A heading or a status-label enum is not a rule.
+  it("fires on a short directive that routes nowhere structured", () => {
+    expect(sigs([], [rule("Dont use emojis.")])).toContain("title-only-rule");
+  });
+  // This heading reaches `judgment` and matches the claimEvidence intent (via
+  // "well-tested"), so the directive-cue guard is the ONLY thing stopping a fire —
+  // verified red: it fires when the guard is removed. (A pure label/noun-phrase
+  // heading like "Status only PASS/WARN/BLOCK" is dropped earlier as notARule, so
+  // it never reaches this guard; no separate test since it cannot exercise it.)
+  it("does NOT fire on a section heading that matches an intent but has no directive cue", () => {
+    expect(sigs([], [rule("Test coverage assessment: what's well-tested vs what's not")])).not.toContain("title-only-rule");
+  });
+});
+
+describe("shadow: quoted-sql (2026-10-12)", () => {
+  const dropRule = rule("Never drop or truncate a database table");
+  it("fires when a plain-text data-destruction rule is present AND a destructive SQL command ran", () => {
+    const ev = [bash("psql -h db -c 'DROP TABLE users;'")];
+    expect(sigs(ev, [dropRule])).toContain("quoted-sql");
+  });
+  it("does NOT fire without a data-destruction rule", () => {
+    const ev = [bash("psql -h db -c 'DROP TABLE users;'")];
+    expect(sigs(ev, [rule("Use two-space indentation")])).not.toContain("quoted-sql");
+  });
+  it("does NOT fire on a non-destructive SQL command", () => {
+    const ev = [bash("psql -h db -c 'SELECT count(*) FROM users;'")];
+    expect(sigs(ev, [dropRule])).not.toContain("quoted-sql");
+  });
+});
+
+describe("shadow: handed-back (2026-10-12)", () => {
+  it("fires when the agent tells the user to run a step itself", () => {
+    expect(sigs([say("I've written the migration. You'll need to run the tests to confirm.")])).toContain("handed-back");
+  });
+  it("does NOT fire on ordinary narration with no hand-back", () => {
+    expect(sigs([say("I ran the tests and they pass; the migration is applied.")])).not.toContain("handed-back");
+  });
+});
