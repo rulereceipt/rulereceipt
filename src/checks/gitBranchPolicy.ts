@@ -52,7 +52,7 @@ type BranchHit = { branch: string; kind: "push" | "create" | "switch"; segment: 
 // the evidence must quote the `git push origin main` line, not the block's
 // first line. Evidence only — detection is unchanged. Falls back to the whole
 // command if no single segment contains the match.
-function segmentContaining(command: string, matched: string): string {
+export function segmentContaining(command: string, matched: string): string {
   for (const seg of segments(command)) {
     if (seg.includes(matched)) return seg.trim();
   }
@@ -62,7 +62,7 @@ function segmentContaining(command: string, matched: string): string {
 // The segment that actually runs `git commit` (the checkout-then-commit
 // violation), for the evidence quote. Evidence only; detection is in
 // findCheckoutCommitViolation and is unchanged.
-function commitSegment(command: string): string {
+export function commitSegment(command: string): string {
   for (const seg of segments(command)) {
     if (leadingCommand(seg) === "git" && GIT_COMMIT.test(seg)) return seg.trim();
   }
@@ -76,7 +76,7 @@ function commitSegment(command: string): string {
  * remote-branch delete (`origin :main`, `origin --delete main`), and a
  * `local:remote` refspec (the TARGET is the remote side).
  */
-function pushTargets(command: string): { branch: string; segment: string }[] {
+export function pushTargets(command: string): { branch: string; segment: string }[] {
   const out: { branch: string; segment: string }[] = [];
   for (const seg of segments(command)) {
     if (leadingCommand(seg) !== "git") continue;
@@ -101,7 +101,7 @@ function pushTargets(command: string): { branch: string; segment: string }[] {
  * into `main` overwrites `main`); `-d/-D/--delete` targets every named branch;
  * a plain `git branch <name> [<start>]` targets only the created <name>.
  */
-function branchTargets(command: string): { branch: string; segment: string }[] {
+export function branchTargets(command: string): { branch: string; segment: string }[] {
   const out: { branch: string; segment: string }[] = [];
   for (const seg of segments(command)) {
     if (leadingCommand(seg) !== "git") continue;
@@ -123,7 +123,7 @@ function branchTargets(command: string): { branch: string; segment: string }[] {
   return out;
 }
 
-function extractGitBranchTargets(command: string): BranchHit[] {
+export function extractGitBranchTargets(command: string): BranchHit[] {
   const hits: BranchHit[] = [];
   const create = command.match(GIT_CHECKOUT_CREATE);
   if (create) hits.push({ branch: create[1], kind: "create", segment: segmentContaining(command, create[0]) });
@@ -154,7 +154,7 @@ function commandFromEvent(event: TranscriptEvent): string | null {
  * straight to a protected branch, or creating/renaming/deleting it, is
  * the violation itself, not something that needs a following commit.
  */
-function findCheckoutCommitViolation(commands: string[], branchName: string): string | null {
+export function findCheckoutCommitViolation(commands: string[], branchName: string): string | null {
   let currentBranch: string | null = null;
   for (const command of commands) {
     const checkoutMatch = command.match(GIT_CHECKOUT_CREATE) ?? command.match(GIT_CHECKOUT_SWITCH_ONLY);
