@@ -185,7 +185,7 @@ export function sentences(text: string): string[] {
  * success, the tool cannot tell whether it re-ran the suite and fixed
  * things — and cannot-know must never render as an accusation.
  */
-const UNKNOWN_SCRIPT_RUNNER =
+export const UNKNOWN_SCRIPT_RUNNER =
   /\b(?:npm|pnpm|yarn|bun)\s+run\s+\S+|\bmake\s+\S+|\bjust\s+\S+|\btask\s+\S+|\bnx\s+run\s+\S+|\brake\s+\S+/i;
 
 /**
@@ -201,7 +201,7 @@ const UNKNOWN_SCRIPT_RUNNER =
  * Only a pipe breaks this. In `cd repo && npm test` the last command in the
  * chain IS the test, so the status is the test's.
  */
-const PIPED = /\|(?!\|)/;
+export const PIPED = /\|(?!\|)/;
 
 /**
  * The result a test runner states in words, which survives a pipe when the
@@ -216,13 +216,13 @@ const PIPED = /\|(?!\|)/;
  * truncated head of the output that says nothing conclusive stays unknown —
  * guessing here means accusing someone of misreporting their own work.
  */
-const OUTPUT_FAILED =
+export const OUTPUT_FAILED =
   /\b([1-9]\d*)\s+(?:tests?\s+)?fail(?:ed|ures?)\b|\bfail(?:ed|ures?)\s*[:=]\s*([1-9]\d*)\b|\btest result:\s*FAILED\b|^\s*FAIL\b/im;
-const OUTPUT_PASSED =
+export const OUTPUT_PASSED =
   /\b([1-9]\d*)\s+(?:tests?\s+)?passed\b|\btest result:\s*ok\b|\bTests?\s+\d+\s+passed\b/i;
 
 /** "failed", "passed", or null when the output settles nothing. */
-function outcomeFromOutput(output: string): boolean | null {
+export function outcomeFromOutput(output: string): boolean | null {
   if (OUTPUT_FAILED.test(output)) return true;
   if (OUTPUT_PASSED.test(output)) return false;
   return null;
@@ -233,15 +233,15 @@ function outcomeFromOutput(output: string): boolean | null {
 // whether the NAMED test was the one that failed, so a scoped claim over a partial run is
 // can't-tell, not a FAIL. claimevidence-named-test, 2026-10-11: a real FP where "The 300MB test
 // passes" was flagged because a *different* sub-test ("a tiny maxBytes…") failed in the same run.
-const GLOBAL_TEST_CLAIM =
+export const GLOBAL_TEST_CLAIM =
   /\b(?:all\s+tests?|the\s+tests\b|the\s+(?:unit|integration|e2e|end-to-end|smoke|regression|whole|entire|full)\s+(?:tests?|suite|test\s+suite)|the\s+suite|everything|full\s+suite|tests?\s+are\s+(?:all\s+)?green)\b/i;
-const SCOPED_TEST_CLAIM =
+export const SCOPED_TEST_CLAIM =
   /\bthe\s+[\w][\w.+/-]*(?:\s+[\w][\w.+/-]*){0,2}\s+tests?\s+(?:pass(?:es|ed)?|is|was|now|works?|green)/i;
-function isScopedTestClaim(s: string): boolean {
+export function isScopedTestClaim(s: string): boolean {
   return SCOPED_TEST_CLAIM.test(s) && !GLOBAL_TEST_CLAIM.test(s);
 }
 // A run where at least one test passed alongside the failure — the failure was NOT total.
-function isPartialRun(output: string): boolean {
+export function isPartialRun(output: string): boolean {
   if (OUTPUT_PASSED.test(output)) return true;
   const m = output.match(/\((\d+)\s+tests?\s*\|\s*([1-9]\d*)\s+(?:failed|fail)\)/i);
   return m !== null && Number(m[1]) > Number(m[2]);
@@ -250,7 +250,7 @@ function isPartialRun(output: string): boolean {
 // The per-test lines shown FAILING. A line carrying a fail glyph (✕/✗/×) or a `FAIL` label names a
 // failing test; a passing line (✓) is deliberately excluded, so "✓ reads a 300MB session" never looks
 // like a failure. Capped so a giant log can't blow up the evidence string.
-function failingTestText(fullOutput: string): string {
+export function failingTestText(fullOutput: string): string {
   return fullOutput
     .split(/\n/)
     .filter((l) => /[✕✗×]/.test(l) || /\bFAIL\b/.test(l))
@@ -263,7 +263,7 @@ function failingTestText(fullOutput: string): string {
 const SCOPED_SUBJECT =
   /\bthe\s+([\w][\w.+/-]*(?:\s+[\w][\w.+/-]*){0,2})\s+tests?\s+(?:pass(?:es|ed)?|is|was|now|works?|green)/i;
 const GENERIC_SUBJECT = new Set(["new", "old", "one", "two", "that", "this", "last", "next", "main", "whole", "first"]);
-function scopedTestSubject(claim: string): string | null {
+export function scopedTestSubject(claim: string): string | null {
   const m = claim.match(SCOPED_SUBJECT);
   if (!m) return null;
   const subject = m[1].trim();
@@ -272,7 +272,7 @@ function scopedTestSubject(claim: string): string | null {
   return subject;
 }
 // The failing line that names this subject, or null. Case-insensitive, whitespace-collapsed.
-function failingLineNaming(failingText: string, subject: string): string | null {
+export function failingLineNaming(failingText: string, subject: string): string | null {
   const needle = subject.toLowerCase().replace(/\s+/g, " ");
   for (const line of failingText.split(/\s{2,}|(?=[✕✗×])/)) {
     if (line.toLowerCase().replace(/\s+/g, " ").includes(needle)) return line.trim();
@@ -304,7 +304,7 @@ interface TestRun {
 }
 
 /** A test command carrying a leading env-var assignment is a variant of the default run. */
-function isVariantRun(command: string): boolean {
+export function isVariantRun(command: string): boolean {
   return /(?:^|&&|;|\|\||\bthen\b|\bdo\b|\s)\s*[A-Z][A-Z0-9_]+=\S+\s+\S/.test(command);
 }
 
@@ -315,7 +315,7 @@ function isVariantRun(command: string): boolean {
  * twenty-line heredoc, which no one can act on. A report nobody can read is
  * not a report.
  */
-function short(command: string): string {
+export function short(command: string): string {
   const oneLine = command.replace(/\s+/g, " ").trim();
   return oneLine.length <= 70 ? oneLine : oneLine.slice(0, 70) + "…";
 }
@@ -345,7 +345,7 @@ function unclear(rule: ClaimEvidenceClassification["rule"], evidence: string): C
  * broad "all passing" claim over a partial re-run is unbacked, not proven
  * (finding #8, 2026-09-26).
  */
-function isFullSuiteRun(command: string): boolean {
+export function isFullSuiteRun(command: string): boolean {
   if (/\s--\s+[^\s-]/.test(command)) return false;
   if (/\b(?:pytest|jest|vitest|mocha|phpunit|rspec)\s+[^\s-]\S*\.\w+/.test(command)) return false;
   if (/\s\S*\.(?:test|spec)\.\w+/.test(command)) return false;

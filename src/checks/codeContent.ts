@@ -25,9 +25,12 @@ import type { CodeContentClassification } from "./classify.js";
 // the construct in prose. Found 2026-10-05 by an adversarial false-accusation
 // probe: writing "Avoid console.log( in production." to docs/readme.md FAILed.
 // NotebookEdit's .ipynb is code, so it is deliberately not in this set.
-const DOC_FILE = /\.(?:md|markdown|mdx|txt|text|rst|adoc|asciidoc|org)$/i;
+// Exported for direct unit testing (behaviour-neutral): DOC_FILE, editedContentFromEvent,
+// isProseSandwich, stripCode, containsCall are internal helpers used only by
+// runCodeContentChecks; the `export` lets tests pin their boundaries precisely.
+export const DOC_FILE = /\.(?:md|markdown|mdx|txt|text|rst|adoc|asciidoc|org)$/i;
 
-function editedContentFromEvent(event: TranscriptEvent): string | null {
+export function editedContentFromEvent(event: TranscriptEvent): string | null {
   if (event.kind !== "tool_use") return null;
   const input = event.input as { content?: unknown; new_string?: unknown; new_source?: unknown; file_path?: unknown; notebook_path?: unknown };
   const path = typeof input?.file_path === "string" ? input.file_path : typeof input?.notebook_path === "string" ? input.notebook_path : "";
@@ -62,7 +65,7 @@ function editedContentFromEvent(event: TranscriptEvent): string | null {
  * "...use a try-catch block...". A real import (`from "lucide-react"`) is not
  * sandwiched in prose (it is bounded by quotes), so it still matches.
  */
-function isProseSandwich(content: string, at: number, pattern: string): boolean {
+export function isProseSandwich(content: string, at: number, pattern: string): boolean {
   const before = content.slice(Math.max(0, at - 12), at);
   const after = content.slice(at + pattern.length, at + pattern.length + 12);
   return /[a-z]\s$/.test(before) && /^\s[a-z]/.test(after);
@@ -81,7 +84,7 @@ function isProseSandwich(content: string, at: number, pattern: string): boolean 
  * `#` is a comment only at a line start or after whitespace (so a TS private
  * field like `this.#count` survives).
  */
-function stripCode(src: string, dropStrings: boolean): string {
+export function stripCode(src: string, dropStrings: boolean): string {
   let out = "";
   let i = 0;
   const n = src.length;
@@ -108,7 +111,7 @@ function stripCode(src: string, dropStrings: boolean): string {
   return out;
 }
 
-function containsCall(content: string, pattern: string): boolean {
+export function containsCall(content: string, pattern: string): boolean {
   const isCall = pattern.endsWith("(");
   const leadsWithIdentifier = /^[A-Za-z0-9_$]/.test(pattern);
   if (!leadsWithIdentifier) {

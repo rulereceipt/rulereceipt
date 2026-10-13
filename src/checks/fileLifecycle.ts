@@ -41,7 +41,10 @@ function escapeRegex(literal: string): string {
  * `/home/x/.claude/settings.json`). Deliberately anchored at a path
  * boundary so `settings.json` does not match `other-settings.json`.
  */
-function pathPattern(filePath: string): string {
+// Exported for direct unit testing (behaviour-neutral): pathPattern, CD_INTO_TEMP and
+// mutatesPathInBash are internal helpers used only by findMutation; the `export` lets
+// tests pin the regex boundaries that the end-to-end checker tests reach only indirectly.
+export function pathPattern(filePath: string): string {
   return `(?:^|[\\s'"=/])${escapeRegex(filePath.replace(/^\.\//, ""))}(?=$|[\\s'";)])`;
 }
 
@@ -49,7 +52,7 @@ function pathPattern(filePath: string): string {
  * The command moves into a throwaway tree before doing anything. Anything
  * it mutates after that is a scratch file, not the project's.
  */
-const CD_INTO_TEMP = /\bcd\s+["']?(?:\/private)?\/(?:tmp|var\/folders)\b|\bcd\s+["']?[^\s"'&|;]*\/(?:scratchpad|node_modules)\b/;
+export const CD_INTO_TEMP = /\bcd\s+["']?(?:\/private)?\/(?:tmp|var\/folders)\b|\bcd\s+["']?[^\s"'&|;]*\/(?:scratchpad|node_modules)\b/;
 
 /**
  * A path named only inside a heredoc body was not touched by the command
@@ -60,7 +63,7 @@ const CD_INTO_TEMP = /\bcd\s+["']?(?:\/private)?\/(?:tmp|var\/folders)\b|\bcd\s+
  * inserts tells readers to put a hook in `.claude/settings.json`. Writing a
  * path into a file is not mutating that path.
  */
-function mutatesPathInBash(rawCommand: string, filePath: string): boolean {
+export function mutatesPathInBash(rawCommand: string, filePath: string): boolean {
   const p = pathPattern(filePath);
   const bare = escapeRegex(filePath.replace(/^\.\//, ""));
   // A truncation/append redirect onto the path, with a trailing path boundary
