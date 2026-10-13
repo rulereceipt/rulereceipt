@@ -179,6 +179,23 @@ describe("shadow: handed-back (2026-10-12)", () => {
   it("does NOT fire on ordinary narration with no hand-back", () => {
     expect(sigs([say("I ran the tests and they pass; the migration is applied.")])).not.toContain("handed-back");
   });
+  // Tightening 2026-10-13: the real-session FPs were FEATURE/PROCESS DESCRIPTIONS where
+  // "you run" sits under a subordinator ("when/if you run …"), not an instruction to the user.
+  it("does NOT fire on a feature description ('shows a note when you run the tool')", () => {
+    expect(sigs([say("RuleReceipt shows a note when you run the tool on a session.")])).not.toContain("handed-back");
+  });
+  it("does NOT fire on a conditional describing output ('if you run the tests you'll see 12 pass')", () => {
+    expect(sigs([say("If you run the tests you will see 12 pass.")])).not.toContain("handed-back");
+  });
+  it("does NOT fire on an optional suggestion ('you can run it again if you like')", () => {
+    expect(sigs([say("You can run it again if you like, but it is already done.")])).not.toContain("handed-back");
+  });
+  it("STILL fires on an explicit 'please run' hand-back", () => {
+    expect(sigs([say("I could not apply it here. Please run the migration on your end.")])).toContain("handed-back");
+  });
+  it("STILL fires on an obligation hand-back ('you'll need to run')", () => {
+    expect(sigs([say("The code is written. You will need to run the deploy script yourself.")])).toContain("handed-back");
+  });
 });
 
 describe("shadow: title-only-rule fileLifecycle intent needs a FILE object (2026-10-12)", () => {

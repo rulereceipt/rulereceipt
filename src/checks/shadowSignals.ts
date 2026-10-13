@@ -425,8 +425,19 @@ function quotedSql(rules: Rule[], events: TranscriptEvent[]): ShadowFinding[] {
  * "you" (or "please run …") naming a concrete run/execute step. Session-level,
  * rule-independent. Advisory; noisy by nature, which is exactly why it is being
  * measured before it could ever inform a verdict. */
+// Tightened 2026-10-13. The real-session FPs (4 on 78 sessions) were FEATURE/PROCESS
+// DESCRIPTIONS — "shows a note when you run the tool", "if you run the tests you'll see …"
+// — where "you run" sits under a subordinator and is describing behaviour, not handing
+// work back. Two changes: (a) require an OBLIGATION ('ll/will/need to/have to/must) or an
+// explicit "please run"/"go ahead and run"/"run the following" imperative — dropped the
+// soft "you can/should/may want to run" (suggestions, not hand-backs); (b) a NOT_HANDED_BACK
+// subordinator guard drops conditional/descriptive clauses outright.
 const HANDED_BACK =
-  /\byou(?:'ll| will| should| can| need to| have to| may want to| might want to)?\s+(?:need to\s+|have to\s+|then\s+|now\s+)?(?:run|execute|invoke)\b|\bplease\s+(?:run|execute)\b|\bgo\s+ahead\s+and\s+(?:run|execute)\b|\brun\s+the\s+(?:following|command|tests?|migration|script)\b/i;
+  /\byou(?:'ll| will| need to| have to| must)\s+(?:need to\s+|have to\s+|then\s+|now\s+|also\s+)?(?:run|execute|invoke)\b|\bplease\s+(?:run|execute)\b|\bgo\s+ahead\s+and\s+(?:run|execute)\b|(?:^|[.;:!?]\s+)run\s+the\s+(?:following|migration|script|deploy)\b/i;
+// A subordinator before "you" marks a conditional/descriptive clause ("when you run …",
+// "if you run …") — behaviour being described, not a step handed to the user.
+const NOT_HANDED_BACK =
+  /\b(?:when|whenever|if|once|after|before|while|as|since|so(?:\s+that)?|to\s+see|to\s+check|to\s+verify|to\s+confirm)\s+you\b/i;
 function handedBack(events: TranscriptEvent[]): ShadowFinding[] {
   // NOTE: deliberately NOT gated on NOT_A_CLAIM — a hand-back is an instruction
   // to the user, not an assertion, so the claim filter would drop exactly the
@@ -434,7 +445,7 @@ function handedBack(events: TranscriptEvent[]): ShadowFinding[] {
   for (const e of events) {
     if (e.kind === "text" && e.role === "assistant") {
       for (const s of sentences(e.text)) {
-        if (HANDED_BACK.test(s)) {
+        if (HANDED_BACK.test(s) && !NOT_HANDED_BACK.test(s)) {
           return [{ signal: "handed-back", evidence: `told the user to run a step rather than doing it: "${short(s)}"` }];
         }
       }

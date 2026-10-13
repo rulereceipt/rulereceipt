@@ -1,7 +1,31 @@
 import { loadRules } from "./rules.js";
 import { readTranscriptFromFile } from "./parsers/transcriptParser.js";
 import { evaluateSession } from "./evaluate.js";
+import { applyVisibility } from "./visibility.js";
+import { readFileSync } from "node:fs";
 import type { CheckResult, Rule } from "./types.js";
+
+export interface HookDecision {
+  block: boolean;
+  failures: CheckResult[];
+  unverified: CheckResult[];
+}
+
+/**
+ * The Stop-hook's block decision as a pure function, so `check`/report and the
+ * hook cannot drift apart (the one-engine argument, one level up again). Applies
+ * the SAME visibility downgrade every other surface applies (visibility.ts says
+ * "runs wherever a verdict is finalized … so every surface agrees" — the hook was
+ * the one surface it had been missed on): a rule the agent could not see is "Rule
+ * not visible", never Broken, so the hook must not block on it either. A FAIL with
+ * `outcome: "not_run"` and the `unverifiedClaim` exception are handled as before.
+ */
+export function hookDecisionFor(results: CheckResult[], transcriptText: string | undefined): HookDecision {
+  const visible = applyVisibility(results, transcriptText);
+  const failures = visible.filter((r) => r.status === "FAIL" && r.outcome !== "not_run" && !r.notVisible);
+  const unverified = visible.filter((r) => r.unverifiedClaim === true);
+  return { block: failures.length > 0 || unverified.length > 0, failures, unverified };
+}
 
 /**
  * The subset of the Stop hook payload this needs. Everything else Claude
@@ -132,13 +156,19 @@ export async function runHook(needsLlmResult: (rule: Rule) => CheckResult): Prom
     // Property 1: deterministic only. `llm: false` is not a default here,
     // it is part of the contract.
     const { results } = await evaluateSession(cwd, rules, events, false, needsLlmResult);
-    const failures = results.filter((r) => r.status === "FAIL" && r.outcome !== "not_run");
-    // Deliberately NOT a FAIL. See CheckResult.unverifiedClaim: the report
-    // calls this unclear and the gate refuses it, and that is the only place
-    // the two are allowed to disagree.
-    const unverified = results.filter((r) => r.unverifiedClaim === true);
-
-    if (failures.length === 0 && unverified.length === 0) return void emit({});
+    // Apply the SAME visibility downgrade `check`/report/export apply, so the hook
+    // does not block on a rule the agent could not see (it was the one surface
+    // missing this). Reading the raw transcript again is cheap and fails open.
+    let transcriptText: string | undefined;
+    try {
+      transcriptText = readFileSync(input.transcript_path, "utf-8");
+    } catch {
+      transcriptText = undefined; // no raw text → visibility is a no-op → stays as before
+    }
+    // The unverifiedClaim exception (report calls it unclear, the gate refuses it)
+    // is the ONLY place the two are allowed to disagree — handled inside hookDecisionFor.
+    const { block, failures, unverified } = hookDecisionFor(results, transcriptText);
+    if (!block) return void emit({});
     return void emit({ decision: "block", reason: blockReason(failures, unverified) });
   } catch (err) {
     // Property 3: fail open, but never silently.

@@ -9,8 +9,11 @@ not guess. If you ever see it guess instead, that is a bug: please report it wit
 
 _Last reviewed: 2026-10-11, against 0.1.106 (session reading for eight agents —
 Claude Code, OpenAI Codex, GitHub Copilot CLI, Cursor, Antigravity, OpenCode, Cline,
-Devin Desktop; bounded streaming reads for very large sessions; six advisory shadow
+Devin Desktop; bounded streaming reads for very large sessions; eight advisory shadow
 signals, none promoted to Broken). Update this file with every release._
+_Spot-checked 2026-10-13 for 0.1.108: the shadow-signal list below is updated to eight
+(added title-only-rule, quoted-sql, handed-back); 0.1.107–0.1.108 were false-accusation
+and reader-crash fixes, not new limitations. The rest was not re-audited line-by-line this pass._
 
 ---
 
@@ -360,7 +363,7 @@ approval gate must NOT be changed to address them without a fresh FA v1+v2 run.
   sessions FIRST): match a "pushed/committed/deployed" claim with no matching
   tool_use that ran and succeeded → **Broken**. Until then it shows as can't-tell.
 - **Shadow signals — IMPLEMENTED + FA MEASURED 2026-10-08 (none promoted to Broken).**
-  Six contradictions are now detected as ADVISORY shadow signals (printed under
+  Eight contradictions are now detected as ADVISORY shadow signals (printed under
   "Shadow signals"/"Guard integrity", never counted, never in the exit code), with
   their false-accusation rate measured on the frozen corpus via `npx tsx
   scripts/shadow-fa.ts`:
@@ -377,6 +380,20 @@ approval gate must NOT be changed to address them without a fresh FA v1+v2 run.
       can't-tell — it is NOT credited as a Followed verdict).
     - `edited-rule-not-loaded` — the session edited a file governed by a rule whose
       rules file was never loaded into context (reported Can't-tell, never Broken).
+    - `title-only-rule` (added 2026-10-11, tightened 2026-10-12) — a short heading-style
+      rule carrying a directive cue that falls through to judgment yet reads as a checkable
+      intent (the fileLifecycle intent requires a file-ish object, so a data-wipe rule about
+      "databases" does not match). Re-measured 2026-10-12 over 585 rules files: 2 fires, both
+      correct, fa-corpus datawipe fixtures stay clean.
+    - `quoted-sql` (added 2026-10-12) — a plain-text data-destruction rule AND a destructive
+      SQL statement in a quoted client arg (e.g. `psql -c 'DROP TABLE users'`). 0 fires on the
+      frozen corpus.
+    - `handed-back` (added 2026-10-12, tightened 2026-10-13) — the agent's own text told the
+      USER to run/execute a step (obligation phrasing: "you'll need to run…", "please run…"),
+      i.e. handed the work back. Tightened to exclude conditional/descriptive clauses
+      ("when/if you run…") and soft suggestions ("you can run…") after a real-session survey
+      found those were the false positives; 0 fires on the frozen corpus; real-session
+      re-measure due on the hold-out set (~2026-10-25).
     - `hooks-disabled` / `no-verify` / `hook-config-edit` (guardTamper, below).
   **MEASURED FA = 0** across fa-corpus-v1+v2+v3 (frozen). A real-session survey of
   the maintainer's own ~194 sessions (item 7) found at least one false positive for
