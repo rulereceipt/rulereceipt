@@ -297,6 +297,28 @@ directory's `CLAUDE.md` genuinely was not in context, and the rule is reported
 the superset and errs toward "loaded" (removing a false accusation, never hiding
 a real one).
 
+**Bash-read triggers are version-gated (2.1.288 / 2.1.293 / 2.1.296+).** A nested
+rule can also load when the agent *views* a file with a shell reader — but which
+reads trigger it changed across Claude Code versions (#90450), so we gate on the
+session's own recorded `version`. This feeds the ADVISORY `edited-rule-not-loaded`
+signal only; it never moves a verdict (confirmed: 0 verdict changes on the 37-session
+snapshot). The model, per the measurement by yishait-tailor on 2.1.296 (an
+`InstructionsLoaded` ground-truth hook):
+
+| Claude Code version | What a Bash read loads |
+|---|---|
+| `< 2.1.293` | nothing — only Read/Write/Edit load a nested rule |
+| `2.1.293 .. < 2.1.296` | a plain single-file reader (`cat`/`head`/`tail`/`sed -n`/`grep`/`bat`/`less`/`more`), with **no** pipe/chain/redirect/substitution |
+| `>= 2.1.296` | **loads:** `cat`/`head`/`tail`/`nl`/`bat`, `sed -n`, `grep`/`rg` — and these also count inside a `;`/`&&` list. **loads nothing:** pipes, `\|\|`, redirects (incl `2>/dev/null`), extra flags (`cat -A`), `cd dir && cat file`, `grep -r`, and every Bash write (`sed -i`, `>`, `>>`, heredoc, `python -c`, `cp`) |
+| unknown version | falls back to the `2.1.293` behaviour (non-regressing) |
+
+Modelling honesty: grep/rg match-dependence ("a grep with no match loads nothing")
+is **not** distinguished from the command alone — a non-recursive grep/rg with a
+single trailing path is counted (the common, matched case); `grep -r` is excluded
+by flag. `nl` was added and `less`/`more` dropped for `>= 2.1.296` to match the
+measured set. This table is from a third-party measurement on 2.1.296; an
+independent re-measure on this maintainer's machine (now on 2.1.299) is pending.
+
 ## Claude Code hook dispatch and how we differ from /code-review (2.1.288–2.1.292)
 
 - **PreToolUse hooks fail CLOSED at the dispatch level since 2.1.288.** Claude Code
