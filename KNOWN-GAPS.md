@@ -316,8 +316,15 @@ Modelling honesty: grep/rg match-dependence ("a grep with no match loads nothing
 is **not** distinguished from the command alone — a non-recursive grep/rg with a
 single trailing path is counted (the common, matched case); `grep -r` is excluded
 by flag. `nl` was added and `less`/`more` dropped for `>= 2.1.296` to match the
-measured set. This table is from a third-party measurement on 2.1.296; an
-independent re-measure on this maintainer's machine (now on 2.1.299) is pending.
+measured set.
+
+Independently re-measured on this maintainer's machine (Claude Code **2.1.299**,
+personal profile, via a live `InstructionsLoaded` hook as ground truth, 2026-10-14)
+for the six core rows — all matched the model: plain `cat` of a nested file LOADS
+(`nested_traversal`); a pipe, `cd dir && cat file`, `grep -r`, and `cat … 2>/dev/null`
+load nothing; a `head … && tail …` list loads each. The finer flag distinctions
+(`nl`/`bat` readers, the `cat -A` exclusion, `sed -n`, grep match-vs-no-match) are
+modelled from the 2.1.296 table, not each re-measured live.
 
 ## Claude Code hook dispatch and how we differ from /code-review (2.1.288–2.1.292)
 
