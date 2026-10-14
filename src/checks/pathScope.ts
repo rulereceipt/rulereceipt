@@ -38,40 +38,132 @@ export function touchedPaths(events: TranscriptEvent[]): string[] {
 }
 
 /**
- * Files a session VIEWED through a single-file Bash reader — `cat FILE`,
- * `head FILE`, `tail FILE`, `sed -n … FILE`, `grep … FILE`. Since Claude Code
- * 2.1.293 such a view ALSO loads a nested/path-scoped rule governing that file's
- * directory, the same way Read/Edit do (issue #90450, 2026-10-09). This is kept
- * SEPARATE from `touchedPaths` on purpose: `touchedPaths` feeds the verdict
- * path's visibility decisions, and widening it would change verdicts — which the
- * approval/visibility hard rule forbids without a fresh FA run. This helper is
- * for the ADVISORY "edited without the rule loaded" shadow signal only.
+ * Files a session VIEWED through a single-file Bash reader. Claude Code loads the
+ * nested/path-scoped rule governing that file's directory from such a view (the
+ * same way Read/Edit do, issue #90450) — but WHICH views trigger it CHANGED across
+ * versions, so this is gated on the session's own recorded Claude Code version:
  *
- * Deliberately narrow and fails safe: only a reader whose FINAL argument is a
- * single path, with NO pipe / redirection / chaining / command-substitution /
- * glob / option-valued flag confusion — because a piped or chained command does
- * NOT trigger the nested load (per the same issue), so counting it would be
- * wrong. When in doubt the file is simply not returned.
+ *   < 2.1.293              a Bash read loads NOTHING (only Read/Write/Edit do).
+ *   2.1.293 .. < 2.1.296   a plain single-file reader (cat/head/tail/sed -n/grep/
+ *                          bat/less/more) loads, but ONLY with no pipe / chain /
+ *                          redirect / substitution. [the first shipped form]
+ *   >= 2.1.296             the measured table (yishait-tailor on 2.1.296, via an
+ *                          InstructionsLoaded ground-truth hook, #90450, 2026-10-13):
+ *                            loads:   cat/head/tail/nl/bat, sed -n, grep/rg — and
+ *                                     these ALSO count inside a `;`/`&&` list;
+ *                            nothing: pipes, ||, redirects (incl 2>/dev/null),
+ *                                     extra flags (cat -A), `cd dir && cat file`,
+ *                                     grep -r, and every Bash WRITE.
+ *   unknown version        the 2.1.293 behaviour (today's shipped default) — a
+ *                          non-regressing fallback. Tagged a modelling choice.
+ *
+ * Kept SEPARATE from `touchedPaths` on purpose: `touchedPaths` feeds the verdict
+ * path's visibility decisions, and widening it would change verdicts — which the
+ * approval/visibility hard rule forbids without a fresh FA run. This helper feeds
+ * the ADVISORY `edited-rule-not-loaded` shadow signal ONLY, so no change here can
+ * move a PASS/FAIL; it still aims to MATCH real behaviour per version.
+ *
+ * Modelling choices where the transcript can't fully decide (tagged, 2.1.296):
+ *  - grep/rg MATCH-dependence ("no match loads nothing") is NOT distinguished from
+ *    the tool_use alone; a non-recursive grep/rg with a single trailing path is
+ *    counted (the common matched case); `grep -r`/`-R` is excluded by flag. A `;`
+ *    inside a quoted sed/grep script can mis-split a segment — that only drops a
+ *    view (more advisory firing), never a false suppression.
+ *  - "extra flags load nothing": for cat/head/tail/nl/bat only a bare call or a
+ *    numeric count flag (head -5 / head -n 5 / tail -n 3) counts; any other flag
+ *    (cat -A, -v, …) is treated as non-loading.
  */
-const BASH_VIEWERS = new Set(["cat", "head", "tail", "sed", "grep", "bat", "less", "more"]);
-export function bashViewedPaths(events: TranscriptEvent[]): string[] {
+const BASH_VIEWERS_LEGACY = new Set(["cat", "head", "tail", "sed", "grep", "bat", "less", "more"]);
+const BASH_VIEWERS_REFINED = new Set(["cat", "head", "tail", "nl", "bat", "sed", "grep", "rg"]);
+
+/** The highest `"version":"x.y.z"` recorded in the raw transcript, or undefined. */
+export function claudeCodeVersionFromTranscript(text: string | undefined): string | undefined {
+  if (!text) return undefined;
+  let best: string | undefined;
+  const re = /"version"\s*:\s*"(\d+\.\d+\.\d+)"/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text))) if (!best || cmpVersion(m[1], best) > 0) best = m[1];
+  return best;
+}
+
+/** Numeric compare of two "a.b.c" version strings; -1 / 0 / 1. */
+export function cmpVersion(a: string, b: string): number {
+  const pa = a.split(".").map(Number);
+  const pb = b.split(".").map(Number);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const x = pa[i] ?? 0;
+    const y = pb[i] ?? 0;
+    if (x !== y) return x < y ? -1 : 1;
+  }
+  return 0;
+}
+
+export type LoadMode = "none" | "legacy" | "refined";
+/** Which Bash-read loading model a session's Claude Code version uses. */
+export function loadModeForVersion(version: string | undefined): LoadMode {
+  if (!version) return "legacy"; // today's shipped default; non-regressing fallback
+  if (cmpVersion(version, "2.1.293") < 0) return "none";
+  if (cmpVersion(version, "2.1.296") < 0) return "legacy";
+  return "refined";
+}
+
+/** The single trailing file a reader segment views, or null. `mode` picks the rule set. */
+function readerViewedPath(segment: string, mode: "legacy" | "refined"): string | null {
+  const tokens = segment.trim().split(/\s+/).filter(Boolean);
+  if (tokens.length < 2) return null; // need a program and at least one arg
+  const prog = tokens[0];
+  const viewers = mode === "legacy" ? BASH_VIEWERS_LEGACY : BASH_VIEWERS_REFINED;
+  if (!viewers.has(prog)) return null;
+  const last = tokens[tokens.length - 1];
+  // The last token must be a plain path: not a flag, not a glob, no shell metachar.
+  if (!last || last.startsWith("-") || /[*?[\]{}]/.test(last) || /[&|;<>$()`]/.test(last)) return null;
+
+  if (mode === "refined") {
+    const flags = tokens.slice(1, -1);
+    if (prog === "sed") {
+      if (!flags.includes("-n")) return null; // only the reading form `sed -n '…' FILE`
+    } else if (prog === "grep" || prog === "rg") {
+      if (flags.some((f) => /^--recursive$/.test(f) || /^-[a-zA-Z]*[rR][a-zA-Z]*$/.test(f))) return null; // grep -r / -rn / -nr loads nothing
+    } else {
+      // cat/head/tail/nl/bat: bare, or only a numeric count flag; any other flag loads nothing.
+      for (let i = 0; i < flags.length; i++) {
+        const f = flags[i];
+        if (f === "-n") { i++; continue; } // `-n N`
+        if (/^-\d+$/.test(f)) continue; // `-5`
+        if (/^-n\d+$/.test(f)) continue; // `-n5`
+        return null;
+      }
+    }
+  }
+  return last.replace(/^['"]|['"]$/g, "").replace(/\\/g, "/");
+}
+
+export function bashViewedPaths(events: TranscriptEvent[], version?: string): string[] {
+  const mode = loadModeForVersion(version);
+  if (mode === "none") return [];
   const out = new Set<string>();
   for (const e of events) {
     if (e.kind !== "tool_use" || e.toolName !== "Bash") continue;
     const cmd = (e.input as { command?: unknown } | null)?.command;
     if (typeof cmd !== "string") continue;
-    // Reject anything chained/piped/redirected/substituted — those don't trigger
-    // the nested load, so they must not count.
-    if (/[|&;><`]|\$\(|<\(/.test(cmd)) continue;
-    const tokens = cmd.trim().split(/\s+/);
-    if (tokens.length === 0) continue;
-    const prog = tokens[0];
-    if (!BASH_VIEWERS.has(prog)) continue;
-    // The last token must be a plain path (not a flag, not a glob).
-    const last = tokens[tokens.length - 1];
-    if (!last || last.startsWith("-") || /[*?[\]{}]/.test(last)) continue;
-    // `sed -n '…' FILE` carries a script arg; still a single trailing file.
-    out.add(last.replace(/^['"]|['"]$/g, "").replace(/\\/g, "/"));
+
+    if (mode === "legacy") {
+      // Reject ANY chaining/pipe/redirect/substitution; the whole command is one reader.
+      if (/[|&;><`]|\$\(|<\(/.test(cmd)) continue;
+      const p = readerViewedPath(cmd, "legacy");
+      if (p) out.add(p);
+      continue;
+    }
+
+    // refined (>= 2.1.296): pipes / || / redirects / substitution load nothing, but a
+    // `;`/`&&` LIST counts — except a command that changes directory (`cd … && cat`).
+    if (/[|<>`]|\$\(|<\(|(?<!&)&(?!&)/.test(cmd)) continue; // pipe, ||, redirect, 2>, backtick, $( , <(, lone &
+    const segments = cmd.split(/\s*(?:&&|;)\s*/).map((s) => s.trim()).filter(Boolean);
+    if (segments.some((s) => /^cd(\s|$)/.test(s))) continue; // `cd dir && cat file` loads nothing
+    for (const seg of segments) {
+      const p = readerViewedPath(seg, "refined");
+      if (p) out.add(p);
+    }
   }
   return [...out];
 }

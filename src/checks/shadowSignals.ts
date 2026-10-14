@@ -2,7 +2,7 @@ import type { TranscriptEvent, Rule } from "../types.js";
 import { TEST_COMMAND, withoutHeredocs } from "./testCommands.js";
 import { ACTION_CLAIMS, NOT_A_CLAIM, SUCCESS_CLAIM, sentences } from "./claimEvidence.js";
 import { approvalOccurrences } from "./approvalGate.js";
-import { ruleWasLoaded, touchedPaths, bashViewedPaths } from "./pathScope.js";
+import { ruleWasLoaded, touchedPaths, bashViewedPaths, claudeCodeVersionFromTranscript } from "./pathScope.js";
 import { classifyRule } from "./classify.js";
 import { basename } from "node:path";
 
@@ -298,6 +298,9 @@ function editedRuleNotLoaded(rules: Rule[], events: TranscriptEvent[], transcrip
   const contextObserved = lines.some((l) => /<system-reminder>|"claudeMd"|"type"\s*:\s*"(?:instructions|nested_memory|attachment|system)"|project instructions|Contents of [^\n"]*\.md|"isCompactSummary"\s*:\s*true/i.test(l));
   if (!contextObserved) return []; // too thin to tell whether a rule was loaded
   const lastCompaction = (() => { let idx = -1; for (let i = 0; i < lines.length; i++) if (COMPACTION_LINE.test(lines[i])) idx = i; return idx; })();
+  // Which Bash reads count as loading a nested rule depends on the session's
+  // Claude Code version (see pathScope.bashViewedPaths) — read it once here.
+  const ccVersion = claudeCodeVersionFromTranscript(transcriptText);
 
   const editedFileAt = (e: TranscriptEvent): string | null => {
     if (e.kind !== "tool_use") return null;
@@ -324,7 +327,7 @@ function editedRuleNotLoaded(rules: Rule[], events: TranscriptEvent[], transcrip
     // context when it DECIDED to edit, i.e. earlier. A Read / earlier Edit / Write
     // or a single-file Bash view of the rule's folder, before the edit, counts.
     const before = events.slice(0, firstEditIdx);
-    const loadTriggersBefore = [...touchedPaths(before), ...bashViewedPaths(before)];
+    const loadTriggersBefore = [...touchedPaths(before), ...bashViewedPaths(before, ccVersion)];
     const dirTouchedBefore = loadTriggersBefore.some((p) => ruleWasLoaded(r.paths!, [p]));
     const injected = ruleFileInjectedBefore(lines, lines.length, basename(r.sourcePath), lastCompaction);
     if (!injected && !dirTouchedBefore && !fired.has(r.sourcePath)) {
