@@ -57,6 +57,7 @@ import { appendHistory, readHistorySince } from "./history.js";
 import { maybeShowWhatsNew } from "./whatsNew.js";
 import { verifyReceipt, parseReceipt } from "./receipt.js";
 import { buildBadge } from "./badge.js";
+import { renderPrComment } from "./prComment.js";
 import { buildInitGuidance } from "./init.js";
 import { loadProjectConfig, handleMap, blockingFailures, warningFailures, visibleResults, PROJECT_CONFIG_PATH } from "./projectConfig.js";
 import { maybeCheckUpdates, isUpdateCheckEnabled } from "./updateCheck.js";
@@ -1594,6 +1595,29 @@ program
       return;
     }
     console.log(JSON.stringify(buildBadge(parsed.receipt.summary), null, 2));
+  });
+
+program
+  .command("pr-comment <receiptPath>")
+  .description(
+    "Render a receipt (from `check --json`, committed) as a PR-comment markdown block — each rule, its verdict, one evidence line, broken first. Display only: runs no check, needs no session (the transcript never leaves your machine). Pipe it into a PR comment from the GitHub Action."
+  )
+  .action((receiptPath: string) => {
+    let text: string;
+    try {
+      text = readFileSync(receiptPath, "utf-8");
+    } catch {
+      console.error(`Could not read receipt file: ${receiptPath}`);
+      process.exitCode = 1;
+      return;
+    }
+    const parsed = parseReceipt(text);
+    if (parsed.error || !parsed.receipt) {
+      console.error(`Not a valid receipt: ${parsed.error}`);
+      process.exitCode = 1;
+      return;
+    }
+    process.stdout.write(renderPrComment(parsed.receipt));
   });
 
 function confirmYesNo(prompt: string): Promise<boolean> {

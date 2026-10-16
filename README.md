@@ -457,6 +457,17 @@ Or run the pieces directly:
 rulereceipt verify-receipt .rulereceipt/receipt.json --max-age-days 7
 ```
 
+**Post the verdict on the PR.** Turn the same committed receipt into a
+PR-comment block — each rule, its verdict, one quoted line, broken first:
+
+```bash
+rulereceipt pr-comment .rulereceipt/receipt.json   # markdown, for a PR comment
+```
+
+It runs no check and needs no session (the transcript never leaves the machine —
+the receipt carries only a hash of it). Evidence is redacted the same way a shared
+export is, so a quoted line can't leak a secret or a path into a public PR.
+
 **Honest trust boundary:** with no session, CI trusts the receipt you
 committed. But if the session *is* available — agentic CI, or you upload the
 transcript — pass it and CI re-derives instead of trusting:
