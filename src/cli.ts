@@ -50,6 +50,7 @@ import { applyVisibility } from "./visibility.js";
 import { teamPlanNote, activateNote } from "./teamPlan.js";
 import { gateOffer, hookIsInstalled } from "./report/gateOffer.js";
 import { generateHtmlReport } from "./report/generateHtmlReport.js";
+import { buildTimeline, renderTimelineHtml } from "./timeline.js";
 import { verifySessionHash } from "./verifyHash.js";
 import { saveEmailConfig, loadEmailConfig, detectSmtpHost, isValidEmail } from "./emailConfig.js";
 import { sendReportEmail } from "./sendReport.js";
@@ -171,6 +172,53 @@ function needsLlmResult(rule: Rule): CheckResult {
 }
 
 const DEFAULT_HTML_REPORT_NAME = "rulereceipt-report.html";
+const DEFAULT_TIMELINE_NAME = "rulereceipt-timeline.html";
+
+/**
+ * Writes the session-timeline HTML. Display only — it lays the verdicts `check`
+ * already computed out along the session, using the transcript `check` already
+ * read. Like writeHtmlReport, a write failure is reported but never throws.
+ * Needs the raw transcript (to place verdicts); with none, it says so and skips.
+ */
+function writeTimeline(
+  results: CheckResult[],
+  transcriptText: string | undefined,
+  sessionFilePath: string | null,
+  fingerprint: string | null,
+  truncated: boolean,
+  cwd: string,
+  target: boolean | string
+): void {
+  if (!transcriptText) {
+    console.log(
+      "\n(--timeline: no readable session transcript was available, so there's no session to place verdicts on. Nothing was written.)"
+    );
+    return;
+  }
+  const requested = typeof target === "string" && target.length > 0 ? target : DEFAULT_TIMELINE_NAME;
+  const outPath = isAbsolute(requested) ? requested : resolve(cwd, requested);
+  const html = renderTimelineHtml(buildTimeline(results, transcriptText), {
+    projectPath: cwd,
+    sessionName: sessionFilePath ? basename(sessionFilePath) : null,
+    sessionFingerprint: fingerprint,
+    generatedAt: new Date(),
+    toolVersion: pkg.version,
+    truncated,
+  });
+  try {
+    writeFileSync(outPath, html, "utf-8");
+    console.log(`\nSession timeline written to ${outPath}`);
+    console.log("Open it in a browser: each verdict sits where it happened in the session, in order. A single self-contained file.");
+    // Same verbatim-content warning as the shareable report: it reproduces rule
+    // text and quoted evidence, and only the author knows what's in their rules.
+    console.log(
+      "\n⚠ This timeline includes your rule text and session evidence VERBATIM.\n" +
+        "  Review it before sharing outside your team — nothing is auto-redacted beyond home paths."
+    );
+  } catch (err) {
+    console.log(`\n(--timeline: couldn't write ${outPath} — ${err instanceof Error ? err.message : String(err)})`);
+  }
+}
 
 /**
  * Writes the shareable report. A write failure is reported but never
@@ -224,6 +272,8 @@ interface CheckOptions {
   telemetry: boolean;
   /** false = not requested; true = requested at the default path; string = explicit path. */
   html: boolean | string;
+  /** Display-only session timeline. false = not requested; true = default path; string = explicit path. */
+  timeline: boolean | string;
   /** Report failures but always exit 0 — for anyone who wants the report without gating on it. */
   exitZero: boolean;
   /** Fail when there is no session, or an empty one, instead of reporting a pass for a check that never ran. */
@@ -238,7 +288,7 @@ interface CheckOptions {
 }
 
 async function runCheck(opts: CheckOptions) {
-  const { markdown, json, checkUpdates, share, email, emailAlways, llm, telemetry, html, exitZero, requireSession, showSkipped, transcriptOverride, exportPath, dev } = opts;
+  const { markdown, json, checkUpdates, share, email, emailAlways, llm, telemetry, html, timeline, exitZero, requireSession, showSkipped, transcriptOverride, exportPath, dev } = opts;
   // When --transcript points at a session recorded in ANOTHER project, load the
   // rules from that project's cwd (where the agent actually ran) rather than
   // wherever this command happens to be invoked — otherwise a Codex rollout from
@@ -543,6 +593,11 @@ async function runCheck(opts: CheckOptions) {
   if (html !== false) {
     writeHtmlReport(results, { sessionFilePath, ruleCount: results.length }, cwd, html);
   }
+  // Display-only timeline: the same verdicts, placed where they happened in the
+  // session. Uses the transcript already read above (never re-reads or re-checks).
+  if (timeline !== false) {
+    writeTimeline(results, transcriptText, sessionFilePath, computeTranscriptHash(sessionFilePath), sessionTruncated, cwd, timeline);
+  }
 
   // A count alone is not enough. The classifier is a heuristic over English
   // verbs: measured across 559 public rules files it drops non-English
@@ -691,6 +746,10 @@ program
     `write a shareable single-file HTML report you can email, attach to a ticket, or print to PDF. Defaults to ./${DEFAULT_HTML_REPORT_NAME}. Written locally — nothing is uploaded.`
   )
   .option(
+    "--timeline [path]",
+    `write a single-file HTML session timeline: the same verdicts, laid out where they happened in the session, with compaction points marked. Display only — no new check. Defaults to ./${DEFAULT_TIMELINE_NAME}. Written locally — nothing is uploaded.`
+  )
+  .option(
     "--exit-zero",
     "always exit 0, even when a rule was broken. Without this, `check` exits 1 on any FAIL so CI can gate on it (rules needing human judgment report UNCLEAR and never affect the exit code)."
   )
@@ -732,6 +791,7 @@ program
       telemetry: Boolean(opts.telemetry),
       // commander gives `true` for a bare --html and the string for --html <path>
       html: opts.html ?? false,
+      timeline: opts.timeline ?? false,
       exitZero: Boolean(opts.exitZero),
       requireSession: Boolean(opts.requireSession),
       showSkipped: Boolean(opts.showSkipped),

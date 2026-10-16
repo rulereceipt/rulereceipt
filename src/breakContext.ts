@@ -77,6 +77,29 @@ function needles(evidence: string): string[] {
     .sort((a, b) => b.length - a.length);
 }
 
+/**
+ * The index of the LAST line carrying a distinctive fragment of `evidence`, or
+ * -1 when it cannot be located. The last match (not the first) so a later,
+ * unrelated mention does not win. `breakContext` uses this to find the break;
+ * the timeline reuses it to place a verdict in the session, so both agree on
+ * where a verdict sits. Takes pre-split lines so a caller can split once and
+ * locate many verdicts over the same transcript.
+ */
+export function evidenceLineIndex(lines: string[], evidence: string): number {
+  const ns = needles(evidence);
+  if (ns.length === 0) return -1;
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const flat = lines[i].replace(/\s+/g, " ");
+    if (ns.some((n) => flat.includes(n))) return i;
+  }
+  return -1;
+}
+
+/** True when a transcript line records a compaction summary. */
+export function isCompactionLine(line: string): boolean {
+  return COMPACTION.test(line);
+}
+
 /** The human's own message on a user line (string content), or null. */
 function userTyped(line: string): string | null {
   try {
@@ -106,14 +129,7 @@ function clip(s: string, n = 140): string {
  */
 export function breakContext(transcriptText: string, evidence: string): BreakContext {
   const lines = transcriptText.split(/\r?\n/);
-  const ns = needles(evidence);
-  let breakIdx = -1;
-  if (ns.length > 0) {
-    for (let i = lines.length - 1; i >= 0; i--) {
-      const flat = lines[i].replace(/\s+/g, " ");
-      if (ns.some((n) => flat.includes(n))) { breakIdx = i; break; }
-    }
-  }
+  const breakIdx = evidenceLineIndex(lines, evidence);
   const contextObserved = lines.some((l) => CONTEXT_MACHINERY.test(l));
   if (breakIdx === -1)
     return { located: false, rulesInContext: false, compactionBefore: false, rulesStaleAfterCompaction: false, contextObserved };
