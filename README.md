@@ -385,6 +385,15 @@ uploaded), but lays the verdicts out in the order they happened across the
 session, with compaction points marked. It computes no new verdicts — it
 is a different view of the ones `check` already produced.
 
+Both the `--html` report and the `--timeline` now also carry an
+**"Advisory — not a verdict"** section when the session shows a hint worth
+seeing but not strong enough to judge — for example, a path-scoped rule's
+file that the agent appears never to have loaded before editing files that
+rule covers. These are hedged observations ("may never have seen this
+rule"), never accusations: they are not counted as broken, never change a
+pass/fail, and never affect the exit code. The same advisory lines the
+terminal already prints are simply shown in the shareable files too.
+
 ## A verdict looks wrong?
 
 ```bash
@@ -454,7 +463,7 @@ rulereceipt check --json > .rulereceipt/receipt.json   # commit this file
 In CI (no session), verify the committed receipt with the Action:
 
 ```yaml
-- uses: rulereceipt/rulereceipt@v0.1.110   # or pin a commit SHA
+- uses: rulereceipt/rulereceipt@v0.1.111   # or pin a commit SHA
   with:
     receipt: .rulereceipt/receipt.json
     max-age-days: "7"                  # optional: reject a stale receipt
