@@ -35,6 +35,7 @@
 
 import { homedir } from "node:os";
 import type { CheckResult } from "./types.js";
+import type { ShadowFinding } from "./checks/shadowSignals.js";
 import { applyVisibility } from "./visibility.js";
 import { evidenceLineIndex, isCompactionLine } from "./breakContext.js";
 
@@ -227,6 +228,30 @@ function renderStream(t: SessionTimeline): string {
   return stream.map((s) => s.html).join("");
 }
 
+/**
+ * The shadow signals, rendered as advisory — NOT verdicts, same contract as the
+ * shareable HTML report. These are contradictions the transcript shows that are
+ * not counted in any of the lane totals above and have no effect on the result
+ * or exit code. The detector (detectShadowSignals) is reused verbatim; nothing is
+ * recomputed. `edited-rule-not-loaded` is already a couldn't-tell ("may never have
+ * seen this rule"), never a flat "not loaded" — this renders its text verbatim.
+ */
+function renderShadowAdvisory(findings: ShadowFinding[]): string {
+  if (findings.length === 0) return "";
+  const items = findings
+    .map(
+      (f) =>
+        `<li class="advisory__item"><span class="advisory__sig">${clean(f.signal)}</span> ${clean(f.evidence)}</li>`
+    )
+    .join("");
+  return `
+  <section class="advisory">
+    <h2 class="section__title">Advisory — not a verdict <span class="section__count">${findings.length}</span></h2>
+    <p class="section__note">Contradictions the transcript shows that are <strong>not</strong> verdicts: they are not counted among the lane totals above, and they do not change the result or the exit code. Their false-accusation rate is still being measured. Where an agent&#39;s transcript does not record whether a rule was loaded, these say &quot;may never have seen&quot; — a couldn&#39;t-tell, never a flat &quot;not loaded&quot;.</p>
+    <ul class="advisory__list">${items}</ul>
+  </section>`;
+}
+
 function renderUnplaced(t: SessionTimeline): string {
   if (t.unplaced.length === 0) return "";
   return `
@@ -237,7 +262,7 @@ function renderUnplaced(t: SessionTimeline): string {
   </section>`;
 }
 
-export function renderTimelineHtml(t: SessionTimeline, meta: TimelineMeta): string {
+export function renderTimelineHtml(t: SessionTimeline, meta: TimelineMeta, shadowFindings: ShadowFinding[] = []): string {
   const c = t.counts;
   const headline =
     c.broken > 0 ? `${c.broken} rule${c.broken === 1 ? "" : "s"} broken` : "No rules broken";
@@ -318,6 +343,10 @@ export function renderTimelineHtml(t: SessionTimeline, meta: TimelineMeta): stri
   .note h2 { font-size: 12px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--ink); margin: 0 0 8px; }
   .note ul { margin: 0 0 10px; padding-left: 18px; }
   .note li { margin-bottom: 4px; }
+  .advisory { margin-top: 28px; }
+  .advisory__list { list-style: none; margin: 0; padding: 0; }
+  .advisory__item { border: 1px solid var(--line); border-left: 3px solid var(--unclear); border-radius: 6px; padding: 12px 14px; margin-bottom: 10px; font-size: 13.5px; color: var(--muted); word-break: break-word; }
+  .advisory__sig { display: inline-block; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; color: var(--ink); background: var(--panel); padding: 1px 6px; border-radius: 4px; margin-right: 6px; }
   @media (max-width: 560px) { .facts th { width: auto; display: block; padding-bottom: 0; border: 0; } .facts td { display: block; padding-top: 2px; } }
 </style>
 </head>
@@ -343,6 +372,7 @@ export function renderTimelineHtml(t: SessionTimeline, meta: TimelineMeta): stri
   <ul class="list">${renderStream(t)}</ul>
 
   ${renderUnplaced(t)}
+  ${renderShadowAdvisory(shadowFindings)}
 
   <div class="note">
     <h2>How to read this</h2>

@@ -2,6 +2,7 @@ import { minimalIssueUrl } from "../wrong.js";
 import { basename } from "node:path";
 import { homedir } from "node:os";
 import type { CheckResult } from "../types.js";
+import type { ShadowFinding } from "../checks/shadowSignals.js";
 import { computeTranscriptHash, type ReportMeta } from "./generateReport.js";
 
 /**
@@ -217,6 +218,37 @@ function renderSection(bucket: Bucket, results: CheckResult[], all: CheckResult[
 }
 
 /**
+ * Advisory section — the shadow signals, rendered as what they are: NOT verdicts.
+ *
+ * These are contradictions the transcript shows that the tool deliberately does
+ * NOT count as broken, followed, couldn't-tell or needs-judgment. They have no
+ * effect on the verdict headline, the four counts, or the exit code — they are
+ * surfaced here only so a reader sees what the terminal already prints. The
+ * detector itself (detectShadowSignals) is reused verbatim; nothing is recomputed
+ * and no verdict is derived from these.
+ *
+ * For a signal like `edited-rule-not-loaded`, the detector already stays silent on
+ * a thin log and phrases a positive finding as "the agent may never have seen this
+ * rule" — a couldn't-tell, never a flat "not loaded". This section renders that
+ * text verbatim and does not sharpen it.
+ */
+function renderShadowAdvisory(findings: ShadowFinding[]): string {
+  if (findings.length === 0) return "";
+  const items = findings
+    .map(
+      (f) =>
+        `<li class="advisory__item"><span class="advisory__sig">${clean(f.signal)}</span> ${clean(f.evidence)}</li>`
+    )
+    .join("");
+  return `
+      <section class="section advisory">
+        <h2 class="section__title">Advisory — not a verdict <span class="section__count">${findings.length}</span></h2>
+        <p class="section__note">These are contradictions the transcript shows that are <strong>not</strong> verdicts. They are not counted among the followed / not-followed / couldn&#39;t-tell / needs-judgment totals above, and they do not change the result or the exit code. Their false-accusation rate is still being measured on a frozen corpus. Where an agent&#39;s transcript does not record whether a rule was loaded, these say &quot;may never have seen&quot; — a couldn&#39;t-tell, never a flat &quot;not loaded&quot;.</p>
+        <ul class="advisory__list">${items}</ul>
+      </section>`;
+}
+
+/**
  * The headline verdict. Deliberately refuses to say "compliant" — this tool
  * checks a single session against rules it could mechanically evaluate, and
  * a reader who takes "compliant" from that has been misled by us, not by
@@ -245,7 +277,7 @@ function verdict(results: CheckResult[]): { text: string; cls: string } {
   return { text: "No rule violations found", cls: "pass" };
 }
 
-export function generateHtmlReport(results: CheckResult[], meta: HtmlReportMeta): string {
+export function generateHtmlReport(results: CheckResult[], meta: HtmlReportMeta, shadowFindings: ShadowFinding[] = []): string {
   const hash = computeTranscriptHash(meta.sessionFilePath);
   const v = verdict(results);
   const project = basename(meta.projectPath) || meta.projectPath;
@@ -312,6 +344,9 @@ export function generateHtmlReport(results: CheckResult[], meta: HtmlReportMeta)
   .note ul { margin: 0 0 12px; padding-left: 18px; }
   .note li { margin-bottom: 5px; }
   .note p:last-child { margin-bottom: 0; }
+  .advisory__list { list-style: none; margin: 0; padding: 0; }
+  .advisory__item { border: 1px solid var(--line); border-left: 3px solid var(--unclear); border-radius: 6px; padding: 12px 14px; margin-bottom: 10px; font-size: 14px; color: var(--muted); }
+  .advisory__sig { display: inline-block; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; color: var(--ink); background: var(--panel); padding: 1px 6px; border-radius: 4px; margin-right: 6px; }
   @media print {
     body { font-size: 12pt; }
     .wrap { max-width: none; padding: 0; }
@@ -346,6 +381,7 @@ export function generateHtmlReport(results: CheckResult[], meta: HtmlReportMeta)
   </table>
 
 ${BUCKET_ORDER.map((b) => renderSection(b, results, results, meta.toolVersion)).join("")}
+${renderShadowAdvisory(shadowFindings)}
 
   <div class="note">
     <h2>How to read this report</h2>

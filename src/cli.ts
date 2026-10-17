@@ -23,7 +23,7 @@ import { auditProject, renderProjectAudit } from "./audit.js";
 import { runHealth, renderHealth } from "./health.js";
 import { evaluateSession } from "./evaluate.js";
 import { detectGuardTamper, renderGuardTamper } from "./checks/guardTamper.js";
-import { detectShadowSignals, renderShadowSignals } from "./checks/shadowSignals.js";
+import { detectShadowSignals, renderShadowSignals, type ShadowFinding } from "./checks/shadowSignals.js";
 import { buildWrongReport, findTarget, reportedLabel } from "./wrong.js";
 import { saveFixture, replayFixtures, renderAccuracy } from "./accuracy.js";
 import { ghReady, issueTitle, issueCreateArgs, buildMailto, mailtoSubject } from "./wrongSubmit.js";
@@ -187,7 +187,8 @@ function writeTimeline(
   fingerprint: string | null,
   truncated: boolean,
   cwd: string,
-  target: boolean | string
+  target: boolean | string,
+  shadowFindings: ShadowFinding[] = []
 ): void {
   if (!transcriptText) {
     console.log(
@@ -204,7 +205,7 @@ function writeTimeline(
     generatedAt: new Date(),
     toolVersion: pkg.version,
     truncated,
-  });
+  }, shadowFindings);
   try {
     writeFileSync(outPath, html, "utf-8");
     console.log(`\nSession timeline written to ${outPath}`);
@@ -230,7 +231,8 @@ function writeHtmlReport(
   results: CheckResult[],
   meta: ReportMeta,
   cwd: string,
-  target: boolean | string
+  target: boolean | string,
+  shadowFindings: ShadowFinding[] = []
 ): void {
   const requested = typeof target === "string" && target.length > 0 ? target : DEFAULT_HTML_REPORT_NAME;
   const outPath = isAbsolute(requested) ? requested : resolve(cwd, requested);
@@ -239,7 +241,7 @@ function writeHtmlReport(
     projectPath: cwd,
     generatedAt: new Date(),
     toolVersion: pkg.version,
-  });
+  }, shadowFindings);
   try {
     writeFileSync(outPath, html, "utf-8");
     console.log(`\nShareable report written to ${outPath}`);
@@ -516,6 +518,11 @@ async function runCheck(opts: CheckOptions) {
   // Kept in human/markdown form for --email and any other reader below, even
   // when stdout is JSON — a manager gets a readable report, not raw JSON.
   const reportText = markdown ? generateMarkdownReport(results, meta) : generateReport(results, meta, transcriptText);
+  // Shadow signals (advisory — NOT a verdict, NOT counted, no exit-code effect):
+  // computed ONCE here and reused by the terminal output below and by the --html
+  // and --timeline files, so all three surface the same advisory without
+  // recomputing it. Never influences results, the counts, or the exit code.
+  const shadowFindings = detectShadowSignals(rules, events, transcriptText);
   if (json) {
     console.log(generateJsonReport(results, meta, pkg.version, editedRuleFiles));
   } else {
@@ -541,7 +548,7 @@ async function runCheck(opts: CheckOptions) {
     // with-no-command, plain-text .env edit, approved-in-prompt, edited-rule-not-
     // loaded. Reuses the BOUNDED transcriptText read above (the "edited without the
     // rule loaded" signal reads Claude Code's context-injection records from it).
-    const shadowLines = renderShadowSignals(detectShadowSignals(rules, events, transcriptText));
+    const shadowLines = renderShadowSignals(shadowFindings);
     if (shadowLines.length) console.log(shadowLines.join("\n"));
     // Name the tool when it is not the default Claude Code, so a Codex run is
     // not silently reported as if it were a Claude session.
@@ -591,12 +598,12 @@ async function runCheck(opts: CheckOptions) {
   // Written before --share/--email so that a failure to send something
   // never costs the user the local artifact they explicitly asked for.
   if (html !== false) {
-    writeHtmlReport(results, { sessionFilePath, ruleCount: results.length }, cwd, html);
+    writeHtmlReport(results, { sessionFilePath, ruleCount: results.length }, cwd, html, shadowFindings);
   }
   // Display-only timeline: the same verdicts, placed where they happened in the
   // session. Uses the transcript already read above (never re-reads or re-checks).
   if (timeline !== false) {
-    writeTimeline(results, transcriptText, sessionFilePath, computeTranscriptHash(sessionFilePath), sessionTruncated, cwd, timeline);
+    writeTimeline(results, transcriptText, sessionFilePath, computeTranscriptHash(sessionFilePath), sessionTruncated, cwd, timeline, shadowFindings);
   }
 
   // A count alone is not enough. The classifier is a heuristic over English
