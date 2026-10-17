@@ -141,6 +141,37 @@ export function commandFromEvent(event: TranscriptEvent): string | null {
 }
 
 /**
+ * Did the command at this index actually FAIL (non-zero exit / error
+ * tool_result)? A branch-destructive command that errored never reached the
+ * remote, so it must not be reported as a violation — the entire product is
+ * zero false accusations, and "the push I attempted was rejected" is not "I
+ * pushed to main". Added 0.1.111 after confirming the checker previously FAILed
+ * on a failed push identically to a successful one.
+ *
+ * Matched by tool_use id when the transcript carries one, else by the next
+ * tool_result (the existing positional heuristic). No recorded result means we
+ * cannot prove it failed, so it counts as having run — this also preserves the
+ * guard/hook path, which evaluates a single pre-push tool_use with no result
+ * yet and MUST still block.
+ */
+function commandErrored(events: TranscriptEvent[], useIndex: number): boolean {
+  const use = events[useIndex];
+  if (use.kind !== "tool_use") return false;
+  const id = use.toolUseId;
+  if (id) {
+    for (const e of events) {
+      if (e.kind === "tool_result" && e.toolUseId === id) return e.isError === true;
+    }
+  }
+  for (let j = useIndex + 1; j < events.length; j++) {
+    const e = events[j];
+    if (e.kind === "tool_result") return e.isError === true;
+    if (e.kind === "tool_use") break; // a new call began before this one got a result
+  }
+  return false;
+}
+
+/**
  * Real gap found 2026-08-30, one publish after the first version of this
  * file shipped: the original version treated ANY checkout of the named
  * branch as a violation — but "git checkout sprint && git pull origin
@@ -174,13 +205,14 @@ export function runGitBranchPolicyChecks(
   events: TranscriptEvent[]
 ): CheckResult[] {
   const commands: string[] = [];
-  const allTargets: { branch: string; command: string; segment: string; kind: BranchHit["kind"] }[] = [];
-  for (const event of events) {
-    const command = commandFromEvent(event);
+  const allTargets: { branch: string; command: string; segment: string; kind: BranchHit["kind"]; errored: boolean }[] = [];
+  for (let i = 0; i < events.length; i++) {
+    const command = commandFromEvent(events[i]);
     if (!command) continue;
     commands.push(command);
+    const errored = commandErrored(events, i);
     for (const hit of extractGitBranchTargets(command)) {
-      allTargets.push({ branch: hit.branch, command, segment: hit.segment, kind: hit.kind });
+      allTargets.push({ branch: hit.branch, command, segment: hit.segment, kind: hit.kind, errored });
     }
   }
 
@@ -209,8 +241,10 @@ export function runGitBranchPolicyChecks(
     }
     // Push, branch-create/delete/rename, and checkout -b are immediate hits.
     // A bare `switch` is not — it only violates if a commit follows (below).
+    // A push/create that ERRORED never reached the branch, so it is not a
+    // violation — only a command that actually ran counts. 0.1.111.
     const pushOrCreateHit = allTargets.find(
-      (t) => t.branch === branchName && (t.kind === "push" || t.kind === "create")
+      (t) => t.branch === branchName && (t.kind === "push" || t.kind === "create") && !t.errored
     );
     const commitViolationCommand = findCheckoutCommitViolation(commands, branchName);
     const hit =

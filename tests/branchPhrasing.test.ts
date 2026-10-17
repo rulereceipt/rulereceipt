@@ -9,9 +9,16 @@ import { checkSessionInBrowser } from "../src/browser/evaluateBrowser.js";
  * AND a backticked name, so only "push to the `main` branch" fired. Found in
  * the full-tool validation 2026-09-29. The fix: a git ref-action verb
  * (push/commit/merge/rebase) plus a backticked, branch-shaped literal is a
- * branch rule too — but a bare "push to main" (no delimiter) stays UNCLEAR, to
- * keep a common English word from being read as a branch, and a file token
- * (`.env`, `dist/`) is never treated as a branch.
+ * branch rule too.
+ *
+ * CHANGED 0.1.111: the plain-prose form with NO delimiter ("never push to
+ * main", "never push directly to the main branch") now routes to the same
+ * checker and FAILs a real push to main, because it is the same rule in the
+ * phrasing people most often use. The over-reach guard it replaces (a bare
+ * "push to main" must stay UNCLEAR) is kept only for "main"/"master" used as
+ * an ordinary word, a push to a different branch, a failed push, and a rule
+ * that merely mentions a branch — see tests/pushMainPlainProse.test.ts. A file
+ * token (`.env`, `dist/`) is still never treated as a branch.
  */
 const kindOf = (text: string) => (classifyRules(parseClaudeMdText(text, "project"))[0] as { kind: string }).kind;
 const session = JSON.stringify({ type: "assistant", timestamp: "t", message: { role: "assistant", content: [{ type: "tool_use", id: "a", name: "Bash", input: { command: "git push origin main" } }] } });
@@ -31,9 +38,15 @@ describe("common branch-rule phrasings are caught", () => {
 });
 
 describe("it does not over-reach", () => {
-  it("bare 'Never push to main' (no backtick) is NOT forced to a branch FAIL", () => {
-    // no delimited branch name — a common English word must not be read as a ref
-    expect(kindOf("## 1. x\nNever push to main.")).not.toBe("gitBranchPolicy");
+  it("bare 'Never push to main' (no backtick) is a branch rule and FAILs a push to main (0.1.111)", () => {
+    // CHANGED 0.1.111: plain prose now routes, matching the backticked form —
+    // the over-reach guard is preserved for ordinary-word uses of "main",
+    // covered in tests/pushMainPlainProse.test.ts.
+    expect(kindOf("## 1. x\nNever push to main.")).toBe("gitBranchPolicy");
+    expect(verdict("## 1. x\nNever push to main.")).toBe("FAIL");
+  });
+  it("'main' as an ordinary adjective is still not a branch rule", () => {
+    expect(kindOf("## 1. x\nKeep the main function small.")).not.toBe("gitBranchPolicy");
   });
   it("a file token in a push rule is not treated as a branch", () => {
     expect(kindOf("## 1. x\nNever push `.env` to the remote.")).not.toBe("gitBranchPolicy");

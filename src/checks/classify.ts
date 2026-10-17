@@ -442,6 +442,71 @@ function isBranchName(literal: string): boolean {
 }
 
 /**
+ * Plain-prose branch policy ("never push to main", "never push directly to the
+ * main branch") carrying NO backticked literal. The backtick branch pass in
+ * classifyRule reads `patterns`, so a prose rule with no delimiter fell through
+ * to judgment/UNCLEAR — the single most common branch rule people write, missed.
+ * Broadened 0.1.111.
+ *
+ * Only a git ref-action verb (push/commit/merge/rebase) pointing AT a branch
+ * routes here, in one of two shapes that keep the verb and the branch in the
+ * SAME clause ([^.;\n] forbids crossing a sentence/clause break):
+ *   - a bare DEFAULT branch right after a preposition ("push to main", "commit
+ *     to master"). Restricted to main/master and required NOT to be followed by
+ *     another word, so an ordinary adjective/noun ("the main goal", "the main
+ *     function", "main changes") is never read as a ref.
+ *   - any branch named explicitly as "<name> branch" ("push to the release
+ *     branch", "commit to the main branch"), unless the word before "branch" is
+ *     a generic descriptor ("a feature branch", "the current branch") rather
+ *     than a name.
+ * Absence of either shape stays judgment — the safe direction, never a FAIL.
+ */
+const PROSE_REF_VERB = String.raw`(?:push(?:ing|es|ed)?|commit(?:ting|s|ted)?|merg(?:e|ing|es|ed)|rebas(?:e|ing|es|ed))`;
+const PROSE_DEFAULT_BRANCH = new RegExp(
+  String.raw`\b${PROSE_REF_VERB}\b[^.;\n]{0,25}?\b(?:in|on)?to\s+(?:the\s+)?(main|master)\b(?!\s+[A-Za-z])`,
+  "i",
+);
+const PROSE_NAMED_BRANCH = new RegExp(
+  String.raw`\b${PROSE_REF_VERB}\b[^.;\n]{0,40}?\b(?:(?:in|on)?to\s+)?(?:the\s+)?([A-Za-z0-9._/-]+)\s+branch\b`,
+  "i",
+);
+
+// Words that stand in for "a branch" generically rather than naming one, so a
+// "<word> branch" capture that is one of these describes a branch instead of
+// naming it. "release"/"develop"/"staging" are deliberately NOT here — those
+// are real, specific branch names.
+const GENERIC_BRANCH_DESCRIPTOR = new Set([
+  "the", "a", "an", "any", "some", "no", "that", "this", "these", "those",
+  "same", "current", "default", "wrong", "right", "correct", "feature",
+  "new", "existing", "protected", "shared", "remote", "local", "base",
+  "target", "source", "other", "another", "your", "our", "its", "their",
+  "every", "each", "which", "what", "whatever", "appropriate", "relevant",
+]);
+
+function prosePushBranch(rule: Rule): string | null {
+  const text = `${rule.title}. ${rule.text}`;
+  // Explicit "<name> branch" first — it is the more specific shape.
+  const named = text.match(PROSE_NAMED_BRANCH);
+  if (named) {
+    const token = named[1];
+    if (
+      !GENERIC_BRANCH_DESCRIPTOR.has(token.toLowerCase()) &&
+      isBranchName(token) &&
+      !looksLikeFilePathToken(token)
+    ) {
+      return token;
+    }
+  }
+  // Bare default branch (main/master) right after a preposition.
+  const bare = text.match(PROSE_DEFAULT_BRANCH);
+  if (bare) {
+    const token = bare[1];
+    if (isBranchName(token) && !looksLikeFilePathToken(token)) return token.toLowerCase();
+  }
+  return null;
+}
+
+/**
  * A literal a rule introduces as an IDENTITY, not a branch — "check you're on
  * account `prod`", "use the `ci` profile". Found dogfooding (2026-10-02): an
  * account name was read as a git branch target. When the rule names one of these
@@ -952,6 +1017,24 @@ export function classifyRule(rule: Rule): Classification {
   if (patterns.size === 0) {
     if (isEditImpliesTestRule(rule)) {
       return { kind: "ifEditThenTest", rule };
+    }
+    // Plain-prose branch policy ("never push to main" / "never push directly
+    // to the main branch") has no backticked literal, so the branch pass below
+    // (which reads `patterns`) never sees it. Route it here when a ref-action
+    // verb clearly points at a branch AND the direction is readable; otherwise
+    // fall through to judgment. 0.1.111.
+    const proseBranch = prosePushBranch(rule);
+    if (proseBranch !== null) {
+      const prosePolarity = detectPolarity(rule);
+      if (prosePolarity !== null) {
+        return {
+          kind: "gitBranchPolicy",
+          rule,
+          branchName: proseBranch,
+          polarity: prosePolarity,
+          polarityInferred: polarityWasInferred(rule),
+        };
+      }
     }
     return { kind: "judgment", rule };
   }
