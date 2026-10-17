@@ -159,6 +159,8 @@ rulereceipt check              # check the latest session in this project
 rulereceipt check --markdown   # same, formatted for pasting into a PR/Slack
 rulereceipt check --html       # write a shareable single-file HTML report you can send
 rulereceipt check --html report.html       # ...to a specific path
+rulereceipt check --timeline   # write the same verdicts laid out in session order (single-file HTML)
+rulereceipt check --timeline timeline.html  # ...to a specific path
 rulereceipt check --show-skipped           # list what was treated as documentation and not checked
 rulereceipt check --require-session        # fail if there's no session, instead of passing silently
 rulereceipt check --exit-zero              # report failures without failing the build
@@ -267,6 +269,13 @@ Read the limit before wiring it in, because it is most of the story. It
 enforces rules naming a **file** or a **branch** — "never modify `.env`",
 "never commit to `main`" — and nothing else.
 
+One honest caveat on phrasing: a rule that names the branch as a token
+(e.g. "never push to `main`") is checked as a hard rule and can FAIL; a
+plain-sentence version of the same intent ("never push directly to the
+main branch") may still come back "couldn't tell" for now, because the
+classifier only treats a recognisable branch token as a branch rule.
+Phrasing the branch as a token is what makes it enforceable today.
+
 It does **not** block a banned command unless you have said which command is
 banned. That was the point of building it, and the automatic version did not
 survive measurement: replaying 16,336 real tool calls against every forbidding
@@ -370,6 +379,12 @@ independently confirm it describes the session it claims to.
 Nothing is uploaded. The file is written to your working directory and
 goes wherever you choose to send it.
 
+`rulereceipt check --timeline` writes the same self-contained HTML, under
+the same contract (no external requests, home path redacted, nothing
+uploaded), but lays the verdicts out in the order they happened across the
+session, with compaction points marked. It computes no new verdicts — it
+is a different view of the ones `check` already produced.
+
 ## A verdict looks wrong?
 
 ```bash
@@ -439,7 +454,7 @@ rulereceipt check --json > .rulereceipt/receipt.json   # commit this file
 In CI (no session), verify the committed receipt with the Action:
 
 ```yaml
-- uses: rulereceipt/rulereceipt@v0.1.109   # or pin a commit SHA
+- uses: rulereceipt/rulereceipt@v0.1.110   # or pin a commit SHA
   with:
     receipt: .rulereceipt/receipt.json
     max-age-days: "7"                  # optional: reject a stale receipt

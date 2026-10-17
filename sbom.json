@@ -3,12 +3,12 @@
   "specVersion": "1.5",
   "version": 1,
   "metadata": {
-    "timestamp": "2026-10-14T06:49:45.984Z",
+    "timestamp": "2026-10-17T04:22:54.779Z",
     "component": {
       "type": "application",
       "name": "rulereceipt",
-      "version": "0.1.109",
-      "purl": "pkg:npm/rulereceipt@0.1.109"
+      "version": "0.1.110",
+      "purl": "pkg:npm/rulereceipt@0.1.110"
     },
     "tools": [
       {
