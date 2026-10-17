@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { homedir } from "node:os";
 import { renderPrComment } from "../src/prComment.js";
 import type { Receipt } from "../src/receipt.js";
 
@@ -43,10 +44,18 @@ describe("renderPrComment — display-only PR comment from a receipt", () => {
   });
 
   it("redacts secrets / home paths / emails in evidence (a PR comment is public)", () => {
+    // Build the home path from the real homedir so this exercises the redactor
+    // on every machine (a hard-coded path only matches homedir on one box, and
+    // passed locally but failed in CI — the redactor masks os.homedir(), not an
+    // arbitrary /Users/<name>).
+    const home = homedir();
     const md = renderPrComment(receipt([
-      { ruleTitle: "No secrets", status: "FAIL", evidence: "cat /Users/shilpa/.env  # me@example.com" },
+      { ruleTitle: "No secrets", status: "FAIL", evidence: `cat ${home}/.env  # me@example.com` },
     ]));
-    expect(md).not.toContain("/Users/shilpa");
+    if (home && home.length > 1) {
+      expect(md).not.toContain(`${home}/.env`);
+      expect(md).toContain("~/.env");
+    }
     expect(md).not.toContain("me@example.com");
   });
 
