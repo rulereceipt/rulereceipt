@@ -238,18 +238,26 @@ function renderStream(t: SessionTimeline): string {
  */
 function renderShadowAdvisory(findings: ShadowFinding[]): string {
   if (findings.length === 0) return "";
-  const items = findings
-    .map(
-      (f) =>
-        `<li class="advisory__item"><span class="advisory__sig">${clean(f.signal)}</span> ${clean(f.evidence)}</li>`
-    )
-    .join("");
-  return `
+  // 0.1.113: surface edited-rule-not-loaded under its own "Never loaded" heading
+  // (shown first), the rest as the generic advisory. Display only — neither is a
+  // verdict, counted, or able to move the exit code.
+  const li = (f: ShadowFinding) =>
+    `<li class="advisory__item"><span class="advisory__sig">${clean(f.signal)}</span> ${clean(f.evidence)}</li>`;
+  const nl = findings.filter((f) => f.signal === "edited-rule-not-loaded");
+  const other = findings.filter((f) => f.signal !== "edited-rule-not-loaded");
+  const neverLoaded = nl.length === 0 ? "" : `
   <section class="advisory">
-    <h2 class="section__title">Advisory — not a verdict <span class="section__count">${findings.length}</span></h2>
-    <p class="section__note">Contradictions the transcript shows that are <strong>not</strong> verdicts: they are not counted among the lane totals above, and they do not change the result or the exit code. Their false-accusation rate is still being measured. Where an agent&#39;s transcript does not record whether a rule was loaded, these say &quot;may never have seen&quot; — a couldn&#39;t-tell, never a flat &quot;not loaded&quot;.</p>
-    <ul class="advisory__list">${items}</ul>
+    <h2 class="section__title">Never loaded <span class="section__count">${nl.length}</span></h2>
+    <p class="section__note">Advisory, not a verdict — a file these rules cover was edited with no record the rule was loaded first. Not counted, no exit-code effect; a couldn&#39;t-tell, never a flat &quot;not loaded&quot;.</p>
+    <ul class="advisory__list">${nl.map(li).join("")}</ul>
   </section>`;
+  const rest = other.length === 0 ? "" : `
+  <section class="advisory">
+    <h2 class="section__title">Advisory — not a verdict <span class="section__count">${other.length}</span></h2>
+    <p class="section__note">Contradictions the transcript shows that are <strong>not</strong> verdicts: they are not counted among the lane totals above, and they do not change the result or the exit code. Their false-accusation rate is still being measured.</p>
+    <ul class="advisory__list">${other.map(li).join("")}</ul>
+  </section>`;
+  return `${neverLoaded}${rest}`;
 }
 
 function renderUnplaced(t: SessionTimeline): string {

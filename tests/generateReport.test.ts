@@ -292,7 +292,7 @@ describe("a hoisted section does not restate its own status on every line", () =
     ];
     const out = generateReport(many, { sessionFilePath: null, ruleCount: 3 });
     expect(occurrences(out, "UNCLEAR")).toBe(0);
-    expect(out).toContain("Needs your judgment (3)");
+    expect(out).toContain("Not checked — needs your judgment (3)");
     for (const t of ["First judgment rule", "Second judgment rule", "Third judgment rule"]) {
       expect(out, `missing ${t}`).toContain(t);
     }

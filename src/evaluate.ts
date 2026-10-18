@@ -95,7 +95,10 @@ export async function evaluateSession(
     outcome: "not_applicable",
     method: "file_events",
     reason: "path_scope_not_loaded",
-    evidence: `path-scoped rule (${rule.paths!.join(", ")}): this session touched no matching file, so Claude never loaded it`,
+    // "Didn't apply", NOT "never loaded": no file this rule covers was touched, so
+    // the rule never had anything to govern. "Never loaded" is reserved for the
+    // edited-rule-not-loaded signal (a COVERED file WAS edited with no load record).
+    evidence: `path-scoped rule (${rule.paths!.join(", ")}): this session edited no file it covers, so it didn't apply`,
   }));
 
   const of = (kind: Classification["kind"]) => classifications.filter((c) => c.kind === kind);

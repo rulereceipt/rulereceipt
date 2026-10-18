@@ -2,6 +2,7 @@ import { statSync, readFileSync } from "node:fs";
 import { listAllSessions } from "./adapters/index.js";
 import { evaluateSession } from "./evaluate.js";
 import { applyVisibility } from "./visibility.js";
+import { detectShadowSignals } from "./checks/shadowSignals.js";
 import type { CheckResult, Rule } from "./types.js";
 
 /**
@@ -58,6 +59,8 @@ export interface HistorySummary {
   judgmentRules: number;
   /** Rules whose only would-be breaks happened while the rule wasn't in context. */
   notVisibleRules: number;
+  /** Advisory: distinct rules whose covered file was edited with no load record. */
+  neverLoadedRules: number;
   elapsedMs: number;
 }
 
@@ -93,6 +96,9 @@ export async function scanHistory(
   }
   const rules_ = new Map<string, Agg>();
   const tools = new Set<string>();
+  // Advisory: distinct rules whose covered file was edited with no load record,
+  // across the whole window. Never a break, never counted as one.
+  const neverLoaded = new Set<string>();
   let sessionsScanned = 0;
 
   /** The latest event timestamp in a session, or null if none parse. */
@@ -128,6 +134,16 @@ export async function scanHistory(
     // the mtime only when the transcript carries no usable timestamp.
     const sessionMs = lastEventMs(events) ?? ms;
     const { results: rawResults } = await evaluateSession(cwd, rules, events, false, needsLlmResult);
+    // Never-loaded (advisory): a rule whose covered file was edited with no record
+    // the rule loaded first. Aggregated for the ranking's secondary signal.
+    try {
+      const tx = readFileSync(file, "utf-8");
+      for (const f of detectShadowSignals(rules, events, tx)) {
+        if (f.signal === "edited-rule-not-loaded") {
+          neverLoaded.add(f.evidence.match(/governed by "([^"]+)"/)?.[1] ?? f.evidence);
+        }
+      }
+    } catch { /* advisory only — a read failure must not sink the scan */ }
     // "Rule not visible" (#4): a FAIL whose rule wasn't in context is not a break
     // here either, so the headline count stays honest across sessions.
     let rawText: string | undefined;
@@ -175,6 +191,7 @@ export async function scanHistory(
     followedRules,
     judgmentRules,
     notVisibleRules,
+    neverLoadedRules: neverLoaded.size,
     elapsedMs: Date.now() - started,
   };
 }
@@ -218,6 +235,9 @@ export function renderHistory(s: HistorySummary, projectName: string, now = Date
   }
   out.push("");
   out.push(`  ${s.followedRules} rule${s.followedRules === 1 ? "" : "s"} followed every time · ${s.judgmentRules} need${s.judgmentRules === 1 ? "s" : ""} your judgment`);
+  if (s.neverLoadedRules > 0) {
+    out.push(`  ⚠ ${s.neverLoadedRules} rule${s.neverLoadedRules === 1 ? "" : "s"} may never have loaded — a covered file was edited with no record the rule loaded first (advisory, not counted as a break)`);
+  }
   if (s.notVisibleRules > 0) {
     out.push(`  ${s.notVisibleRules} rule${s.notVisibleRules === 1 ? " was" : "s were"} not in context when the agent acted — NOT counted as broken. Start sessions from the project root, or add a SessionStart hook that injects your rules.`);
   }

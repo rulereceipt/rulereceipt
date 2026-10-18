@@ -2,6 +2,7 @@ import { loadRules } from "./rules.js";
 import { readTranscriptFromFile } from "./parsers/transcriptParser.js";
 import { evaluateSession } from "./evaluate.js";
 import { applyVisibility } from "./visibility.js";
+import { detectShadowSignals } from "./checks/shadowSignals.js";
 import { readFileSync } from "node:fs";
 import type { CheckResult, Rule } from "./types.js";
 
@@ -168,6 +169,16 @@ export async function runHook(needsLlmResult: (rule: Rule) => CheckResult): Prom
     // The unverifiedClaim exception (report calls it unclear, the gate refuses it)
     // is the ONLY place the two are allowed to disagree — handled inside hookDecisionFor.
     const { block, failures, unverified } = hookDecisionFor(results, transcriptText);
+    // Session-end one-liner for the USER (stderr; the agent gets the block
+    // decision on stdout). Printed ONLY when there is something to act on — a
+    // proven FAIL or a rule that may never have loaded — so a clean finish stays
+    // silent. Opt-in by construction: this hook only runs once `protect` wired it.
+    const neverLoaded = detectShadowSignals(rules, events, transcriptText).filter((f) => f.signal === "edited-rule-not-loaded").length;
+    const needJudgment = results.filter((r) => r.status === "UNCLEAR" && r.needsHuman).length;
+    const checked = results.length - needJudgment;
+    if (failures.length > 0 || neverLoaded > 0) {
+      process.stderr.write(`RuleReceipt: ${failures.length} FAIL · ${neverLoaded} never loaded · ${checked} checked · ${needJudgment} need judgment\n`);
+    }
     if (!block) return void emit({});
     return void emit({ decision: "block", reason: blockReason(failures, unverified) });
   } catch (err) {

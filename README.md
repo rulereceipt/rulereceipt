@@ -314,6 +314,14 @@ Of 99 forbidding rules in the corpus that name a command-shaped literal, only
 marked automatically, which is the point.
 
 
+### Accuracy
+
+Accuracy (0.1.112, measured 2026-10-18): 0 false FAILs on our frozen test sets
+(184 checks). On 559 real rules files × 5 real sessions (2,795 reports), 0.4%
+showed a FAIL, down from 2.9% in September. We checked each one by hand: all were
+real actions (e.g. a real push to main) matched against another project's rule.
+When the evidence isn't clear, we say "couldn't tell".
+
 ### Reproducing the published numbers
 
 Every figure in the [postmortem](https://rulereceipt.dev/postmortem) and in the

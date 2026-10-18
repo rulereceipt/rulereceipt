@@ -517,12 +517,18 @@ async function runCheck(opts: CheckOptions) {
       : "";
   // Kept in human/markdown form for --email and any other reader below, even
   // when stdout is JSON — a manager gets a readable report, not raw JSON.
-  const reportText = markdown ? generateMarkdownReport(results, meta) : generateReport(results, meta, transcriptText);
   // Shadow signals (advisory — NOT a verdict, NOT counted, no exit-code effect):
-  // computed ONCE here and reused by the terminal output below and by the --html
-  // and --timeline files, so all three surface the same advisory without
-  // recomputing it. Never influences results, the counts, or the exit code.
+  // computed ONCE here and reused by the terminal report (the "Never loaded"
+  // group), the shadow lines below, and the --html / --timeline files. Never
+  // influences results, the counts, or the exit code.
   const shadowFindings = detectShadowSignals(rules, events, transcriptText);
+  // "Never loaded" = edited-rule-not-loaded ONLY (a COVERED file was edited with
+  // no record the rule loaded first). Path-scoped rules whose covered files were
+  // never touched are "Didn't apply", not this. Titles parsed from the finding.
+  const neverLoaded = shadowFindings
+    .filter((f) => f.signal === "edited-rule-not-loaded")
+    .map((f) => f.evidence.match(/governed by "([^"]+)"/)?.[1] ?? f.evidence);
+  const reportText = markdown ? generateMarkdownReport(results, meta) : generateReport(results, meta, transcriptText, neverLoaded);
   if (json) {
     console.log(generateJsonReport(results, meta, pkg.version, editedRuleFiles));
   } else {
@@ -548,7 +554,10 @@ async function runCheck(opts: CheckOptions) {
     // with-no-command, plain-text .env edit, approved-in-prompt, edited-rule-not-
     // loaded. Reuses the BOUNDED transcriptText read above (the "edited without the
     // rule loaded" signal reads Claude Code's context-injection records from it).
-    const shadowLines = renderShadowSignals(shadowFindings);
+    // edited-rule-not-loaded now renders as the report's "Never loaded" group in
+    // text mode, so drop it here to avoid showing it twice; markdown has no such
+    // group, so keep it there.
+    const shadowLines = renderShadowSignals(markdown ? shadowFindings : shadowFindings.filter((f) => f.signal !== "edited-rule-not-loaded"));
     if (shadowLines.length) console.log(shadowLines.join("\n"));
     // Name the tool when it is not the default Claude Code, so a Codex run is
     // not silently reported as if it were a Claude session.
@@ -1840,16 +1849,16 @@ program
 program
   .command("history")
   .description(
-    "Check EVERY session for this project in the last 30 days (this is what runs when you type `rulereceipt` with no arguments). Leads with the rules broken most, each with a count, the last date and one quoted line. Counts only proven breaks; judgment rules stay separate. No session to pick, no API key, nothing uploaded."
+    "Check EVERY session for this project in the last 14 days (this is what runs when you type `rulereceipt` with no arguments). Leads with the rules broken most (ranked by proven FAILs), then a never-loaded advisory. Counts only proven breaks; judgment rules stay separate. Real sessions only, no API key, nothing uploaded. Use `--days` for a wider window."
   )
-  .option("--days <n>", "how many days back to scan", "30")
+  .option("--days <n>", "how many days back to scan", "14")
   .action(async (opts: { days?: string }) => {
     await runHistory(opts);
   });
 
 async function runHistory(opts: { days?: string }): Promise<void> {
   const cwd = process.cwd();
-  const parsedDays = Number.parseInt(opts.days ?? "30", 10);
+  const parsedDays = Number.parseInt(opts.days ?? "14", 10);
   const days = Number.isFinite(parsedDays) && parsedDays > 0 ? parsedDays : 30;
   const rules = loadRules(cwd);
   if (rules.length === 0) {

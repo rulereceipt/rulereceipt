@@ -64,11 +64,12 @@ function countSpan(html: string): string {
 describe("shadow advisory — HTML report", () => {
   it("renders the advisory, labeled as not-a-verdict, when findings are present", () => {
     const html = generateHtmlReport([result()], htmlMeta(), [finding()]);
-    expect(html).toContain("Advisory — not a verdict");
-    expect(html).toContain("edited-rule-not-loaded");
+    // 0.1.113: edited-rule-not-loaded now renders under the "Never loaded"
+    // group (display regroup), still labelled not-a-verdict, hedged wording kept.
+    expect(html).toContain("Never loaded");
     expect(html).toContain("may never have seen this rule");
     // The label must disclaim verdict status in the same section.
-    expect(html).toMatch(/not<\/strong>\s*verdicts/);
+    expect(html).toMatch(/not a verdict/i);
   });
 
   it("renders NO advisory section when there are no findings", () => {
@@ -92,9 +93,12 @@ describe("shadow advisory — HTML report", () => {
     // add script. The no-external-URL contract is asserted on the timeline.)
     const html = generateHtmlReport([result()], htmlMeta(), [finding()]);
     expect(html).not.toMatch(/<script/i);
-    // The advisory block itself introduces no URL.
-    const block = html.slice(html.indexOf("Advisory — not a verdict"));
-    expect(block.split("How to read this report")[0]).not.toMatch(/https?:\/\//);
+    // The advisory block itself introduces no URL. (0.1.113: edited-rule-not-loaded
+    // renders under the "Never loaded" group — isolate JUST that <section>, since
+    // it now sits above the result rows, which carry a pre-existing GitHub link.)
+    const start = html.indexOf("Never loaded");
+    const block = html.slice(start, html.indexOf("</section>", start));
+    expect(block).not.toMatch(/https?:\/\//);
   });
 
   it("does NOT change the verdict counts when an advisory is attached", () => {
@@ -119,8 +123,7 @@ describe("shadow advisory — timeline HTML", () => {
   it("renders the advisory under the same escape/no-script/no-URL contract", () => {
     const t = buildTimeline([result({ status: "PASS", evidence: "ok" })], transcript);
     const html = renderTimelineHtml(t, timelineMeta, [finding({ evidence: "<img src=x onerror=alert(1)>" })]);
-    expect(html).toContain("Advisory — not a verdict");
-    expect(html).toContain("edited-rule-not-loaded");
+    expect(html).toContain("Never loaded");
     expect(html).not.toContain("<img src=x");
     expect(html).not.toMatch(/<script/i);
     expect(html).not.toMatch(/https?:\/\//);
@@ -216,27 +219,27 @@ describe("shadow advisory — end-to-end: does not change the exit code", () => 
 
   it("fires the advisory in the HTML yet still exits 0 with 0 not-followed", () => {
     const { out, status } = runCapture(["check", "--transcript", "session.jsonl", "--html"]);
-    // The advisory fired in the terminal output...
-    expect(out).toContain("edited-rule-not-loaded");
+    // The advisory fired in the terminal output (now the "Never loaded" group)...
+    expect(out).toContain("Never loaded");
     // ...and in the HTML file...
     const htmlPath = join(dir, "rulereceipt-report.html");
     expect(existsSync(htmlPath)).toBe(true);
     const html = readFileSync(htmlPath, "utf-8");
-    expect(html).toContain("Advisory — not a verdict");
-    expect(html).toContain("edited-rule-not-loaded");
-    // ...but it did NOT flip the exit code or invent a failure.
+    expect(html).toContain("Never loaded");
+    expect(html).toContain("may never have seen this rule");
+    // ...but it did NOT flip the exit code or invent a failure. (verdict/count — unchanged)
     expect(status).toBe(0);
     expect(html).toContain("0 not followed");
   });
 
   it("also fires the advisory in the --timeline HTML, still exit 0", () => {
     const { out, status } = runCapture(["check", "--transcript", "session.jsonl", "--timeline", "tl.html"]);
-    expect(out).toContain("edited-rule-not-loaded");
+    expect(out).toContain("Never loaded");
     const tlPath = join(dir, "tl.html");
     expect(existsSync(tlPath)).toBe(true);
     const html = readFileSync(tlPath, "utf-8");
-    expect(html).toContain("Advisory — not a verdict");
-    expect(html).toContain("edited-rule-not-loaded");
+    expect(html).toContain("Never loaded");
+    expect(html).toContain("may never have seen this rule");
     expect(status).toBe(0);
   });
 });

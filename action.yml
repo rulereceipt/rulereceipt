@@ -27,7 +27,15 @@ inputs:
     required: false
     default: ""
   anthropic-api-key:
-    description: "Optional. If set, also run the CLAUDE.md-vs-AGENTS.md contradiction check (needs judgment), which FAILS the build on a contradiction. Pass a secret, never a literal."
+    description: "Optional. If set, also run the CLAUDE.md-vs-AGENTS.md contradiction check (needs judgment). ADVISORY ONLY — surfaced as a workflow warning, NEVER fails the build: an --llm opinion is never a verdict and never gates CI. Pass a secret, never a literal."
+    required: false
+    default: ""
+  pr-comment:
+    description: "'true' to post a PR comment ONLY when a committed receipt carries a proven (deterministic) FAIL. A 'couldn't tell'/UNCLEAR or an --llm opinion NEVER posts. Needs `receipt`, `github-token`, and a pull_request event."
+    required: false
+    default: "false"
+  github-token:
+    description: "With `pr-comment`: a token with pull-requests: write (usually \${{ github.token }}). Empty = never posts."
     required: false
     default: ""
 
@@ -67,13 +75,37 @@ runs:
         if [ -n "$RR_MAX_AGE" ]; then args+=(--max-age-days "$RR_MAX_AGE"); fi
         npx --yes "rulereceipt@$RR_VERSION" "${args[@]}"
 
-    # Optional gate: contradictions between CLAUDE.md and AGENTS.md. Needs a
-    # key because it takes judgment; fails the build on a contradiction.
-    - name: Contradiction check
+    # Advisory: contradictions between CLAUDE.md and AGENTS.md. Needs a key
+    # because it takes judgment. It is an --llm opinion, so per product policy it
+    # NEVER fails the build — a contradiction is surfaced as a workflow warning
+    # and the step still exits 0.
+    - name: Contradiction check (advisory)
       if: ${{ inputs.anthropic-api-key != '' }}
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
         RR_VERSION: ${{ inputs.version }}
         ANTHROPIC_API_KEY: ${{ inputs.anthropic-api-key }}
-      run: npx --yes "rulereceipt@$RR_VERSION" lint --llm
+      run: npx --yes "rulereceipt@$RR_VERSION" lint --llm || echo "::warning title=RuleReceipt::CLAUDE.md/AGENTS.md contradiction check flagged something (advisory — an --llm opinion never fails CI)."
+
+    # Optional: post a PR comment ONLY when the committed receipt carries a proven
+    # (deterministic) FAIL. A "couldn't tell"/UNCLEAR never sets summary.fail, and
+    # an --llm opinion is never a verdict, so neither ever posts. Runs even if the
+    # verify step already failed the build, so the comment accompanies the failure.
+    - name: PR comment on proven FAIL
+      if: ${{ always() && inputs.pr-comment == 'true' && inputs.receipt != '' && inputs.github-token != '' && github.event_name == 'pull_request' }}
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        RR_VERSION: ${{ inputs.version }}
+        RR_RECEIPT: ${{ inputs.receipt }}
+        GH_TOKEN: ${{ inputs.github-token }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+      run: |
+        fails=$(node -e "try{const r=JSON.parse(require('fs').readFileSync(process.env.RR_RECEIPT,'utf8'));console.log((r.summary&&r.summary.fail)||0)}catch(e){console.log(0)}")
+        if [ "$fails" -gt 0 ]; then
+          npx --yes "rulereceipt@$RR_VERSION" pr-comment "$RR_RECEIPT" > "$RUNNER_TEMP/rr-pr-comment.md"
+          gh pr comment "$PR_NUMBER" --body-file "$RUNNER_TEMP/rr-pr-comment.md"
+        else
+          echo "No proven FAIL in the receipt — nothing posted (a couldn't-tell is never posted)."
+        fi

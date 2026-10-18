@@ -161,22 +161,6 @@ const BUCKET_LABEL: Record<Bucket, string> = {
 };
 
 /**
- * Failures, then the two kinds of gap, then what held, then what never came
- * up, then the human's half. "Not run" sits near the top on purpose: a
- * check that did not happen is closer to a gap than to a result, and
- * burying it is how it got mistaken for one.
- */
-const BUCKET_ORDER: Bucket[] = [
-  "FAIL",
-  "RULE_NOT_VISIBLE",
-  "UNCLEAR_EVIDENCE",
-  "NOT_RUN",
-  "PASS",
-  "NOT_APPLICABLE",
-  "UNCLEAR_JUDGMENT",
-];
-
-/**
  * The explanation shared by every rule in a section, or null when they
  * differ.
  *
@@ -216,13 +200,40 @@ function sharedEvidence(rs: CheckResult[]): string | null {
  * gets A4 "why it broke" context (the user message before it, whether the rules
  * file was in context, whether a compaction preceded it) read straight from it.
  */
-export function generateReport(results: CheckResult[], meta: ReportMeta, transcriptText?: string): string {
+/**
+ * The observable buckets — a real checker (file/branch/command/claim/content)
+ * reached a conclusion. Shown under "Checked". Judgment rules are the only ones
+ * NOT here; they go to the collapsed "Not checked" group. "Never loaded" sits
+ * above both, from the edited-rule-not-loaded signal (passed in), never a verdict.
+ */
+const CHECKED_BUCKETS: Bucket[] = [
+  "FAIL", "RULE_NOT_VISIBLE", "UNCLEAR_EVIDENCE", "NOT_RUN", "PASS", "NOT_APPLICABLE",
+];
+
+export function generateReport(results: CheckResult[], meta: ReportMeta, transcriptText?: string, neverLoaded?: string[]): string {
   const clean = results.map(sanitize);
   const lines: string[] = [];
   lines.push(`RuleReceipt · ${meta.ruleCount} rules checked`);
   lines.push("─".repeat(40));
 
-  for (const bucket of BUCKET_ORDER) {
+  // GROUP 1 — Never loaded (top). Advisory, NOT a verdict and NOT counted: a file
+  // one of these rules covers was edited, but the session shows no record of the
+  // rule being loaded first. Sourced from the edited-rule-not-loaded signal.
+  if (neverLoaded && neverLoaded.length > 0) {
+    lines.push("");
+    lines.push(`⚠ Never loaded (${neverLoaded.length})`);
+    lines.push("  advisory, not a verdict — a file these rules cover was edited, with no record the rule was loaded first");
+    for (const t of neverLoaded) lines.push(`  • ${t}`);
+  }
+
+  // GROUP 2 — Checked (observable rules). Only emit the header when something
+  // landed here, so a judgment-only report doesn't show an empty "Checked".
+  const checkedTotal = clean.filter((r) => CHECKED_BUCKETS.includes(bucketOf(r))).length;
+  if (checkedTotal > 0) {
+    lines.push("");
+    lines.push(`Checked — observable rules (${checkedTotal})`);
+  }
+  for (const bucket of CHECKED_BUCKETS) {
     const inBucket = clean.filter((r) => bucketOf(r) === bucket);
     if (inBucket.length === 0) continue;
 
@@ -268,6 +279,23 @@ export function generateReport(results: CheckResult[], meta: ReportMeta, transcr
       if (r.status === "FAIL" && !r.notVisible && transcriptText && r.evidence) {
         for (const l of renderBreakContext(breakContext(transcriptText, r.evidence))) lines.push(l);
       }
+    }
+  }
+
+  // GROUP 3 — Not checked: judgment rules, COLLAPSED. Nothing in a transcript
+  // settles these; they never affect the counts or the exit code. Shown
+  // compactly (header + titles) so a wordy rules file can't read as "mostly
+  // checked". With --llm each carries its own grade — a labelled OPINION, never
+  // a verdict, and it cannot change a count or an exit code.
+  const judgment = clean.filter((r) => bucketOf(r) === "UNCLEAR_JUDGMENT");
+  if (judgment.length > 0) {
+    lines.push("");
+    lines.push(`Not checked — needs your judgment (${judgment.length})   [collapsed; run --llm for a labelled opinion, or --html]`);
+    const shared = sharedEvidence(judgment);
+    lines.push(`  ${shared ?? "nothing in the transcript settles these — a human (or --llm) decides"}`);
+    for (const r of judgment) {
+      lines.push(`  • ${ruleLabel(r, clean)}`);
+      if (r.evidence && r.evidence !== shared) lines.push(`      ${r.evidence}`);
     }
   }
 

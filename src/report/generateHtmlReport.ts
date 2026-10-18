@@ -146,7 +146,8 @@ const BUCKET_CLASS: Record<Bucket, string> = {
  * past — the opposite of what an audit document is for. Judgment calls
  * sit last: they're expected, and they're the longest section.
  */
-const BUCKET_ORDER: Bucket[] = ["FAIL", "UNCLEAR_EVIDENCE", "PASS", "UNCLEAR_JUDGMENT"];
+// Section order is now expressed by the grouped render below (Never loaded →
+// Checked → Not checked), so there is no standalone BUCKET_ORDER here.
 
 function ruleLabel(result: CheckResult, all: CheckResult[]): string {
   const collides = all.filter((other) => other.ruleId === result.ruleId).length > 1;
@@ -380,8 +381,25 @@ export function generateHtmlReport(results: CheckResult[], meta: HtmlReportMeta,
     <tr><th>Tool version</th><td><code>rulereceipt ${clean(meta.toolVersion)}</code></td></tr>
   </table>
 
-${BUCKET_ORDER.map((b) => renderSection(b, results, results, meta.toolVersion)).join("")}
-${renderShadowAdvisory(shadowFindings)}
+${(() => {
+      // Display grouping (0.1.113): Never loaded → Checked → Not checked. Pure
+      // presentation — renderSection is unchanged, so no verdict, count or exit
+      // code moves. "Never loaded" = edited-rule-not-loaded only (a covered file
+      // was edited with no load record); other advisories stay at the bottom.
+      const nl = shadowFindings.filter((f) => f.signal === "edited-rule-not-loaded");
+      const other = shadowFindings.filter((f) => f.signal !== "edited-rule-not-loaded");
+      const sec = (b: Bucket) => renderSection(b, results, results, meta.toolVersion);
+      const checked = (["FAIL", "UNCLEAR_EVIDENCE", "PASS"] as Bucket[]).map(sec).join("");
+      const judgment = (["UNCLEAR_JUDGMENT"] as Bucket[]).map(sec).join("");
+      const groupHead = (t: string) => `\n      <h2 class="section__title">${clean(t)}</h2>`;
+      const neverLoadedSec = nl.length === 0 ? "" : `
+      <section class="section advisory">
+        <h2 class="section__title">Never loaded <span class="section__count">${nl.length}</span></h2>
+        <p class="section__note">Advisory, not a verdict — a file these rules cover was edited with no record the rule was loaded first. Not counted, no exit-code effect.</p>
+        <ul class="advisory__list">${nl.map((f) => `<li class="advisory__item">${clean(f.evidence)}</li>`).join("")}</ul>
+      </section>`;
+      return `${neverLoadedSec}${groupHead("Checked — observable rules")}${checked}${judgment ? `${groupHead("Not checked — needs your judgment")}${judgment}` : ""}${renderShadowAdvisory(other)}`;
+    })()}
 
   <div class="note">
     <h2>How to read this report</h2>
