@@ -1,0 +1,3 @@
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Pushing to main; its result is not recorded, but a later unrelated command errored."}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_push1","name":"Bash","input":{"command":"git push origin main"}}]}}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_other","content":"ls: nonexistent-dir: No such file or directory","is_error":true}]}}

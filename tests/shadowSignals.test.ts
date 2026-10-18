@@ -101,6 +101,16 @@ describe("shadow: edited-rule-not-loaded", () => {
     const text = REMINDER + '\nContents of /proj/src/db/CLAUDE.md (project instructions, checked into the codebase)';
     expect(sigs(ev, [scoped()], text)).not.toContain("edited-rule-not-loaded");
   });
+  it("does NOT fire on a STRUCTURED nested_memory attachment alone (no 'Contents of' text)", () => {
+    const ev = [edit("/proj/src/db/schema.ts")];
+    const text = REMINDER + '\n{"attachment":{"type":"nested_memory","path":"/proj/src/db/CLAUDE.md"}}';
+    expect(sigs(ev, [scoped()], text)).not.toContain("edited-rule-not-loaded");
+  });
+  it("does NOT fire on a structured attachment with path before type", () => {
+    const ev = [edit("/proj/src/db/schema.ts")];
+    const text = REMINDER + '\n{"attachment":{"path":"/proj/src/db/CLAUDE.md","type":"nested_memory"}}';
+    expect(sigs(ev, [scoped()], text)).not.toContain("edited-rule-not-loaded");
+  });
   it("does NOT fire when a single-file Bash view of the rule's folder loaded it (2.1.293+)", () => {
     const ev: TranscriptEvent[] = [bash("cat src/db/notes.md"), edit("/proj/src/db/schema.ts")];
     expect(sigs(ev, [scoped()], REMINDER)).not.toContain("edited-rule-not-loaded");

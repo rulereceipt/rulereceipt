@@ -159,9 +159,15 @@ function commandErrored(events: TranscriptEvent[], useIndex: number): boolean {
   if (use.kind !== "tool_use") return false;
   const id = use.toolUseId;
   if (id) {
+    // A tool id is AUTHORITATIVE: the result is matched by id or it is absent.
+    // If absent, we cannot prove this command failed, so it counts as having
+    // run (return false) — we must NEVER fall through to the positional scan
+    // and attribute an UNRELATED later error to this command, which would
+    // suppress a real violation (a missed detection). Locked as fa-corpus-v5.
     for (const e of events) {
       if (e.kind === "tool_result" && e.toolUseId === id) return e.isError === true;
     }
+    return false;
   }
   for (let j = useIndex + 1; j < events.length; j++) {
     const e = events[j];

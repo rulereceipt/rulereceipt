@@ -1,0 +1,3 @@
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Trying to push; it may be rejected."}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","name":"Bash","input":{"command":"git push origin main"}}]}}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","content":"To github.com:acme/widgets.git\n ! [rejected]        main -> main (fetch first)\nerror: failed to push some refs to 'github.com:acme/widgets.git'","is_error":true}]}}

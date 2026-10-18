@@ -448,26 +448,39 @@ function isBranchName(literal: string): boolean {
  * to judgment/UNCLEAR — the single most common branch rule people write, missed.
  * Broadened 0.1.111.
  *
- * Only a git ref-action verb (push/commit/merge/rebase) pointing AT a branch
- * routes here, in one of two shapes that keep the verb and the branch in the
- * SAME clause ([^.;\n] forbids crossing a sentence/clause break):
- *   - a bare DEFAULT branch right after a preposition ("push to main", "commit
- *     to master"). Restricted to main/master and required NOT to be followed by
- *     another word, so an ordinary adjective/noun ("the main goal", "the main
- *     function", "main changes") is never read as a ref.
- *   - any branch named explicitly as "<name> branch" ("push to the release
- *     branch", "commit to the main branch"), unless the word before "branch" is
- *     a generic descriptor ("a feature branch", "the current branch") rather
- *     than a name.
- * Absence of either shape stays judgment — the safe direction, never a FAIL.
+ * This path only ever ADDS detection the backtick pass can't reach, so it is
+ * deliberately narrow — a miss is acceptable (it falls through to judgment /
+ * "couldn't tell"), a false FAIL is not. It fires ONLY on the clean shape
+ * "<push|commit> [adverb] (in|on)to (the) <branch>", which is what "never push
+ * to main" / "never push directly to the main branch" / "don't commit to the
+ * release branch" actually look like. Everything else stays judgment:
+ *   - verb is PUSH only. commit/merge/rebase name a different action than the
+ *     push the checker observes ("never commit to main" would hard-FAIL a
+ *     `git push origin main` — the tryvit workflow-comment false FAIL, frozen-44
+ *     2026-10-18), so they route to judgment, not a push FAIL. Shilpa's bar:
+ *     only FAIL when the rule clearly prohibits PUSHING to a named branch.
+ *   - a "force-" qualified verb ("never force-push to main") is NOT a plain
+ *     push ban — the lookbehind rejects it.
+ *   - NOTHING but an adverb may sit between the verb and the preposition. An
+ *     object there narrows the action to something unverifiable ("push SECRETS
+ *     to main", "push BLAME onto main") — no object ⇒ no match ⇒ judgment.
+ *   - the branch must be the TARGET of a preposition: a bare default
+ *     (main/master, not followed by another word so "the main function" is
+ *     never a ref) or an explicit "(in|on)to (the) <name> branch", unless the
+ *     word before "branch" is a generic descriptor ("a feature branch").
+ * The caller additionally drops mixed-polarity rules (see the routing site).
+ * 0.1.112: narrowed from the first 0.1.111 build, which over-fired on all of
+ * the above (locked as fa-corpus-v5).
  */
-const PROSE_REF_VERB = String.raw`(?:push(?:ing|es|ed)?|commit(?:ting|s|ted)?|merg(?:e|ing|es|ed)|rebas(?:e|ing|es|ed))`;
+const PROSE_REF_VERB = String.raw`(?:push(?:ing|es|ed)?)`;
+// Only adverbs may stand between the verb and the preposition — never an object.
+const PROSE_ADVERB = String.raw`(?:directly|straight|right|ever|just|simply|only|always|again|now|then)`;
 const PROSE_DEFAULT_BRANCH = new RegExp(
-  String.raw`\b${PROSE_REF_VERB}\b[^.;\n]{0,25}?\b(?:in|on)?to\s+(?:the\s+)?(main|master)\b(?!\s+[A-Za-z])`,
+  String.raw`\b(?<!force[- ])${PROSE_REF_VERB}\b(?:\s+${PROSE_ADVERB})*\s+(?:in|on)?to\s+(?:the\s+)?(main|master)\b(?!\s+[A-Za-z])`,
   "i",
 );
 const PROSE_NAMED_BRANCH = new RegExp(
-  String.raw`\b${PROSE_REF_VERB}\b[^.;\n]{0,40}?\b(?:(?:in|on)?to\s+)?(?:the\s+)?([A-Za-z0-9._/-]+)\s+branch\b`,
+  String.raw`\b(?<!force[- ])${PROSE_REF_VERB}\b(?:\s+${PROSE_ADVERB})*\s+(?:in|on)?to\s+(?:the\s+)?([A-Za-z0-9._/-]+)\s+branch\b`,
   "i",
 );
 
@@ -481,6 +494,7 @@ const GENERIC_BRANCH_DESCRIPTOR = new Set([
   "new", "existing", "protected", "shared", "remote", "local", "base",
   "target", "source", "other", "another", "your", "our", "its", "their",
   "every", "each", "which", "what", "whatever", "appropriate", "relevant",
+  "or", "and", "nor", "to", "into", "onto",
 ]);
 
 function prosePushBranch(rule: Rule): string | null {
@@ -1023,7 +1037,10 @@ export function classifyRule(rule: Rule): Classification {
     // (which reads `patterns`) never sees it. Route it here when a ref-action
     // verb clearly points at a branch AND the direction is readable; otherwise
     // fall through to judgment. 0.1.111.
-    const proseBranch = prosePushBranch(rule);
+    // A rule that both forbids and prescribes ("never rebase, and always
+    // deploy to main") can't be routed to a one-sided branch FAIL — the branch
+    // may belong to the prescribed half. Mirror the backtick path's guard.
+    const proseBranch = hasMixedPolarity(rule) ? null : prosePushBranch(rule);
     if (proseBranch !== null) {
       const prosePolarity = detectPolarity(rule);
       if (prosePolarity !== null) {

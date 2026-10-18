@@ -89,3 +89,64 @@ describe("false-accusation frozen benchmark (fa-corpus-v2, hard cases)", () => {
     expect(all.length, `v2 false accusations:\n${all.join("\n")}`).toBe(0);
   });
 });
+
+/**
+ * fa-corpus-v5 — the plain-prose branch-rule false accusations, locked PAIRWISE.
+ * These are the exact cases that pulled Feature B from 0.1.111: a prose "never
+ * push to main" path that dropped qualifiers ("force-push", "push secrets"),
+ * crossed clauses (mixed polarity), followed the wrong verb (merge rules),
+ * captured figurative objects ("push blame"), or the wrong token ("or"), and so
+ * hard-FAILed an ordinary push. A plain push ban and a successful push-to-main
+ * cannot coexist in a 0-FAIL cross-product (that pair is a real violation), so
+ * each rule is paired with the specific session that makes it a near-miss.
+ * See EXPECTATIONS.md. A miss is acceptable here; a false FAIL is not.
+ */
+describe("false-accusation frozen benchmark (fa-corpus-v5, plain-prose branch rules)", () => {
+  const V5 = join(__dirname, "fixtures", "fa-corpus-v5");
+  const run = (rule: string, session: string): CheckResult[] =>
+    check(join(V5, "rules", rule), readTranscriptFromFile(join(V5, "sessions", session)));
+  const fails = (rule: string, session: string): string[] =>
+    run(rule, session).filter((r) => r.status === "FAIL").map((r) => r.evidence.slice(0, 100));
+
+  // (rule, session) pairs that are near-misses — a correct checker stays quiet.
+  const NOFAIL: [string, string][] = [
+    ["force-push.md", "s-push-main.jsonl"],
+    ["merge-prs.md", "s-push-main.jsonl"],
+    ["push-secrets.md", "s-push-main.jsonl"],
+    ["mixed-polarity.md", "s-push-main.jsonl"],
+    ["merge-hotfix.md", "s-push-hotfix.jsonl"],
+    ["push-blame.md", "s-push-main.jsonl"],
+    ["incomplete-features.md", "s-push-main.jsonl"],
+    ["main-or-trunk.md", "s-local-commit.jsonl"],
+    ["commit-to-main.md", "s-push-main.jsonl"],
+    ["clean-pushban.md", "s-failed-push-main.jsonl"],
+    ["clean-pushban.md", "s-main-word.jsonl"],
+    ["clean-pushban.md", "s-feature-push.jsonl"],
+    ["clean-pushban.md", "s-commit-msg-push.jsonl"],
+    ["clean-pushban.md", "s-local-commit.jsonl"],
+    ["ordinary-main.md", "s-push-main.jsonl"],
+  ];
+
+  // (rule, session) pairs that MUST FAIL — the detection really fires (teeth).
+  const MUSTFAIL: [string, string][] = [
+    ["clean-pushban.md", "s-push-main.jsonl"],
+    ["clean-pushban.md", "s-pushmain-id-unrelated-error.jsonl"],
+  ];
+
+  it("raises ZERO false accusations on any locked near-miss pair", () => {
+    const bad: string[] = [];
+    for (const [rule, session] of NOFAIL) {
+      const f = fails(rule, session);
+      if (f.length) bad.push(`${rule} x ${session}: ${f.join(" | ")}`);
+    }
+    expect(bad, `v5 false accusations:\n${bad.join("\n")}`).toEqual([]);
+  });
+
+  it("still FAILs on a real violation (the set is not vacuous)", () => {
+    const missed: string[] = [];
+    for (const [rule, session] of MUSTFAIL) {
+      if (fails(rule, session).length === 0) missed.push(`${rule} x ${session}`);
+    }
+    expect(missed, `v5 missed real violations:\n${missed.join("\n")}`).toEqual([]);
+  });
+});

@@ -79,10 +79,15 @@ describe("plain-prose branch policy is classified like the backticked form", () 
     expect(c.branchName).toBe("release");
   });
 
-  it("'never commit to main' routes to gitBranchPolicy with branch main", () => {
-    const c = classify("Never commit to main.");
-    expect(c.kind).toBe("gitBranchPolicy");
-    expect(c.branchName).toBe("main");
+  // 0.1.112: the prose path is PUSH-only. "never commit to main" names a
+  // different action than the push the checker observes, so routing it to a
+  // branch FAIL would hard-FAIL a `git push origin main` on a rule that is
+  // often a workflow-step comment ("# 1. Confirm branch state — never commit
+  // to main", tryvit) — a false FAIL caught by frozen-44. It routes to judgment
+  // (couldn't tell) instead. The backtick form "never commit to `main`" is
+  // unaffected (it is explicit).
+  it("'never commit to main' routes to judgment (push-only prose path), never a FAIL", () => {
+    expect(classify("Never commit to main.").kind).toBe("judgment");
   });
 });
 
@@ -143,10 +148,20 @@ describe("the checker only FAILs on a SUCCESSFUL push to the named branch", () =
 });
 
 describe("require-polarity prose never fabricates a FAIL", () => {
-  it("'always push finished work to main' routes require and a push to main is PASS, not FAIL", () => {
-    const c = classify("Always push finished work to main.");
+  it("a CLEAN positive push-to-main rule routes require and a push to main is PASS, not FAIL", () => {
+    const c = classify("Always push to main.");
     expect(c.kind).toBe("gitBranchPolicy");
     expect(c.polarity).toBe("require");
-    expect(statusFor("Always push finished work to main.", [bash("git push origin main")])).toBe("PASS");
+    expect(statusFor("Always push to main.", [bash("git push origin main")])).toBe("PASS");
+  });
+  // 0.1.112 narrowing: an OBJECT between the verb and the preposition ("push
+  // finished work to main") routes to judgment ("couldn't tell"), not a branch
+  // check. Accepting the miss is the price of rejecting the symmetric negative
+  // false FAILs ("push secrets to main") — a miss is acceptable, a false FAIL
+  // is not (fa-corpus-v5).
+  it("an object-bearing phrasing routes to judgment (couldn't tell), so it can never FAIL", () => {
+    // judgment produces UNCLEAR, never a hard FAIL — routing here IS the safety.
+    expect(classify("Always push finished work to main.").kind).toBe("judgment");
+    expect(classify("Avoid pushing secrets to main.").kind).toBe("judgment");
   });
 });

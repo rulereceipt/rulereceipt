@@ -289,7 +289,16 @@ function ruleFileInjectedBefore(lines: string[], limit: number, ruleBasename: st
   // "Contents of …/<file> (project instructions", a claudeMd/instructions/
   // nested_memory attachment whose path ends in <file>, escaped or not.
   const re = new RegExp(`Contents of [^\\n"]*${esc}|${esc}[^"\\\\]{0,40}(?:project instructions|claudeMd|nested_memory|instructions)|(?:claudeMd|nested_memory|instructions)[^"]{0,200}${esc}`, "i");
-  for (let i = Math.max(0, afterCompaction); i < limit; i++) if (re.test(lines[i])) return true;
+  // The STRUCTURED attachment record, in either field order. The text regex
+  // above uses [^"] and so cannot bridge the quotes/commas between "type" and
+  // "path" in {"type":"nested_memory",…,"path":"…/<file>"}; this reads the
+  // JSON fields directly within one object ([^}] stops at its closing brace),
+  // so a load recorded only structurally is still seen. Defense-in-depth,
+  // display-only — it can only make the advisory go quiet, never raise a FAIL.
+  const typeKey = `"type"\\s*:\\s*"(?:nested_memory|instructions|claudeMd)"`;
+  const pathKey = `"path"\\s*:\\s*"[^"]*${esc}"`;
+  const reStruct = new RegExp(`${typeKey}[^}]{0,400}${pathKey}|${pathKey}[^}]{0,400}${typeKey}`, "i");
+  for (let i = Math.max(0, afterCompaction); i < limit; i++) if (re.test(lines[i]) || reStruct.test(lines[i])) return true;
   return false;
 }
 function editedRuleNotLoaded(rules: Rule[], events: TranscriptEvent[], transcriptText?: string): ShadowFinding[] {
