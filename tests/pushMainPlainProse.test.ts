@@ -89,6 +89,24 @@ describe("plain-prose branch policy is classified like the backticked form", () 
   it("'never commit to main' routes to judgment (push-only prose path), never a FAIL", () => {
     expect(classify("Never commit to main.").kind).toBe("judgment");
   });
+
+  // The "branch 'or'" false FAIL (frozen-44): a compound branch phrasing must
+  // NEVER capture a conjunction/filler as the branch name. Asserted on
+  // branchName UNCONDITIONALLY (undefined for the judgment cases, "main" when a
+  // clean default is read) so it is not vacuous: it fails loudly the moment a
+  // regression loosens the capture to re-grab "or"/"and"/"trunk"/"develop".
+  it("never captures a conjunction/filler as the branch (the 'or' false FAIL)", () => {
+    const FILLER = ["or", "and", "nor", "trunk", "develop"];
+    for (const t of [
+      "Never push to main or trunk.",
+      "Never commit to main or develop.",
+      "Protect the main or release branch.",
+      "Keep main and trunk protected.",
+    ]) {
+      const c = classify(t) as { kind: string; branchName?: string };
+      expect(FILLER).not.toContain(c.branchName ?? "");
+    }
+  });
 });
 
 describe("plain-prose push-to-main FAILs a real successful push", () => {

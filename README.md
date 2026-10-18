@@ -269,12 +269,17 @@ Read the limit before wiring it in, because it is most of the story. It
 enforces rules naming a **file** or a **branch** — "never modify `.env`",
 "never commit to `main`" — and nothing else.
 
-One honest caveat on phrasing: a rule that names the branch as a token
-(e.g. "never push to `main`") is checked as a hard rule and can FAIL; a
-plain-sentence version of the same intent ("never push directly to the
-main branch") may still come back "couldn't tell" for now, because the
-classifier only treats a recognisable branch token as a branch rule.
-Phrasing the branch as a token is what makes it enforceable today.
+One honest caveat on phrasing, stated plainly: a plain **"never push to
+main"** (no backticks needed) is a **hard FAIL on a real successful push** to
+that branch. A plain **"never commit to main"** still comes back **"couldn't
+tell"** — the checker sees the push the session made, not whether a rule about
+*committing* was meant to cover it, so it does not turn that into a FAIL.
+The same "couldn't tell" holds for any phrasing that narrows or changes the
+action the log can't confirm — a qualifier ("never force-push to main", "avoid
+pushing secrets to main"), a different verb ("never merge PRs into main"), or a
+figurative one ("don't push blame onto main"). That miss is deliberate: a false
+accusation is the one thing this tool must never make, so when the rule isn't
+clearly a push ban it stays quiet.
 
 It does **not** block a banned command unless you have said which command is
 banned. That was the point of building it, and the automatic version did not
@@ -463,7 +468,7 @@ rulereceipt check --json > .rulereceipt/receipt.json   # commit this file
 In CI (no session), verify the committed receipt with the Action:
 
 ```yaml
-- uses: rulereceipt/rulereceipt@v0.1.111   # or pin a commit SHA
+- uses: rulereceipt/rulereceipt@v0.1.112   # or pin a commit SHA
   with:
     receipt: .rulereceipt/receipt.json
     max-age-days: "7"                  # optional: reject a stale receipt
