@@ -41,11 +41,18 @@ npx rulereceipt
 ```
 
 With no arguments it runs **history mode**: it checks *every* session for this
-project in the last 30 days and leads with the rules broken most — each with a
-count, the last date, and one quoted line from the session. The headline counts
-only proven breaks (a structured check with evidence); judgment rules stay on
-their own line, so the number never overstates. `rulereceipt check` still checks
-one session in full.
+project in the **last 14 days** (changed from 30 in 0.1.113) and leads with the
+rules broken most — each with a count, the last date, and one quoted line from
+the session, plus a "never loaded" advisory line. The headline counts only
+proven breaks (a structured check with evidence); judgment rules stay on their
+own line, so the number never overstates. `rulereceipt check` still checks one
+session in full.
+
+Since 0.1.113 a single-session report is grouped **Never loaded → Checked →
+Not checked (needs judgment)**, in the terminal and in `--html` / `--timeline`:
+"Never loaded" lists only rules whose covered file was edited with no record the
+rule loaded first (advisory, never a verdict); a path-scoped rule whose files
+were never touched is "Didn't apply", not "never loaded".
 
 To stop it happening again:
 
@@ -54,7 +61,10 @@ npx rulereceipt protect
 ```
 
 Adds a PreToolUse guard and a Stop hook to `.claude/settings.json` — after
-showing you exactly what it will add and asking.
+showing you exactly what it will add and asking. With `protect` wired, each
+session also ends with a one-line summary printed for you (not just the agent),
+e.g. `RuleReceipt: 1 FAIL · 2 never loaded · 8 checked · 40 need judgment` — and
+it stays silent on a clean session (0 FAIL and 0 never loaded).
 
 **Scope:** *checking* (`check`/`report`) works across **all eight supported
 agents** — Claude Code, OpenAI Codex, GitHub Copilot CLI, Cursor, Antigravity,
@@ -476,11 +486,13 @@ rulereceipt check --json > .rulereceipt/receipt.json   # commit this file
 In CI (no session), verify the committed receipt with the Action:
 
 ```yaml
-- uses: rulereceipt/rulereceipt@v0.1.112   # or pin a commit SHA
+- uses: rulereceipt/rulereceipt@v0.1.113   # or pin a commit SHA
   with:
     receipt: .rulereceipt/receipt.json
     max-age-days: "7"                  # optional: reject a stale receipt
-    # anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}  # optional: also fail on CLAUDE.md↔AGENTS.md contradictions
+    # anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}  # optional: CLAUDE.md↔AGENTS.md contradiction check — ADVISORY only (since 0.1.113), surfaced as a warning, never fails the build (an --llm opinion never gates CI)
+    # pr-comment: "true"                 # optional: post a PR comment only on a proven FAIL (never a couldn't-tell)
+    # github-token: ${{ github.token }}  # required for pr-comment
 ```
 
 The build **fails** unless the receipt is a real, current, passing
