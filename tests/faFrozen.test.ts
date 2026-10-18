@@ -150,3 +150,48 @@ describe("false-accusation frozen benchmark (fa-corpus-v5, plain-prose branch ru
     expect(missed, `v5 missed real violations:\n${missed.join("\n")}`).toEqual([]);
   });
 });
+
+/**
+ * fa-corpus-v6 — plain-prose FILE bans (0.1.114). "Never edit .env files." with no
+ * backtick now routes to fileLifecycle (a hard FAIL on a real edit). Pairwise, same
+ * as v5: each near-miss (a DIFFERENT file like .env.example, a READ not an edit, an
+ * unrelated file, a different-verb/qualifier rule that stays judgment) must stay
+ * clean; a real edit of the named file MUST FAIL. See EXPECTATIONS.md.
+ */
+describe("false-accusation frozen benchmark (fa-corpus-v6, plain-prose file bans)", () => {
+  const V6 = join(__dirname, "fixtures", "fa-corpus-v6");
+  const fails = (rule: string, session: string): string[] =>
+    check(join(V6, "rules", rule), readTranscriptFromFile(join(V6, "sessions", session)))
+      .filter((r) => r.status === "FAIL").map((r) => r.evidence.slice(0, 100));
+
+  const NOFAIL: [string, string][] = [
+    ["envban.md", "s-edit-envexample.jsonl"],   // .env.example is a DIFFERENT file
+    ["envban.md", "s-read-env.jsonl"],           // reading ≠ editing
+    ["envban.md", "s-edit-other.jsonl"],         // unrelated file
+    ["read-env.md", "s-read-env.jsonl"],         // positive/read rule → judgment
+    ["read-env.md", "s-edit-env.jsonl"],         // judgment, never a FAIL
+    ["commit-secrets.md", "s-edit-env.jsonl"],   // "commit secrets to .env" → judgment (qualifier)
+    ["configban.md", "s-edit-other.jsonl"],      // unrelated file
+  ];
+  const MUSTFAIL: [string, string][] = [
+    ["envban.md", "s-edit-env.jsonl"],           // real edit of .env
+    ["configban.md", "s-edit-config.jsonl"],     // real edit of config/prod.yaml
+  ];
+
+  it("raises ZERO false accusations on any locked near-miss pair", () => {
+    const bad: string[] = [];
+    for (const [rule, session] of NOFAIL) {
+      const f = fails(rule, session);
+      if (f.length) bad.push(`${rule} x ${session}: ${f.join(" | ")}`);
+    }
+    expect(bad, `v6 false accusations:\n${bad.join("\n")}`).toEqual([]);
+  });
+
+  it("still FAILs on a real file edit (the set is not vacuous)", () => {
+    const missed: string[] = [];
+    for (const [rule, session] of MUSTFAIL) {
+      if (fails(rule, session).length === 0) missed.push(`${rule} x ${session}`);
+    }
+    expect(missed, `v6 missed real violations:\n${missed.join("\n")}`).toEqual([]);
+  });
+});

@@ -335,7 +335,11 @@ function isNotARule(rule: Rule): boolean {
 const REPORTING_VERB =
   /\b(?:report|claim|say|said|state|assert|tell|declar|announc|call(?:ing)?\s+it|mark(?:ing)?\s+it)\w*\b/i;
 const EVIDENCE_NOUN =
-  /\b(?:evidence|proof|prove|paste|pasted|verif\w*|receipt|output|actual\s+(?:result|output)|test\s+output)\b/i;
+  // 0.1.114: "tests"/"test suite"/"test run" count as evidence — running the tests
+  // IS the proof for a "done" claim ("run the tests before saying you are done").
+  // The claimEvidence checker still only FAILs when a run positively contradicts
+  // the claim; "tests pass" with no in-session run stays UNCLEAR (unverified).
+  /\b(?:evidence|proof|prove|paste|pasted|verif\w*|receipt|output|actual\s+(?:result|output)|tests?(?:\s+(?:output|suite|run))?)\b/i;
 const DONE_WORD =
   /\b(?:done|complete\w*|pass(?:ing|ed|es)?|working|fixed|confirmed|success\w*|green|ready)\b/i;
 
@@ -518,6 +522,28 @@ function prosePushBranch(rule: Rule): string | null {
     if (isBranchName(token) && !looksLikeFilePathToken(token)) return token.toLowerCase();
   }
   return null;
+}
+
+/**
+ * Plain-prose FILE ban ("never edit .env files", "don't modify config/prod.yaml")
+ * with NO backtick, so the fileLifecycle pass (which reads `patterns`) never sees
+ * it. Mirror of prosePushBranch, deliberately narrow: a mutation verb, then only
+ * articles/prepositions (never an arbitrary object), then a REAL file token in
+ * the same clause → route to fileLifecycle; otherwise judgment. reading ≠ editing
+ * (fileLifecycle counts only mutations); a DIFFERENT file (".env.example" vs
+ * ".env") is the checker's exact-path job, locked as fa-corpus-v6. 0.1.114.
+ */
+const PROSE_FILE_VERB = String.raw`(?:edit(?:s|ing|ed)?|modif(?:y|ies|ying|ied)|chang(?:e|es|ing|ed)|delet(?:e|es|ing|ed)|remov(?:e|es|ing|ed)|overwrit(?:e|es|ing|ten)|touch(?:es|ing|ed)?|writ(?:e|es|ing|ten)|creat(?:e|es|ing|ed)|renam(?:e|es|ing|ed)|mov(?:e|es|ing|ed))`;
+const PROSE_FILE_BAN = new RegExp(
+  String.raw`\b${PROSE_FILE_VERB}\b(?:\s+(?:the|a|an|any|your|our|this|that|to|into|in|on|all|every)\b)*\s+((?:[.\w/-]*\.[A-Za-z0-9]+)|(?:\.[A-Za-z][\w.-]*))`,
+  "i",
+);
+function proseFileBan(rule: Rule): string | null {
+  const m = `${rule.title}. ${rule.text}`.match(PROSE_FILE_BAN);
+  if (!m) return null;
+  const token = m[1].replace(/[.,;:!?]+$/, "");
+  const looksFile = FILE_EXTENSION.test(token) || /^\.[A-Za-z]/.test(token) || (token.includes("/") && !/^https?:\/\//i.test(token));
+  return looksFile && looksLikeFilePathToken(token) ? token : null;
 }
 
 /**
@@ -1051,6 +1077,16 @@ export function classifyRule(rule: Rule): Classification {
           polarity: prosePolarity,
           polarityInferred: polarityWasInferred(rule),
         };
+      }
+    }
+    // Plain-prose FILE ban ("never edit .env files") with no backtick — route to
+    // fileLifecycle when a mutation verb clearly points at a real file token.
+    // Same mixed-polarity guard as the branch path. 0.1.114 (fa-corpus-v6).
+    const proseFile = hasMixedPolarity(rule) ? null : proseFileBan(rule);
+    if (proseFile !== null) {
+      const polF = detectPolarity(rule);
+      if (polF !== null) {
+        return { kind: "fileLifecycle", rule, filePath: proseFile, polarity: polF, polarityInferred: polarityWasInferred(rule) };
       }
     }
     return { kind: "judgment", rule };

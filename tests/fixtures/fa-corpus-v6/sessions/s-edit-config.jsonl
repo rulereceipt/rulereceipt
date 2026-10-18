@@ -1,0 +1,2 @@
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","name":"Edit","input":{"file_path":"/Users/dev/acme/config/prod.yaml","old_string":"A=1","new_string":"A=2"}}]}}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","content":"ok","is_error":false}]}}
