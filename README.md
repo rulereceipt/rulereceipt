@@ -291,6 +291,12 @@ figurative one ("don't push blame onto main"). That miss is deliberate: a false
 accusation is the one thing this tool must never make, so when the rule isn't
 clearly a push ban it stays quiet.
 
+Since 0.1.114 the same applies to **file** bans: a plain **"never edit `.env`
+files"** or **"do not modify `config/prod.yaml`"** (backticks optional) is a
+hard FAIL on a real edit of that file. Reading it is not editing it; a
+*different* file (`.env.example` vs `.env`) does not match; and a qualified or
+other-verb phrasing ("never commit secrets to `.env`") stays "couldn't tell".
+
 It does **not** block a banned command unless you have said which command is
 banned. That was the point of building it, and the automatic version did not
 survive measurement: replaying 16,336 real tool calls against every forbidding
@@ -486,7 +492,7 @@ rulereceipt check --json > .rulereceipt/receipt.json   # commit this file
 In CI (no session), verify the committed receipt with the Action:
 
 ```yaml
-- uses: rulereceipt/rulereceipt@v0.1.113   # or pin a commit SHA
+- uses: rulereceipt/rulereceipt@v0.1.114   # or pin a commit SHA
   with:
     receipt: .rulereceipt/receipt.json
     max-age-days: "7"                  # optional: reject a stale receipt
