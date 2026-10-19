@@ -491,14 +491,43 @@ const CI_FAILURE = /\bfail(?:ed|ure|ing)?\b|✗|✕|×|\berror\b|\bred\b/i;
 // The agent is quoting someone/something, not asserting the claim itself.
 const QUOTE_ATTR = /\b(?:you\s+(?:said|asked|told|mentioned|wrote)|the\s+user|per\s+(?:your|the)|according\s+to|the\s+(?:file|rule|instruction|doc|readme|spec|ticket)s?\s+(?:say|state|read)|as\s+you\s+(?:said|mentioned))\b/i;
 
+// #3: a DOC edit (.md/.txt/CHANGELOG*/docs/**) does not re-arm the signal — a
+// README tweak after a green run is not a code change. Config files (package.json,
+// *.yml/*.yaml, *.toml, lockfiles) count as CODE.
+function isDocEdit(path: string): boolean {
+  const p = (path || "").replace(/\\/g, "/").toLowerCase();
+  const base = p.split("/").pop() ?? "";
+  return /\.(md|markdown|mdx|txt|rst)$/.test(base) || base.startsWith("changelog") || /(?:^|\/)docs\//.test(p);
+}
+// #2: an intent/heading ("Now run the tests green:", "Let me run…") is not a claim.
+const UNPROVEN_IMPERATIVE = /^\s*(?:now\s+|then\s+|next\s+)?(?:let\s+me|let'?s|i'?ll|i\s+will|going\s+to|re-?run|run|verify|ensure|make\s+sure)\b/i;
+// #1: the pass phrase sits inside a "…" or `…` span → a quote/reference, not the
+// agent's own assertion ("101 tests pass claims", fake "tests pass" claims).
+function matchInsideQuote(s: string, re: RegExp): boolean {
+  const m = re.exec(s);
+  if (!m) return true;
+  const before = s.slice(0, m.index);
+  return (before.match(/"/g) || []).length % 2 === 1 || (before.match(/`/g) || []).length % 2 === 1;
+}
+
+function editedFilePath(e: TranscriptEvent): string {
+  if (e.kind !== "tool_use") return "";
+  const inp = e.input as { file_path?: unknown; notebook_path?: unknown } | undefined;
+  if (typeof inp?.file_path === "string") return inp.file_path;
+  if (typeof inp?.notebook_path === "string") return inp.notebook_path;
+  return "";
+}
+
 function unprovenClaims(events: TranscriptEvent[]): ShadowFinding[] {
-  const out: ShadowFinding[] = [];
-  let hadEdit = false, testSince = false, buildSince = false, ciSince = false;
+  let hadCodeEdit = false, testSince = false, buildSince = false, ciSince = false;
   const pendingCI = new Map<string | null, true>();
+  let last: ShadowFinding | null = null; // #4: keep only the last qualifying claim after the last code edit
   for (const e of events) {
     if (e.kind === "tool_use" && (e.toolName === "Edit" || e.toolName === "Write" || e.toolName === "NotebookEdit")) {
-      // A new edit resets the "verified since the last edit" state.
-      hadEdit = true; testSince = false; buildSince = false; ciSince = false;
+      const fp = editedFilePath(e);
+      // #3: only a CODE edit re-arms (and invalidates an earlier pending notice);
+      // a doc-only edit is ignored so it never fires on a doc tweak after a green run.
+      if (fp && !isDocEdit(fp)) { hadCodeEdit = true; testSince = false; buildSince = false; ciSince = false; last = null; }
       continue;
     }
     const cmd = commandOf(e);
@@ -512,28 +541,30 @@ function unprovenClaims(events: TranscriptEvent[]): ShadowFinding[] {
     if (e.kind === "tool_result") {
       const id = e.toolUseId ?? null;
       if (pendingCI.has(id)) {
-        // CI evidence counts as a matching run only when the output shows success.
         if (CI_SUCCESS.test(e.content) && !CI_FAILURE.test(e.content)) ciSince = true;
         pendingCI.delete(id);
       }
       continue;
     }
-    if (e.kind === "text" && e.role === "assistant" && hadEdit) {
-      if (QUOTE_ATTR.test(e.text)) continue; // quoting the user/a file, not its own claim
+    if (e.kind === "text" && e.role === "assistant" && hadCodeEdit) {
+      if (QUOTE_ATTR.test(e.text)) continue; // quoting the user/a file
       for (const s of sentences(e.text)) {
-        if (/^\s*["'>]/.test(s) || /["']\s*[.!?]?\s*$/.test(s)) continue; // a quoted line
-        if (NOT_A_CLAIM.test(s)) continue; // future/conditional/negation ("should pass", "once tests pass")
-        const isTest = SUCCESS_CLAIM.test(s) || TESTED_CLAIM.test(s);
+        if (UNPROVEN_IMPERATIVE.test(s)) continue;            // #2 intent/heading, not a claim
+        if (NOT_A_CLAIM.test(s)) continue;                    // future/conditional/negation
+        // A REAL pass assertion with tests/build as subject (not bare "tested").
+        const isTest = SUCCESS_CLAIM.test(s);
         const isBuild = BUILD_CLAIM.test(s);
         if (!isTest && !isBuild) continue;
+        if (isTest && matchInsideQuote(s, SUCCESS_CLAIM)) continue;            // #1 quoted/referenced
+        if (isBuild && !isTest && matchInsideQuote(s, BUILD_CLAIM)) continue;
         if (isTest && (testSince || ciSince)) continue;
         if (isBuild && (buildSince || ciSince)) continue;
         const kind = isBuild && !isTest ? "build" : "test";
-        out.push({ signal: "unproven-claim", evidence: `claimed "${short(s)}" but no ${kind} ran after the last edit in this session` });
+        last = { signal: "unproven-claim", evidence: `claimed "${short(s)}" but no ${kind} ran after the last code edit in this session` };
       }
     }
   }
-  return out;
+  return last ? [last] : [];
 }
 
 export function detectShadowSignals(rules: Rule[], events: TranscriptEvent[], transcriptText?: string): ShadowFinding[] {
