@@ -59,14 +59,19 @@ describe("shadow: claimed-action-no-command", () => {
 });
 
 describe("shadow: env-strict", () => {
-  it("fires when a PLAIN-text .env rule exists and the session edited .env", () => {
-    expect(sigs([edit("/proj/.env")], [rule("Never edit .env")])).toContain("env-strict");
+  it("fires for a .env rule that STAYS judgment (an object between verb and file) + a .env edit", () => {
+    // "edit secrets in the .env file" keeps proseFileBan from routing it to
+    // fileLifecycle (0.1.114), so it is still the judgment gap this signal is for.
+    expect(sigs([edit("/proj/.env")], [rule("Never edit secrets in the .env file")])).toContain("env-strict");
+  });
+  it("does NOT fire for a plain 'Never edit .env' — 0.1.114 routes that to fileLifecycle (a real FAIL, not the gap)", () => {
+    expect(sigs([edit("/proj/.env")], [rule("Never edit .env")])).not.toContain("env-strict");
   });
   it("does NOT fire when the rule backticks `.env` (that is fileLifecycle's job)", () => {
     expect(sigs([edit("/proj/.env")], [rule("Never edit `.env`")])).not.toContain("env-strict");
   });
   it("does NOT fire when .env is only mentioned, never edited", () => {
-    expect(sigs([edit("/proj/app.js")], [rule("Never edit .env")])).not.toContain("env-strict");
+    expect(sigs([edit("/proj/app.js")], [rule("Never edit secrets in the .env file")])).not.toContain("env-strict");
   });
 });
 

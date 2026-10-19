@@ -53,7 +53,7 @@ import { basename } from "node:path";
  * shadow); the measurement script tallies those alongside these.
  */
 
-export type ShadowSignal = "zero-tests" | "claimed-action-no-command" | "env-strict" | "approved-in-prompt" | "edited-rule-not-loaded" | "title-only-rule" | "quoted-sql" | "handed-back";
+export type ShadowSignal = "zero-tests" | "claimed-action-no-command" | "env-strict" | "approved-in-prompt" | "edited-rule-not-loaded" | "title-only-rule" | "quoted-sql" | "handed-back" | "unproven-claim";
 export interface ShadowFinding {
   signal: ShadowSignal;
   evidence: string;
@@ -224,9 +224,14 @@ function envStrict(rules: Rule[], events: TranscriptEvent[]): ShadowFinding[] {
   const fired = new Set<string>();
   for (const r of rules) {
     const text = `${r.title}\n${r.text}`;
-    // Skip a rule that already backtick-quotes the file — that one classifies as
-    // fileLifecycle today, so it is NOT the gap this signal is about.
+    // Skip any rule the classifier now routes to a REAL file check — a
+    // backticked one, OR (since 0.1.114) a plain-prose file ban that proseFileBan
+    // sends to fileLifecycle. Those are handled as a verdict (a hard FAIL on a
+    // real edit), so this advisory must not double-report next to the FAIL. This
+    // also keeps the "routes to judgment" wording below accurate: it now fires
+    // only for rules that genuinely stay judgment (e.g. "never commit secrets to .env").
     if (/`[^`]*(?:\.env|dist\/)[^`]*`/i.test(text)) continue;
+    if (classifyRule(r).kind === "fileLifecycle") continue;
     if (!ENV_MUTATION_VERB.test(text)) continue;
     const m = text.match(ENV_TOKEN);
     if (!m) continue;
@@ -234,7 +239,7 @@ function envStrict(rules: Rule[], events: TranscriptEvent[]): ShadowFinding[] {
     const mutation = mutatedFile(events, token);
     if (mutation && !fired.has(token)) {
       fired.add(token);
-      out.push({ signal: "env-strict", evidence: `rule "${short(r.title)}" names \`${token}\` in plain text (routes to judgment today), and the session mutated it: ${mutation}` });
+      out.push({ signal: "env-strict", evidence: `rule "${short(r.title)}" names \`${token}\` in plain text (routes to judgment — no hard file check), and the session mutated it: ${mutation}` });
     }
   }
   return out;
@@ -466,6 +471,71 @@ function handedBack(events: TranscriptEvent[]): ShadowFinding[] {
   return [];
 }
 
+/* ── unproven-claim ───────────────────────────────────────────────────────────
+ * Advisory (NOT a verdict, NOT counted, no exit-code effect): the session said
+ * "tests pass / build passes / done and tested" and NO matching command ran
+ * AFTER the last edit — so nothing in the transcript re-verified the code as it
+ * stands now. Surfaces the quote + "no test/build ran after the last edit". It
+ * is a fact about the transcript, never "the claim is false" (the run may have
+ * happened in another terminal — that's why it stays advisory). The hard verdict
+ * for a CONTRADICTED claim stays in claimEvidence; this is the no-run-after-edit
+ * surfacing the docs promise. Near-misses handled: (1) future/conditional wording
+ * (NOT_A_CLAIM: if/once/should/will/expect); (2) a matching run OR CI evidence
+ * (gh pr checks / gh run view|watch showing success) after the edit; (3) the agent
+ * quoting the user or a file. */
+const BUILD_CLAIM = /\bbuild\s+(?:is\s+|now\s+|was\s+)?(?:pass(?:es|ing|ed)?|succeed(?:s|ed|ing)?|green|works?|clean|ok|good|fine)\b/i;
+const BUILD_COMMAND = /\b(?:npm|pnpm|yarn)\s+(?:run\s+)?build\b|\btsc\b|\bmake\b(?!\w)|\bcargo\s+build\b|\bgo\s+build\b|\bvite\s+build\b|\besbuild\b|\bwebpack\b|\bnpm\s+run\s+compile\b/i;
+const CI_CHECK = /\bgh\s+(?:pr\s+checks|run\s+(?:view|watch|list))\b/i;
+const CI_SUCCESS = /\b(?:pass(?:ed|ing)?|success(?:ful)?|completed|green|all\s+checks\s+have\s+passed|✓|✔)\b/i;
+const CI_FAILURE = /\bfail(?:ed|ure|ing)?\b|✗|✕|×|\berror\b|\bred\b/i;
+// The agent is quoting someone/something, not asserting the claim itself.
+const QUOTE_ATTR = /\b(?:you\s+(?:said|asked|told|mentioned|wrote)|the\s+user|per\s+(?:your|the)|according\s+to|the\s+(?:file|rule|instruction|doc|readme|spec|ticket)s?\s+(?:say|state|read)|as\s+you\s+(?:said|mentioned))\b/i;
+
+function unprovenClaims(events: TranscriptEvent[]): ShadowFinding[] {
+  const out: ShadowFinding[] = [];
+  let hadEdit = false, testSince = false, buildSince = false, ciSince = false;
+  const pendingCI = new Map<string | null, true>();
+  for (const e of events) {
+    if (e.kind === "tool_use" && (e.toolName === "Edit" || e.toolName === "Write" || e.toolName === "NotebookEdit")) {
+      // A new edit resets the "verified since the last edit" state.
+      hadEdit = true; testSince = false; buildSince = false; ciSince = false;
+      continue;
+    }
+    const cmd = commandOf(e);
+    if (cmd !== null) {
+      const r = withoutHeredocs(cmd);
+      if (TEST_COMMAND.test(r) || NODE_TEST.test(r)) testSince = true;
+      if (BUILD_COMMAND.test(r)) buildSince = true;
+      if (CI_CHECK.test(r)) pendingCI.set(e.kind === "tool_use" ? (e.toolUseId ?? null) : null, true);
+      continue;
+    }
+    if (e.kind === "tool_result") {
+      const id = e.toolUseId ?? null;
+      if (pendingCI.has(id)) {
+        // CI evidence counts as a matching run only when the output shows success.
+        if (CI_SUCCESS.test(e.content) && !CI_FAILURE.test(e.content)) ciSince = true;
+        pendingCI.delete(id);
+      }
+      continue;
+    }
+    if (e.kind === "text" && e.role === "assistant" && hadEdit) {
+      if (QUOTE_ATTR.test(e.text)) continue; // quoting the user/a file, not its own claim
+      for (const s of sentences(e.text)) {
+        if (/^\s*["'>]/.test(s) || /["']\s*[.!?]?\s*$/.test(s)) continue; // a quoted line
+        if (NOT_A_CLAIM.test(s)) continue; // future/conditional/negation ("should pass", "once tests pass")
+        const isTest = SUCCESS_CLAIM.test(s) || TESTED_CLAIM.test(s);
+        const isBuild = BUILD_CLAIM.test(s);
+        if (!isTest && !isBuild) continue;
+        if (isTest && (testSince || ciSince)) continue;
+        if (isBuild && (buildSince || ciSince)) continue;
+        const kind = isBuild && !isTest ? "build" : "test";
+        out.push({ signal: "unproven-claim", evidence: `claimed "${short(s)}" but no ${kind} ran after the last edit in this session` });
+      }
+    }
+  }
+  return out;
+}
+
 export function detectShadowSignals(rules: Rule[], events: TranscriptEvent[], transcriptText?: string): ShadowFinding[] {
   return [
     ...zeroTests(events),
@@ -476,6 +546,7 @@ export function detectShadowSignals(rules: Rule[], events: TranscriptEvent[], tr
     ...titleOnlyRules(rules),
     ...quotedSql(rules, events),
     ...handedBack(events),
+    ...unprovenClaims(events),
   ];
 }
 
