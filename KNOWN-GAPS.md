@@ -477,3 +477,5 @@ approval gate must NOT be changed to address them without a fresh FA v1+v2 run.
   from the delete pattern + a `NOT_A_DATA_WIPE` exclusion (git branch/tag/worktree/
   stash, docker rmi, npm/pnpm/yarn remove). Covered by guardDeleteFP.test.ts and
   fa-corpus-v3.
+
+- unproven-claim (0.1.115): the FIRE path is validated by unit tests and by zero false positives on 44 real sessions; it has not yet been observed firing in a real Claude Code transcript (current models re-run tests after a later edit, so the stale "claimed pass, no run after" case did not arise in 3 live scratch-repo runs). Advisory only — never a verdict.
