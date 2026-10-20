@@ -717,6 +717,16 @@
     .will-reveal { opacity: 1 !important; transform: none !important; }
     .hero-mark .draw { animation: none; stroke-dashoffset: 0; }
   }
+  /* Hero demo video (real 0.1.115 output). Autoplays muted/looped; a static
+     poster shows instead under prefers-reduced-motion. */
+  .hero-video { max-width: 760px; margin: 28px auto 0; }
+  .hero-video video, .hero-video__poster { width: 100%; height: auto; display: block; border-radius: 10px; border: 1px solid var(--panel-line-strong, #e7e4dd); }
+  .hero-video__poster { display: none; }
+  .hero-video__cap { margin: 8px 0 0; font-size: 0.82rem; color: var(--paper-dim, #7A756E); text-align: center; }
+  @media (prefers-reduced-motion: reduce) {
+    .hero-video video { display: none; }
+    .hero-video__poster { display: block; }
+  }
 </style>
 </head>
 <body>
@@ -744,6 +754,14 @@
       </div>
       <p style="margin-top:16px; font-size:0.9rem;">Quick check, nothing to install &mdash; <a href="/check">paste your rules file</a> and see how much of it is checkable. Runs in your browser, nothing uploaded.</p>
     </div>
+
+    <figure class="hero-video">
+      <video muted autoplay loop playsinline preload="metadata" poster="/media/rulereceipt-3-catches-poster.png" aria-label="Demo session: RuleReceipt flags a push to main and a .env edit as not-followed, and an 'all tests pass' claim with no test run.">
+        <source src="/media/rulereceipt-3-catches-16x9.mp4" type="video/mp4" />
+      </video>
+      <img class="hero-video__poster" src="/media/rulereceipt-3-catches-poster.png" alt="RuleReceipt demo: a push to main and a .env edit marked FAIL, and an unbacked 'all tests pass' claim flagged." />
+      <figcaption class="hero-video__cap">Demo session &middot; real RuleReceipt output</figcaption>
+    </figure>
 
     <div class="trace-stage">
       <div class="trace-panel">

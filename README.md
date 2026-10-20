@@ -8,7 +8,9 @@
 
 **Did it push straight to main? Touch a file you told it never to? RuleReceipt checks the finished session against your rules file (CLAUDE.md, AGENTS.md, .cursor/rules) and marks each rule followed, broken, or can't tell — with the exact line as proof.**
 
-[![RuleReceipt checking an agent session against your rules — three rules broken, each with the quoted line](https://raw.githubusercontent.com/rulereceipt/rulereceipt/main/docs/screenshot.png)](https://rulereceipt.dev)
+[![RuleReceipt checking a real session against three rules — a push to main and a .env edit marked FAIL, and an "all tests pass" claim with no test run flagged (demo session, real 0.1.115 output)](https://raw.githubusercontent.com/rulereceipt/rulereceipt/main/docs/rulereceipt-3-catches.gif)](https://rulereceipt.dev)
+
+<sub>Demo session · real RuleReceipt output</sub>
 
 ```bash
 npx rulereceipt
