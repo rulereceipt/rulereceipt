@@ -1,0 +1,39 @@
+name: Publish blog (scheduled)
+
+# Rebuilds the static blog daily. A post with draft:false whose date has arrived
+# (date <= today) gets built and committed, which triggers the Vercel deploy.
+# Deterministic output: if nothing crossed its date, there is no diff and no commit.
+
+on:
+  schedule:
+    - cron: "10 13 * * *" # 13:10 UTC daily
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: blog-publish
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Build blog
+        run: node landing/build-blog.mjs
+      - name: Commit if a post came due
+        run: |
+          git config user.name "rulereceipt"
+          git config user.email "hello@rulereceipt.dev"
+          if git diff --quiet -- landing/blog; then
+            echo "no blog changes — nothing due today"
+          else
+            git add landing/blog
+            git commit -m "chore(blog): publish scheduled post(s)"
+            git push
+          fi

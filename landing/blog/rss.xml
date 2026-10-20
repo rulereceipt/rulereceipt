@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"><channel>
+  <title>RuleReceipt blog</title>
+  <link>https://rulereceipt.dev/blog</link>
+  <description>Checking what AI coding agents actually did, against your written rules.</description>
+  <language>en</language>
+    <item>
+      <title>I wrote a rule. My agent broke it anyway.</title>
+      <link>https://rulereceipt.dev/blog/three-rules</link>
+      <guid>https://rulereceipt.dev/blog/three-rules</guid>
+      <pubDate>Tue, 20 Oct 2026 09:00:00 GMT</pubDate>
+      <description>I had 'never push without asking' in my CLAUDE.md. Claude pushed to main, and I only noticed later. So I built a demo session with three mistakes agents really make, and ran RuleReceipt on it. Here's what a receipt of the session shows, and what it honestly can't.</description>
+    </item>
+</channel></rss>

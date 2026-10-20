@@ -4,7 +4,8 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "test": "vitest run"
+    "test": "vitest run",
+    "build:blog": "node build-blog.mjs"
   },
   "dependencies": {
     "@upstash/redis": "^1.38.4"

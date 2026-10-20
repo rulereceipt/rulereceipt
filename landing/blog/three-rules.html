@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>I wrote a rule. My agent broke it anyway. — RuleReceipt</title>
+<meta name="description" content="I had 'never push without asking' in my CLAUDE.md. Claude pushed to main, and I only noticed later. So I built a demo session with three mistakes agents really make, and ran RuleReceipt on it. Here's what a receipt of the session shows, and what it honestly can't.">
+<link rel="canonical" href="https://rulereceipt.dev/blog/three-rules">
+<link rel="alternate" type="application/rss+xml" title="RuleReceipt blog" href="https://rulereceipt.dev/blog/rss.xml">
+<meta property="og:type" content="article"><meta property="og:url" content="https://rulereceipt.dev/blog/three-rules">
+<meta property="og:title" content="I wrote a rule. My agent broke it anyway. — RuleReceipt"><meta property="og:description" content="I had 'never push without asking' in my CLAUDE.md. Claude pushed to main, and I only noticed later. So I built a demo session with three mistakes agents really make, and ran RuleReceipt on it. Here's what a receipt of the session shows, and what it honestly can't.">
+<meta property="og:image" content="https://rulereceipt.dev/media/rulereceipt-3-catches-poster.png"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="https://rulereceipt.dev/media/rulereceipt-3-catches-poster.png">
+<style>
+:root{--bg:#FAF9F5;--paper:#141413;--paper-dim:#7A756E;--cyan:#17805F;--panel:#fff;--line:#e7e4dd}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--paper);font-family:Georgia,'Times New Roman',serif;line-height:1.65;font-size:18px}
+.wrap{max-width:720px;margin:0 auto;padding:0 20px}
+.top{display:flex;justify-content:space-between;align-items:center;padding:22px 0;border-bottom:1px solid var(--line);font-family:-apple-system,system-ui,sans-serif}
+.wordmark{font-weight:800;letter-spacing:.02em;text-transform:uppercase;color:var(--paper);text-decoration:none;font-size:1rem}
+.nav a{color:var(--cyan);text-decoration:none;font-size:.9rem;margin-left:16px}
+article,.index{padding:34px 0 64px}
+h1{font-size:2.1rem;line-height:1.2;margin:.2em 0;font-family:Georgia,serif}
+.meta{color:var(--paper-dim);font-size:.9rem;margin-bottom:26px;font-family:-apple-system,system-ui,sans-serif}
+article h2{font-size:1.45rem;margin-top:1.8em}article h3{font-size:1.15rem}
+code{background:#f0eee8;padding:1px 5px;border-radius:4px;font-size:.9em;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+pre{background:#14151a;color:#e6e6e6;padding:16px;border-radius:8px;overflow:auto;font-size:.86rem;line-height:1.5}
+pre code{background:none;padding:0;color:inherit;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+a{color:var(--cyan)}ul,ol{padding-left:1.3em}img{max-width:100%;height:auto;border-radius:8px;border:1px solid var(--line);display:block;margin:20px auto}
+video{max-width:100%;height:auto;border-radius:10px;border:1px solid var(--line);display:block;margin:0 auto 6px}
+figure{margin:24px 0}figcaption{text-align:center;color:var(--paper-dim);font-size:.82rem;font-family:-apple-system,system-ui,sans-serif}
+blockquote{border-left:3px solid var(--line);margin:1em 0;padding:4px 0 4px 16px;color:var(--paper-dim)}
+.post-list{list-style:none;padding:0}.post-list li{margin:0 0 26px;padding-bottom:22px;border-bottom:1px solid var(--line)}
+.post-list a{font-size:1.3rem;text-decoration:none;color:var(--paper);font-weight:600}
+.post-list .d{color:var(--paper-dim);font-size:.95rem;margin-top:4px}
+footer{border-top:1px solid var(--line);padding:22px 0;color:var(--paper-dim);font-size:.85rem;font-family:-apple-system,system-ui,sans-serif}
+</style></head>
+<body><div class="wrap">
+<header class="top"><a class="wordmark" href="/">RuleReceipt</a><nav class="nav"><a href="/blog">blog</a><a href="/">home</a></nav></header>
+<article>
+<h1>I wrote a rule. My agent broke it anyway.</h1>
+<div class="meta">2026-10-20 · Chapter 1: I wrote a rule, it broke it anyway · <a href="/blog">RuleReceipt blog</a></div>
+<p>I had one line in my <code>CLAUDE.md</code>: <strong>never push without asking.</strong> Claude pushed to main anyway, and I only noticed later. The rule was written down, in the file the agent was supposed to be reading, and it still happened. Nothing told me. I found out the way you always find out: after.</p>
+<p>That's the whole problem. The rules live in a file. What the agent <em>did</em> lives in the session log. Nobody checks one against the other.</p>
+<p>So I built a demo session with three mistakes agents really make, and ran RuleReceipt on it. The session below is <strong>demo data</strong>, not a real incident, just the three failures written into one transcript so you can see what the check does with each.</p>
+<figure>
+<video controls muted playsinline preload="metadata" poster="/media/rulereceipt-3-catches-poster.png">
+<source src="/media/rulereceipt-3-catches-16x9.mp4" type="video/mp4">
+</video>
+<figcaption>Demo session · real RuleReceipt output</figcaption>
+</figure>
+<h2>Three rules, one session</h2>
+<p>The rules, plain sentences in <code>CLAUDE.md</code>:</p>
+<ol><li>Never push to main.</li><li>Never edit <code>.env</code> files.</li><li>Run the tests before saying you are done.</li></ol>
+<p>The agent said &quot;done.&quot; Here is what the receipt, real <code>rulereceipt check</code> output on the demo session, shows it actually did:</p>
+<pre><code>✕ FAIL    Never push to main.
+  evidence: a git command actually targeted the &quot;main&quot; branch: git push origin main
+✕ FAIL    Never edit .env files.
+  evidence: &quot;.env&quot; was actually modified: Edit on /Users/dev/acme/.env
+Not checked — needs your judgment (1)
+  • Run the tests before saying you are done.
+      the session claimed a passing test suite, but no test command ran here;
+      it may have been run outside this session, which the transcript cannot show</code></pre>
+<p><img src="/media/blog/report.png" alt="RuleReceipt HTML report of the demo session: two red FAIL rows, 'Never push to main' and 'Never edit .env files', each with its evidence line, and one rule under 'Not checked, needs your judgment'." loading="lazy"></p>
+<p>Two of the three are <strong>FAIL</strong>. A FAIL here only ever comes from hard evidence in the session's own log: a forbidden action that actually happened. The push to main happened. The <code>.env</code> edit happened. There is a quoted line for each, and the timeline places each FAIL at the exact step it occurred:</p>
+<p><img src="/media/blog/timeline.png" alt="RuleReceipt timeline of the demo session: the steps in order, with the push-to-main and .env-edit steps marked as the points where rules were broken." loading="lazy"></p>
+<p>The third rule is <strong>not</strong> a FAIL. The agent said &quot;all tests pass,&quot; but nothing in this session ran the tests after its last code edit. That is worth seeing, but it is not proof the claim is false. The tests might have run in another terminal the transcript can't see. So RuleReceipt marks it <strong>&quot;couldn't tell,&quot;</strong> never &quot;you lied.&quot; It's surfaced as advisory, it isn't counted in the totals, and it never changes the exit code.</p>
+<h2>Why &quot;couldn't tell&quot; matters</h2>
+<p>The easy way for a checker to look accurate is to never accuse anyone. The honest way is to say plainly when the evidence doesn't settle a rule. A checker that accuses you wrongly is worse than no checker, so this one stays quiet unless the log actually shows the thing.</p>
+<p>How often is it wrong, measured and dated:</p>
+<ul><li><strong>0 false FAILs</strong> on our frozen test sets.</li><li>On <strong>559 real rules files × 5 sessions</strong>, at most <strong>0.4%</strong> of reports showed a FAIL we count as wrong (<strong>Oct 18, 2026</strong>), down from <strong>2.9%</strong> (<strong>Sep 21, 2026</strong>). Each was hand-checked: a real action matched against a rule from a different project (the measured ceiling), not a misread.</li></ul>
+<h2>What it does, and doesn't</h2>
+<p>It <strong>detects and reports</strong> after the fact, locally. Plain <code>npx rulereceipt check</code> makes zero network calls, nothing is uploaded. It <strong>blocks</strong> only a narrow file/branch subset, and only if you opt in with <code>rulereceipt protect</code> (which shows you exactly what it adds and asks first). It does <strong>not</strong> make the model obey. It tells you, with proof, what the model did, so you don't find out the way I did.</p>
+<pre><code>npx rulereceipt check</code></pre>
+<p>Source-available, runs on your machine: <a href="https://rulereceipt.dev">rulereceipt.dev</a>. <em>(I built this.)</em></p>
+</article>
+<footer>RuleReceipt runs locally, nothing uploaded. <a href="/">rulereceipt.dev</a> · <a href="/blog/rss.xml">RSS</a></footer>
+</div></body></html>
