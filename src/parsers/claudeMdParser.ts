@@ -65,6 +65,79 @@ const SETEXT_H2_UNDERLINE = /^-{2,}\s*$/;
 const FENCE_LINE = /^\s*(`{3,}|~{3,})/;
 
 /**
+ * Plain lines (no "- " bullet) under a plain header are a real and common way
+ * to write rules — Anthropic's own early examples and many hand-written
+ * CLAUDE.md files list one directive per line with no bullet. The parser used
+ * to merge every such line into ONE section rule (`S<n>.0`), so none of them
+ * got classified or checked. This splits a pure-prose (no-bullet) section into
+ * one rule per directive LINE, the same way bullets split, but only when it is
+ * safe to:
+ *   - a line opens a new rule only if it starts with an imperative/modal
+ *     (Never/Always/Do not/Use/Run/…); any other line is a continuation of the
+ *     rule above it, so a wrapped sentence ("…opening a pull / request…") stays
+ *     one rule;
+ *   - if the FIRST non-blank line is not a directive, the section is treated as
+ *     described prose and left merged (no split) — narrative never becomes fake
+ *     rules;
+ *   - it only fires with 2+ directive lines, so a single prose rule is untouched.
+ * Added 2026-10-20.
+ */
+// `\b` after the opener so a gerund ("Running…", "Checking…") that only shares a
+// prefix with a verb ("run", "check") is NOT read as a new directive.
+const IMPERATIVE_RULE_START =
+  /^(?:never|always|do\s+not|don'?t|dont|avoid|ensure|only|prefer|use|run|keep|write|make|add|remove|delete|check|verify|follow|require|must|should|no)\b/i;
+// A real directive line reads like a sentence: it ends in sentence punctuation
+// (allowing a trailing quote/paren/backtick). Shell/command lines end in flags,
+// paths, parens or `#` comments, so this keeps a command-reference block from
+// being fabricated into one rule per command line.
+const RULE_LINE_END = /[.!?:]["'`)\]]*$/;
+
+function splitSectionProse(
+  sectionPrefix: string,
+  title: string,
+  bodyLines: string[],
+  bodyStartLine: number,
+  source: "global" | "project"
+): Rule[] | null {
+  const items: { parts: string[]; line: number; start: boolean }[] = [];
+  let inFence = false;
+  let fenceChar = "";
+  bodyLines.forEach((raw, k) => {
+    const t = raw.trim();
+    const fence = raw.match(FENCE_LINE);
+    if (fence) {
+      // A fenced code block is content, not structure — never split inside it.
+      const ch = fence[1][0];
+      if (!inFence) { inFence = true; fenceChar = ch; } else if (ch === fenceChar) inFence = false;
+      if (items.length > 0) items[items.length - 1].parts.push(t);
+      return;
+    }
+    if (inFence) {
+      if (items.length > 0) items[items.length - 1].parts.push(t);
+      return;
+    }
+    if (t === "") return;
+    // A new rule starts only on a prose directive line: an imperative opener that
+    // also reads like a sentence. Anything else continues the rule above it, so a
+    // wrapped sentence or a code/command line never becomes its own rule.
+    const start = IMPERATIVE_RULE_START.test(t) && RULE_LINE_END.test(t);
+    if (start) {
+      items.push({ parts: [t], line: bodyStartLine + k, start: true });
+    } else if (items.length > 0) {
+      items[items.length - 1].parts.push(t); // continuation of the rule above
+    } else {
+      items.push({ parts: [t], line: bodyStartLine + k, start: false }); // leading non-directive line
+    }
+  });
+  if (items.length < 2) return null; // 0 or 1 rule: leave the section as-is
+  if (!items[0].start) return null; // described/narrative section: do not split
+  return items.map((it, i) => {
+    const text = it.parts.join(" ");
+    return { id: `${sectionPrefix}.${i + 1}`, title: text, text, source, sourceLine: it.line };
+  });
+}
+
+/**
  * Removes HTML comments (`<!-- … -->`, possibly multi-line) from a rules file.
  *
  * whyrule / AgentLint, 2026-09-28: instructions inside an HTML comment are
@@ -184,6 +257,7 @@ export function parseClaudeMdText(rawInput: string, source: "global" | "project"
   let current: Rule | null = null;
   let currentIsMarkedRule = false; // true for numbered/bold rules: bullets in their body stay as body text
   let bodyLines: string[] = [];
+  let bodyStartLine = 0; // 1-based line of the first body line of a plain-section prose rule
   let pendingSectionTitle: string | null = null;
   // Bullets under an "## Examples" / "## Sample commit messages" heading are
   // samples, not directives. Found dogfooding (2026-10-02): ~8 sample lines were
@@ -204,10 +278,18 @@ export function parseClaudeMdText(rawInput: string, source: "global" | "project"
   const flush = () => {
     if (current) {
       current.text = bodyLines.join("\n").trim();
-      rules.push(current);
+      // A plain-header section with no bullets and 2+ directive lines splits into
+      // one rule per line (see splitSectionProse); everything else is one rule.
+      const split =
+        !currentIsMarkedRule && bulletIndex === 0
+          ? splitSectionProse(current.id.replace(/\.0$/, ""), current.title, bodyLines, bodyStartLine, source)
+          : null;
+      if (split) rules.push(...split);
+      else rules.push(current);
     }
     current = null;
     bodyLines = [];
+    bodyStartLine = 0;
   };
 
   const assignSectionId = () => {
@@ -225,6 +307,7 @@ export function parseClaudeMdText(rawInput: string, source: "global" | "project"
     } else if (pendingSectionTitle !== null && !inExampleSection && line.trim() !== "") {
       current = { id: `${assignSectionId()}.0`, title: pendingSectionTitle, text: "", source, sourceLine: pendingSectionLine };
       bodyLines = [line];
+      bodyStartLine = lineNo;
       pendingSectionTitle = null;
     } else if (current) {
       bodyLines.push(line);

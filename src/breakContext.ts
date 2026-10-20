@@ -69,12 +69,21 @@ const CONTEXT_MACHINERY =
 
 /** Longest-first distinctive fragments of the evidence to find the break line by. */
 function needles(evidence: string): string[] {
+  const clean = (s: string) => s.replace(/\s+/g, " ").trim().slice(0, 80);
   const quoted = [...evidence.matchAll(/"([^"]{6,})"/g)].map((m) => m[1]);
   const after = evidence.split(/:\s/).slice(1).join(": ");
-  return [...quoted, after]
-    .map((s) => s.replace(/\s+/g, " ").trim().slice(0, 80))
-    .filter((s) => s.length >= 6)
-    .sort((a, b) => b.length - a.length);
+  // File paths named in the evidence come straight from a tool's file_path and
+  // appear verbatim in the raw log, even when the surrounding sentence ("Edit on
+  // …") is constructed and does not. Extracting them lets a file-ban / lifecycle
+  // FAIL place at its edit instead of falling to "not placed" — e.g. ".env" is
+  // too short (4 chars) to survive the quoted-fragment filter, but the full path
+  // "/Users/…/.env" is distinctive. Placement-only; never changes a verdict.
+  // (2026-10-20) A path token must contain a slash or end in an alphabetic
+  // extension, so a bare version like "0.1.115" is not treated as a filename.
+  const paths = [...evidence.matchAll(/[^\s"'`,;()]*\/[^\s"'`,;()]+|[\w-]+(?:\.[\w-]+)*\.[A-Za-z][A-Za-z0-9]{0,11}/g)].map((m) => m[0]);
+  const general = [...quoted, after].map(clean).filter((s) => s.length >= 6);
+  const files = paths.map(clean).filter((s) => /[/.]/.test(s) && s.length >= 4);
+  return [...general, ...files].sort((a, b) => b.length - a.length);
 }
 
 /**
