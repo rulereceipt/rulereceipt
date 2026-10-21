@@ -13,12 +13,15 @@
  */
 
 import type { Receipt } from "./receipt.js";
+import type { CheckResult } from "./types.js";
+import { type Bucket, bucketOf } from "./report/buckets.js";
 import { redact } from "./wrong.js";
 
 /** One rule's fields as they appear in a `check --json` receipt (see generateJsonReport). */
 interface ReceiptResult {
   ruleTitle?: unknown;
   status?: unknown;
+  outcome?: unknown;
   evidence?: unknown;
   notVisible?: unknown;
   needsHuman?: unknown;
@@ -52,11 +55,17 @@ function item(r: ReceiptResult, marker: string): string {
 export function renderPrComment(receipt: Receipt): string {
   const results = (Array.isArray(receipt.results) ? receipt.results : []) as ReceiptResult[];
 
-  const broken = results.filter((r) => r.status === "FAIL" && !r.notVisible);
-  const followed = results.filter((r) => r.status === "PASS");
-  const notVisible = results.filter((r) => r.status === "FAIL" && r.notVisible);
-  // Everything else — UNCLEAR, judgment calls — is "can't tell".
-  const cantTell = results.filter((r) => r.status !== "FAIL" && r.status !== "PASS");
+  // Count through the ONE shared classifier (buckets.ts) so this surface agrees
+  // with the terminal, HTML, timeline and --json on followed / not-followed /
+  // not-visible / can't-tell (enforced by the cross-surface parity gate). A
+  // judgment call is NOT "can't tell" — the tool never had a mechanical answer —
+  // so it gets its own line, same split the terminal makes.
+  const bag = (b: Bucket) => results.filter((r) => bucketOf(r as unknown as CheckResult) === b);
+  const broken = bag("FAIL");
+  const followed = bag("PASS");
+  const notVisible = bag("RULE_NOT_VISIBLE");
+  const cantTell = bag("UNCLEAR_EVIDENCE");
+  const needsJudgment = bag("UNCLEAR_JUDGMENT");
 
   const s = receipt.summary ?? { total: results.length, pass: followed.length, fail: broken.length, unclear: cantTell.length };
   const headline = `**RuleReceipt** — ${broken.length} broken · ${followed.length} followed · ${cantTell.length} can't tell`;
@@ -75,7 +84,11 @@ export function renderPrComment(receipt: Receipt): string {
   }
 
   if (cantTell.length > 0) {
-    out.push(`${cantTell.length} rule${cantTell.length === 1 ? "" : "s"} can't be told from this session (judgment calls, or no evidence either way).`, "");
+    out.push(`${cantTell.length} rule${cantTell.length === 1 ? "" : "s"} can't be told from this session (the tool looked, the evidence was ambiguous).`, "");
+  }
+
+  if (needsJudgment.length > 0) {
+    out.push(`${needsJudgment.length} rule${needsJudgment.length === 1 ? "" : "s"} need a human's judgment (never a mechanical question).`, "");
   }
 
   if (notVisible.length > 0) {

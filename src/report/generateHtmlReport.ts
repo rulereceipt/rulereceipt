@@ -4,6 +4,7 @@ import { homedir } from "node:os";
 import type { CheckResult } from "../types.js";
 import type { ShadowFinding } from "../checks/shadowSignals.js";
 import { computeTranscriptHash, type ReportMeta } from "./generateReport.js";
+import { type Bucket, bucketOf, summarize } from "./buckets.js";
 
 /**
  * A shareable, self-contained report — one HTML file with no external
@@ -118,26 +119,29 @@ function clean(value: string): string {
  * are judgment calls. Presenting those as an unresolved pile makes an
  * accurate report look like a broken one.
  */
-type Bucket = "FAIL" | "UNCLEAR_EVIDENCE" | "UNCLEAR_JUDGMENT" | "PASS";
-
-function bucketOf(result: CheckResult): Bucket {
-  if (result.status === "FAIL") return "FAIL";
-  if (result.status === "PASS") return "PASS";
-  return result.needsHuman ? "UNCLEAR_JUDGMENT" : "UNCLEAR_EVIDENCE";
-}
+// Bucket + bucketOf now live in ./buckets.ts, shared with the terminal report,
+// the timeline, the PR comment and the --json summary, so a "rule not visible"
+// FAIL can never be counted as "not followed" in one surface and not another
+// (the exact split caught 2026-10-21).
 
 const BUCKET_LABEL: Record<Bucket, string> = {
   FAIL: "Not followed",
+  RULE_NOT_VISIBLE: "Rule not visible (not a violation)",
   UNCLEAR_EVIDENCE: "Couldn't tell",
-  UNCLEAR_JUDGMENT: "Needs your judgment",
+  NOT_RUN: "Not run",
   PASS: "Followed",
+  NOT_APPLICABLE: "Didn't apply this session",
+  UNCLEAR_JUDGMENT: "Needs your judgment",
 };
 
 const BUCKET_CLASS: Record<Bucket, string> = {
   FAIL: "fail",
+  RULE_NOT_VISIBLE: "unclear",
   UNCLEAR_EVIDENCE: "unclear",
-  UNCLEAR_JUDGMENT: "judgment",
+  NOT_RUN: "unclear",
   PASS: "pass",
+  NOT_APPLICABLE: "unclear",
+  UNCLEAR_JUDGMENT: "judgment",
 };
 
 /**
@@ -154,10 +158,6 @@ function ruleLabel(result: CheckResult, all: CheckResult[]): string {
   return collides
     ? `Rule ${result.ruleId} (${result.ruleSource})`
     : `Rule ${result.ruleId}`;
-}
-
-function countBy(results: CheckResult[], status: CheckResult["status"]): number {
-  return results.filter((r) => r.status === status).length;
 }
 
 function renderResultRow(result: CheckResult, all: CheckResult[], hideEvidence: boolean, version = ""): string {
@@ -206,6 +206,8 @@ function renderSection(bucket: Bucket, results: CheckResult[], all: CheckResult[
   const note =
     bucket === "UNCLEAR_JUDGMENT"
       ? `<p class="section__note">These were never questions a tool could settle — they need someone to read the session and decide. That is expected, not a gap in the check.</p>`
+      : bucket === "RULE_NOT_VISIBLE"
+      ? `<p class="section__note">A file these rules cover was edited, but the rule was not in the session's context at that moment — so this is <strong>not</strong> counted as a violation. It is shown so you can decide whether the rule should have been loaded.</p>`
       : "";
   const shared = sharedEvidence(inSection);
   const sharedBlock = shared ? `<p class="section__shared">${clean(shared)}</p>` : "";
@@ -256,9 +258,12 @@ function renderShadowAdvisory(findings: ShadowFinding[]): string {
  * the developer who sent it.
  */
 function verdict(results: CheckResult[]): { text: string; cls: string } {
-  const fail = countBy(results, "FAIL");
-  const couldntTell = results.filter((r) => bucketOf(r) === "UNCLEAR_EVIDENCE").length;
-  const needsHuman = results.filter((r) => bucketOf(r) === "UNCLEAR_JUDGMENT").length;
+  // A "rule not visible" FAIL is NOT a violation — exclude it, exactly as the
+  // terminal, the PR comment and the CI gate do. Use the shared counts.
+  const c = summarize(results);
+  const fail = c.notFollowed;
+  const couldntTell = c.couldntTell;
+  const needsHuman = c.needsJudgment;
 
   if (fail > 0) {
     return { text: `${fail} rule${fail === 1 ? "" : "s"} not followed`, cls: "fail" };
@@ -370,7 +375,18 @@ export function generateHtmlReport(results: CheckResult[], meta: HtmlReportMeta,
 
   <div class="verdict verdict--${v.cls}">
     <strong>${clean(v.text)}</strong>
-    <span>${countBy(results, "PASS")} followed · ${countBy(results, "FAIL")} not followed · ${results.filter((r) => bucketOf(r) === "UNCLEAR_EVIDENCE").length} couldn&#39;t tell · ${results.filter((r) => bucketOf(r) === "UNCLEAR_JUDGMENT").length} need your judgment</span>
+    <span>${(() => {
+      // Same counts, same order as the terminal summaryLine (buckets.ts). A
+      // "rule not visible" FAIL is its own count, never folded into "not followed".
+      const c = summarize(results);
+      const parts = [`${c.followed} followed`, `${c.notFollowed} not followed`];
+      if (c.notVisible) parts.push(`${c.notVisible} rule not visible`);
+      if (c.couldntTell) parts.push(`${c.couldntTell} couldn&#39;t tell`);
+      if (c.notRun) parts.push(`${c.notRun} not run`);
+      if (c.notApplicable) parts.push(`${c.notApplicable} didn&#39;t apply`);
+      if (c.needsJudgment) parts.push(`${c.needsJudgment} need your judgment`);
+      return parts.join(" · ");
+    })()}</span>
   </div>
 
   <table class="facts">
@@ -389,7 +405,7 @@ ${(() => {
       const nl = shadowFindings.filter((f) => f.signal === "edited-rule-not-loaded");
       const other = shadowFindings.filter((f) => f.signal !== "edited-rule-not-loaded");
       const sec = (b: Bucket) => renderSection(b, results, results, meta.toolVersion);
-      const checked = (["FAIL", "UNCLEAR_EVIDENCE", "PASS"] as Bucket[]).map(sec).join("");
+      const checked = (["FAIL", "RULE_NOT_VISIBLE", "UNCLEAR_EVIDENCE", "NOT_RUN", "PASS", "NOT_APPLICABLE"] as Bucket[]).map(sec).join("");
       const judgment = (["UNCLEAR_JUDGMENT"] as Bucket[]).map(sec).join("");
       const groupHead = (t: string) => `\n      <h2 class="section__title">${clean(t)}</h2>`;
       const neverLoadedSec = nl.length === 0 ? "" : `

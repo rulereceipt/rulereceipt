@@ -30,7 +30,12 @@ describe("generateJsonReport", () => {
 
   it("summary counts match the results", () => {
     const j = JSON.parse(generateJsonReport(RESULTS, META, "9.9.9"));
-    expect(j.summary).toEqual({ total: 3, pass: 1, fail: 1, unclear: 1, ruleNotVisible: 0 });
+    // Canonical counts shared with every other surface (buckets.ts); `unclear`
+    // is kept as the legacy BROAD total for back-compat.
+    expect(j.summary).toEqual({
+      total: 3, pass: 1, fail: 1, couldntTell: 0, needsJudgment: 1,
+      notRun: 0, didntApply: 0, ruleNotVisible: 0, unclear: 1,
+    });
   });
 
   it("maps every result with its fields", () => {

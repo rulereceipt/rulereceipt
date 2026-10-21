@@ -1,7 +1,7 @@
 {
   "name": "rulereceipt",
   "displayName": "RuleReceipt",
-  "version": "0.1.117",
+  "version": "0.1.118",
   "description": "Check whether your agent followed your CLAUDE.md / AGENTS.md rules. Adds a rulereceipt skill and /rulereceipt:check, :audit, :why, :health commands that read the finished session locally and report each rule as followed, broken (with the quoted line as proof), or needs-human-judgment. Installs NO hooks and makes NO network calls — it reports after the fact and blocks nothing. PREREQUISITE: the rulereceipt CLI must be installed (npm i -g rulereceipt); the commands tell you to install it if it is missing and never auto-download it.",
   "author": {
     "name": "RuleReceipt",

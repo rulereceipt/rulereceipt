@@ -38,8 +38,9 @@ import type { CheckResult } from "./types.js";
 import type { ShadowFinding } from "./checks/shadowSignals.js";
 import { applyVisibility } from "./visibility.js";
 import { evidenceLineIndex, isCompactionLine } from "./breakContext.js";
+import { bucketOf } from "./report/buckets.js";
 
-export type TimelineLane = "broken" | "not-visible" | "followed" | "needs-judgment" | "cant-tell";
+export type TimelineLane = "broken" | "not-visible" | "followed" | "needs-judgment" | "cant-tell" | "not-applicable";
 
 export interface TimelineVerdict {
   lane: TimelineLane;
@@ -66,6 +67,7 @@ export interface TimelineCounts {
   followed: number;
   needsJudgment: number;
   cantTell: number;
+  notApplicable: number;
 }
 
 export interface SessionTimeline {
@@ -93,9 +95,19 @@ export interface TimelineMeta {
 }
 
 function laneOf(r: CheckResult): TimelineLane {
-  if (r.status === "FAIL") return r.notVisible ? "not-visible" : "broken";
-  if (r.status === "PASS") return "followed";
-  return r.needsHuman ? "needs-judgment" : "cant-tell";
+  // One shared classifier (buckets.ts) so "couldn't tell" here means exactly
+  // what it means in the terminal / HTML / --json / PR comment: the tool looked
+  // and the evidence was ambiguous. "Didn't apply" and "not run" are their own
+  // lane, never folded into "can't tell".
+  switch (bucketOf(r)) {
+    case "FAIL": return "broken";
+    case "RULE_NOT_VISIBLE": return "not-visible";
+    case "PASS": return "followed";
+    case "UNCLEAR_JUDGMENT": return "needs-judgment";
+    case "UNCLEAR_EVIDENCE": return "cant-tell";
+    case "NOT_APPLICABLE":
+    case "NOT_RUN": return "not-applicable";
+  }
 }
 
 function toVerdict(r: CheckResult, lines: string[]): TimelineVerdict {
@@ -136,6 +148,7 @@ export function buildTimeline(results: CheckResult[], transcriptText: string): S
     followed: verdicts.filter((v) => v.lane === "followed").length,
     needsJudgment: verdicts.filter((v) => v.lane === "needs-judgment").length,
     cantTell: verdicts.filter((v) => v.lane === "cant-tell").length,
+    notApplicable: verdicts.filter((v) => v.lane === "not-applicable").length,
   };
 
   return { placed, unplaced, markers, counts };
@@ -176,6 +189,7 @@ const LANE_LABEL: Record<TimelineLane, string> = {
   followed: "Followed",
   "needs-judgment": "Needs your judgment",
   "cant-tell": "Couldn't tell",
+  "not-applicable": "Didn't apply this session",
 };
 
 /** One line of evidence, redacted + collapsed, for the compact timeline node. */
@@ -332,6 +346,7 @@ export function renderTimelineHtml(t: SessionTimeline, meta: TimelineMeta, shado
   .node--broken .dot { background: var(--fail); }
   .node--followed .dot { background: var(--pass); }
   .node--cant-tell .dot { background: var(--unclear); }
+  .node--not-applicable .dot { background: var(--unclear); }
   .node--needs-judgment .dot { background: var(--judgment); }
   .node--not-visible .dot { background: var(--notvis); }
   .node--compaction .dot { background: var(--compact); }
@@ -340,6 +355,7 @@ export function renderTimelineHtml(t: SessionTimeline, meta: TimelineMeta, shado
   .badge--broken { color: var(--fail); border-color: var(--fail); }
   .badge--followed { color: var(--pass); border-color: var(--pass); }
   .badge--cant-tell { color: var(--unclear); border-color: var(--unclear); }
+  .badge--not-applicable { color: var(--unclear); border-color: var(--unclear); }
   .badge--needs-judgment { color: var(--judgment); }
   .badge--not-visible { color: var(--notvis); border-color: var(--notvis); }
   .badge--compaction { color: var(--compact); border-color: var(--compact); }

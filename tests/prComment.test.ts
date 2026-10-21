@@ -71,11 +71,26 @@ describe("renderPrComment — display-only PR comment from a receipt", () => {
     expect(renderPrComment(receipt([]))).toContain("0 broken");
   });
 
-  it("groups judgment/unclear rules as can't-tell, not as broken or followed", () => {
+  it("a judgment rule is 'need judgment', NOT 'can't tell' (same split as the terminal)", () => {
     const md = renderPrComment(receipt([
       { ruleTitle: "Keep changes small", status: "UNCLEAR", evidence: "", needsHuman: true },
     ]));
-    expect(md).toContain("1 rule can't be told");
+    // Judgment calls are their own thing — never folded into "can't tell".
+    expect(md).toContain("0 broken · 0 followed · 0 can't tell");
+    expect(md).toContain("1 rule need a human's judgment");
+  });
+
+  it("an ambiguous-evidence rule IS 'can't tell' (narrow, matches every other surface)", () => {
+    const md = renderPrComment(receipt([
+      { ruleTitle: "No console.log", status: "UNCLEAR", evidence: "mentioned but unclear", needsHuman: false },
+    ]));
     expect(md).toContain("0 broken · 0 followed · 1 can't tell");
+  });
+
+  it("a not-applicable rule is neither can't-tell nor broken", () => {
+    const md = renderPrComment(receipt([
+      { ruleTitle: "Never delete the ledger", status: "UNCLEAR", outcome: "not_applicable", evidence: "never came up", needsHuman: false },
+    ]));
+    expect(md).toContain("0 broken · 0 followed · 0 can't tell");
   });
 });

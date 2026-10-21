@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import type { CheckResult } from "../types.js";
 import { breakContext, renderBreakContext } from "../breakContext.js";
+import { type Bucket, bucketOf, summarize } from "./buckets.js";
 
 /**
  * Where a rule lives, for the report — "~/proj/CLAUDE.md:42", or just the path
@@ -103,43 +104,13 @@ function summaryLine(results: CheckResult[]): string {
   return parts.join(" · ");
 }
 
-type Bucket = "FAIL" | "RULE_NOT_VISIBLE" | "UNCLEAR_EVIDENCE" | "NOT_RUN" | "PASS" | "NOT_APPLICABLE" | "UNCLEAR_JUDGMENT";
-
 /**
- * Six buckets, because "the tool looked and could not decide", "the tool
- * never ran", and "the situation never arose" are three different things
- * that were all rendering as one.
- *
- * From anthropics/claude-code#90542. With no API key the report printed
- * "13 couldn't tell" — a phrase defined in this file as the tool having
- * looked — about thirteen rules it had never examined. And an empty
- * transcript produced 2,770 green ticks across the 559-file corpus, every
- * one of them true and none of them meaning anything, because a rule whose
- * situation never arose was being counted as followed.
- *
- * `outcome` is preferred where a checker sets it; `status` remains the
- * fallback while the rest are migrated.
+ * Bucketing moved to ./buckets.ts so every surface (terminal, HTML, timeline,
+ * PR comment, --json) classifies and counts identically. Six-plus-one buckets,
+ * because "the tool looked and could not decide", "the tool never ran", "the
+ * situation never arose" and "the rule wasn't in context" are different things
+ * that once all rendered as one. From anthropics/claude-code#90542.
  */
-function bucketOf(result: CheckResult): Bucket {
-  // A would-be Broken whose rule wasn't in context is "Rule not visible", never
-  // Broken — decided before anything else so it can't be counted as a violation.
-  if (result.notVisible) return "RULE_NOT_VISIBLE";
-  switch (result.outcome) {
-    case "fail":
-      return "FAIL";
-    case "pass":
-      return "PASS";
-    case "not_run":
-      return "NOT_RUN";
-    case "not_applicable":
-      return "NOT_APPLICABLE";
-    case "inconclusive":
-      return result.needsHuman ? "UNCLEAR_JUDGMENT" : "UNCLEAR_EVIDENCE";
-  }
-  if (result.status === "FAIL") return "FAIL";
-  if (result.status === "PASS") return "PASS";
-  return result.needsHuman ? "UNCLEAR_JUDGMENT" : "UNCLEAR_EVIDENCE";
-}
 
 /**
  * Deliberately identical to generateHtmlReport's buckets, order and labels.
@@ -382,14 +353,24 @@ export function generateJsonReport(results: CheckResult[], meta: ReportMeta, too
     // Rules/settings files the session itself edited (a NOTE, not a verdict):
     // the verdicts are against the rules as they are now.
     agentEditedRuleFiles: editedRuleFiles,
-    summary: {
-      total: clean.length,
-      pass: count("PASS"),
-      // A "rule not visible" FAIL is never counted as broken — same everywhere.
-      fail: clean.filter((r) => r.status === "FAIL" && !r.notVisible).length,
-      unclear: count("UNCLEAR"),
-      ruleNotVisible: clean.filter((r) => Boolean(r.notVisible)).length,
-    },
+    // Canonical counts from the shared summarize() — identical to the terminal,
+    // HTML, timeline and PR-comment surfaces (enforced by the cross-surface
+    // parity gate). `unclear` stays as the legacy BROAD total for back-compat.
+    summary: (() => {
+      const c = summarize(clean);
+      return {
+        total: clean.length,
+        pass: c.followed,
+        // A "rule not visible" FAIL is never counted as broken — same everywhere.
+        fail: c.notFollowed,
+        couldntTell: c.couldntTell,
+        needsJudgment: c.needsJudgment,
+        notRun: c.notRun,
+        didntApply: c.notApplicable,
+        ruleNotVisible: c.notVisible,
+        unclear: count("UNCLEAR"),
+      };
+    })(),
     results: clean.map((r) => ({
       ruleId: r.ruleId,
       ruleTitle: r.ruleTitle,

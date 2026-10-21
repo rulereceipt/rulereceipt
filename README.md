@@ -494,7 +494,7 @@ rulereceipt check --json > .rulereceipt/receipt.json   # commit this file
 In CI (no session), verify the committed receipt with the Action:
 
 ```yaml
-- uses: rulereceipt/rulereceipt@v0.1.117   # or pin a commit SHA
+- uses: rulereceipt/rulereceipt@v0.1.118   # or pin a commit SHA
   with:
     receipt: .rulereceipt/receipt.json
     max-age-days: "7"                  # optional: reject a stale receipt
