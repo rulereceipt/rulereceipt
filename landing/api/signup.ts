@@ -56,7 +56,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const body = req.body ?? {};
-  const { email } = body as { email?: unknown };
+  const { email, company } = body as { email?: unknown; company?: unknown };
+
+  // Honeypot: `company` is a hidden field real users never see or fill. A bot
+  // that fills it is silently accepted (so it can't tell it was caught) but the
+  // address is never stored. No error, no signal.
+  if (typeof company === "string" && company.trim() !== "") {
+    res.status(200).json({ ok: true });
+    return;
+  }
 
   if (!isValidEmail(email)) {
     res.status(400).json({ error: "expected a valid email address" });

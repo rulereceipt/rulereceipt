@@ -1,0 +1,25 @@
+# RuleReceipt
+
+> RuleReceipt checks what your AI coding agent actually did in a session against
+> your own written rules (CLAUDE.md, AGENTS.md, .cursor/rules) and marks each rule
+> followed, broken, or can't-tell — with the exact line as proof. It runs locally;
+> plain `rulereceipt check` makes zero network calls. It detects and reports, and
+> blocks only a narrow opt-in file/branch subset; it does not make the model obey.
+
+## What it is
+- A command-line tool: `npx rulereceipt check` reads the finished session transcript and reports per rule.
+- Supported agents (read sessions): Claude Code, OpenAI Codex CLI, GitHub Copilot CLI, Cursor, Antigravity, OpenCode, Cline, Devin. Any other agent is experimental.
+- Supported OS: macOS and Linux. Windows is untested.
+- Verdicts: followed / not followed (with the quoted evidence) / couldn't tell / rule not visible (edited a covered file with no record the rule was loaded) / needs human judgment. An `--llm` grade is a labelled opinion only and never fails CI or blocks.
+
+## Key pages
+- Home: https://rulereceipt.dev
+- Accuracy (real measured false-FAIL numbers): https://rulereceipt.dev/accuracy
+- Blog: https://rulereceipt.dev/blog
+- Check your rules file in the browser: https://rulereceipt.dev/check
+- Source (free CLI, source-available): https://github.com/rulereceipt/rulereceipt
+- Security policy: https://rulereceipt.dev/.well-known/security.txt
+
+## Privacy
+- The CLI runs on your machine and uploads nothing by default. Three opt-ins (`--llm`, `--share`, telemetry) are off unless you ask.
+- The website uses PostHog analytics; see the privacy policy at https://rulereceipt.dev/privacy

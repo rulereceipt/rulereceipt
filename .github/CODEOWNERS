@@ -1,0 +1,9 @@
+# Code owners — a change to any of these needs review from the owner.
+# The release/CI surface and the package manifest are the highest-leverage
+# files (a malicious edit here can exfiltrate secrets or ship bad code), so
+# they are owned explicitly.
+
+/.github/workflows/   @rulereceipt
+/.github/CODEOWNERS   @rulereceipt
+/package.json         @rulereceipt
+/package-lock.json    @rulereceipt

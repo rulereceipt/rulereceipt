@@ -129,6 +129,24 @@ describe("POST success", () => {
   });
 });
 
+describe("honeypot (bot trap)", () => {
+  it("a filled 'company' honeypot is accepted (looks like success) but NEVER stored", async () => {
+    const { res, statusCode, jsonBody } = mockRes();
+    await handler(mockReq({ method: "POST", body: { email: "bot@example.com", company: "Acme Bots Inc" } }), res);
+    expect(statusCode()).toBe(200);
+    expect(jsonBody()).toEqual({ ok: true });
+    // the address must NOT be on the list — a bot can't tell it was caught.
+    expect(redisInstance._sets.get("rulereceipt:signups")?.has("bot@example.com") ?? false).toBe(false);
+  });
+
+  it("an empty honeypot does not block a real signup", async () => {
+    const { res, statusCode } = mockRes();
+    await handler(mockReq({ method: "POST", body: { email: "human@example.com", company: "" } }), res);
+    expect(statusCode()).toBe(200);
+    expect(redisInstance._sets.get("rulereceipt:signups")?.has("human@example.com")).toBe(true);
+  });
+});
+
 describe("email-enumeration regression (real fix, 2026-08-28)", () => {
   it("returns an IDENTICAL response for a brand-new email and an already-registered one", async () => {
     const { res: res1, statusCode: status1, jsonBody: body1 } = mockRes();

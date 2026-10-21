@@ -728,6 +728,20 @@
     .hero-video__poster { display: block; }
   }
 </style>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "RuleReceipt",
+  "applicationCategory": "DeveloperApplication",
+  "operatingSystem": "macOS, Linux",
+  "description": "Checks what your AI coding agent actually did in a session against your CLAUDE.md / AGENTS.md rules, and marks each rule followed, broken (with the quoted line as proof), or can't-tell. Runs locally; plain `rulereceipt check` makes zero network calls.",
+  "url": "https://rulereceipt.dev",
+  "softwareHelp": "https://rulereceipt.dev/accuracy",
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+  "author": { "@type": "Organization", "name": "RuleReceipt", "url": "https://rulereceipt.dev" }
+}
+</script>
 </head>
 <body>
 
@@ -947,6 +961,7 @@
         <p>No account needed to use the tool. One email when team pricing goes live.</p>
         <form class="signup-form" id="signup-form">
           <input type="email" id="signup-email" placeholder="you@example.com" required>
+          <input type="text" id="signup-company" name="company" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden">
           <button type="submit">Notify me</button>
         </form>
         <div class="signup-note" id="signup-note"></div>
@@ -1170,6 +1185,8 @@
       var note = document.getElementById('signup-note');
       var button = signupForm.querySelector('button');
       var email = emailInput.value.trim();
+      var hp = document.getElementById('signup-company');
+      var company = hp ? hp.value : '';
 
       button.disabled = true;
       note.textContent = '';
@@ -1178,7 +1195,7 @@
       fetch('/api/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email }),
+        body: JSON.stringify({ email: email, company: company }),
       })
         .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
         .then(function (result) {
