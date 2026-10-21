@@ -5,14 +5,14 @@
     "email": "hello@rulereceipt.dev",
     "url": "https://rulereceipt.dev"
   },
-  "description": "RuleReceipt — a guard that blocks a command breaking a file/branch rule, a Stop hook that won't let a session end on a broken rule, and commands to check what your agent actually did against your rules.",
+  "description": "RuleReceipt — a skill and commands to check what your agent actually did against your CLAUDE.md / AGENTS.md rules. Reads the finished session locally and reports each rule followed, broken (with the quoted line), or needs-judgment.",
   "plugins": [
     {
       "name": "rulereceipt",
       "source": "./plugin",
-      "description": "Guard (PreToolUse) + Stop hook + /rulereceipt:check, :audit, :health, :why. Runs the rulereceipt CLI locally; zero network calls in the guard and checks.",
+      "description": "rulereceipt skill + /rulereceipt:check, :audit, :health, :why. Runs the rulereceipt CLI locally; no hooks installed, zero network calls, blocks nothing — it reports after the fact.",
       "category": "quality",
-      "tags": ["rules", "audit", "compliance", "guard", "claude-code"]
+      "tags": ["rules", "audit", "compliance", "claude-code"]
     }
   ]
 }

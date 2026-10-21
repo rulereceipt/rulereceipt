@@ -15,6 +15,10 @@ function read(filePath: string): TranscriptEvent {
   return { role: "assistant", kind: "tool_use", toolName: "Read", input: { file_path: filePath }, timestamp: "2026-08-30T00:00:00Z" };
 }
 
+function edit(filePath: string): TranscriptEvent {
+  return { role: "assistant", kind: "tool_use", toolName: "Edit", input: { file_path: filePath, old_string: "a", new_string: "b" }, timestamp: "2026-08-30T00:00:00Z" };
+}
+
 function textEvent(text: string): TranscriptEvent {
   return { role: "assistant", kind: "text", text, timestamp: "2026-08-30T00:00:00Z" };
 }
@@ -259,5 +263,47 @@ describe("a shell mutation inside a temp directory is still a temp file", () => 
   it("still fires on a real deletion in the project", () => {
     const [r] = runFileLifecycleChecks([protectClaude], [bash("rm -rf .claude/")]);
     expect(r.status).toBe("FAIL");
+  });
+});
+
+describe("directory path-ban counts edits to files UNDER the directory (fix 2026-10-21)", () => {
+  const banPaymentsDir: FileLifecycleClassification = {
+    kind: "fileLifecycle",
+    rule: { id: "P1", title: "No edits under src/payments", text: "Never edit files under `src/payments/` without approval.", source: "project" },
+    filePath: "src/payments/", // trailing slash => directory token (classify.ts keeps it)
+    polarity: "forbid",
+  };
+
+  it("an Edit to a file under the banned dir is a FAIL (was wrongly 'not applicable')", () => {
+    const r = runFileLifecycleChecks([banPaymentsDir], [edit("src/payments/charge.ts")])[0];
+    expect(r.status).toBe("FAIL");
+    expect(r.evidence).toContain("src/payments/charge.ts");
+  });
+
+  it("an absolute path under the banned dir also FAILs", () => {
+    const r = runFileLifecycleChecks([banPaymentsDir], [write("/home/dev/proj/src/payments/refund.ts")])[0];
+    expect(r.status).toBe("FAIL");
+  });
+
+  it("boundary: a sibling dir with the same prefix does NOT match (src/payments2/)", () => {
+    const r = runFileLifecycleChecks([banPaymentsDir], [edit("src/payments2/charge.ts")])[0];
+    expect(r.status).not.toBe("FAIL");
+  });
+
+  it("reading a file under the banned dir is not a mutation", () => {
+    const r = runFileLifecycleChecks([banPaymentsDir], [read("src/payments/charge.ts")])[0];
+    expect(r.status).not.toBe("FAIL");
+  });
+
+  it("regression: a FILE token still needs an exact/suffix match, not a prefix", () => {
+    const banEnv: FileLifecycleClassification = {
+      kind: "fileLifecycle",
+      rule: { id: "E1", title: "No .env edits", text: "Never edit `.env`.", source: "project" },
+      filePath: ".env",
+      polarity: "forbid",
+    };
+    // my.env.example must NOT match .env; /x/.env must.
+    expect(runFileLifecycleChecks([banEnv], [edit("config/my.env.example")])[0].status).not.toBe("FAIL");
+    expect(runFileLifecycleChecks([banEnv], [write("/home/x/proj/.env")])[0].status).toBe("FAIL");
   });
 });

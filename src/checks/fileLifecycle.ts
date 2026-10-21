@@ -102,6 +102,29 @@ interface MutationResult {
   outsideProject: string | null;
 }
 
+/**
+ * Does an edited path fall under the rule's protected path?
+ *
+ * For a FILE token (`.env`, `src/app.ts`) the edited path must BE that file:
+ * exactly, or an absolute path ending in it (so `.env` matches
+ * `/home/x/proj/.env`), anchored at a `/` boundary so `.env` never matches
+ * `my.env.example` and `app.ts` never matches `other-app.ts`.
+ *
+ * For a DIRECTORY token (a trailing slash, `src/payments/`, `dist/` — classify.ts
+ * only keeps the slash for dir-shaped tokens) any file UNDER the directory counts,
+ * relative or absolute. This fixes a real gap (2026-10-21): "Never edit files under
+ * `src/payments/`" reported "never written to" on an `Edit` of `src/payments/charge.ts`
+ * because the edited file equalled neither the directory nor a suffix of it. The
+ * trailing slash keeps the boundary tight — `src/payments2/x` does not match.
+ */
+export function editTouchesForbiddenPath(actual: string, normalized: string): boolean {
+  if (normalized.endsWith("/")) {
+    const dirNoSlash = normalized.slice(0, -1);
+    return actual === dirNoSlash || actual.startsWith(normalized) || actual.includes(`/${normalized}`);
+  }
+  return actual === normalized || actual.endsWith(`/${normalized}`);
+}
+
 function findMutation(events: TranscriptEvent[], filePath: string): MutationResult {
   const normalized = filePath.replace(/^\.\//, "");
   let outsideProject: string | null = null;
@@ -112,7 +135,7 @@ function findMutation(events: TranscriptEvent[], filePath: string): MutationResu
       const input = event.input as { file_path?: unknown };
       if (typeof input?.file_path === "string") {
         const actual = input.file_path.replace(/^\.\//, "");
-        const matches = actual === normalized || actual.endsWith(`/${normalized}`);
+        const matches = editTouchesForbiddenPath(actual, normalized);
         if (!matches) continue;
         // A throwaway copy is not the project's file. A rule saying
         // "CHANGELOG.md is release-only" fired on a scratchpad CHANGELOG.md

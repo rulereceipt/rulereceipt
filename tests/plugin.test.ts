@@ -5,8 +5,13 @@ import { join } from "node:path";
 /**
  * The self-hosted Claude Code plugin + marketplace. `claude plugin validate` is
  * the authoritative check (run in CI/release); this pins the fields RuleReceipt
- * relies on so a regression (wrong source path, a hook that stops invoking the
- * guard, a missing command) fails the suite, not just a manual validate.
+ * relies on so a regression (wrong source path, a resurrected auto-installed hook,
+ * a missing command or skill) fails the suite, not just a manual validate.
+ *
+ * Design (2026-10-20): the plugin ships a SKILL.md skill + commands only. It
+ * installs NO hooks — a plugin must never silently add a PreToolUse guard or a
+ * Stop hook that blocks the user. Hooks remain available via the CLI for anyone
+ * who opts in and wires them up themselves.
  */
 const root = join(__dirname, "..");
 const readJson = (p: string) => JSON.parse(readFileSync(join(root, p), "utf-8"));
@@ -28,27 +33,22 @@ describe("Claude Code plugin + marketplace manifest", () => {
     expect(p.version).toBeTruthy();
   });
 
-  it("the guard + Stop hooks invoke the rulereceipt CLI (no matcher = all tools)", () => {
-    const h = readJson("plugin/hooks/hooks.json").hooks;
-    const cmd = (event: string) => h[event][0].hooks[0].command as string;
-    expect(cmd("PreToolUse")).toMatch(/rulereceipt guard/);
-    expect(cmd("Stop")).toMatch(/rulereceipt hook/);
-    // No matcher field -> fires on every tool (so no dead tool names to maintain).
-    expect(h.PreToolUse[0].matcher).toBeUndefined();
+  it("installs NO hooks — the plugin never auto-wires a guard or Stop hook", () => {
+    // The whole point of the skill+command design: no silent PreToolUse/Stop hook.
+    expect(existsSync(join(root, "plugin/hooks/hooks.json"))).toBe(false);
+    expect(existsSync(join(root, "plugin/hooks"))).toBe(false);
   });
 
-  it("hooks FAIL OPEN when rulereceipt isn't installed — never a silent auto-download", () => {
-    const h = readJson("plugin/hooks/hooks.json").hooks;
-    for (const event of ["PreToolUse", "Stop"]) {
-      const cmd = h[event][0].hooks[0].command as string;
-      // Must NOT auto-install/download (npx --yes / -y fetches from the network).
-      expect(cmd, event).not.toMatch(/npx\s+(--yes|-y)\b/);
-      expect(cmd, event).not.toMatch(/\bnpx\b/); // no npx at all -> no accidental fetch
-      // Must gate on the CLI being present and fail open with an install hint.
-      expect(cmd, event).toMatch(/command -v rulereceipt/);
-      expect(cmd, event).toMatch(/npm i -g rulereceipt/);
-      expect(cmd, event).toMatch(/exit 0/);
-    }
+  it("ships the rulereceipt skill in the shared SKILL.md format", () => {
+    const p = join(root, "plugin/skills/rulereceipt/SKILL.md");
+    expect(existsSync(p)).toBe(true);
+    const body = readFileSync(p, "utf-8");
+    // Open Agent Skills frontmatter (name == dir, description present).
+    expect(body).toMatch(/^---[\s\S]*\nname:\s*rulereceipt\b/);
+    expect(body).toMatch(/\ndescription:\s*\S/);
+    // Runs the read-only check, never --llm, no server/upload.
+    expect(body).toContain("npx rulereceipt check");
+    expect(body).toMatch(/Never pass `--llm`/);
   });
 
   it("ships the four commands", () => {
@@ -57,8 +57,12 @@ describe("Claude Code plugin + marketplace manifest", () => {
     }
   });
 
-  it("hooks reference no network URL (the guard and checks run locally)", () => {
-    const raw = readFileSync(join(root, "plugin/hooks/hooks.json"), "utf-8");
-    expect(raw).not.toMatch(/https?:\/\//);
+  it("neither manifest claims a guard/Stop hook anymore", () => {
+    const market = readFileSync(join(root, ".claude-plugin/marketplace.json"), "utf-8");
+    const plugin = readFileSync(join(root, "plugin/.claude-plugin/plugin.json"), "utf-8");
+    for (const raw of [market, plugin]) {
+      expect(raw).not.toMatch(/Stop hook/i);
+      expect(raw).not.toMatch(/PreToolUse/);
+    }
   });
 });
