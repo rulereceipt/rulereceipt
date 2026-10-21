@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Did your agent ignore your rule, or never see it? — RuleReceipt</title>
+<meta name="description" content="A rule can break two ways: the agent read it and ignored it, or the rule never loaded at all. Those are different problems, and RuleReceipt tells them apart. A break on a rule that never loaded is shown, but not counted as a violation.">
+<link rel="canonical" href="https://rulereceipt.dev/blog/ignored-or-never-saw-it">
+<link rel="alternate" type="application/rss+xml" title="RuleReceipt blog" href="https://rulereceipt.dev/blog/rss.xml">
+<meta property="og:type" content="article"><meta property="og:url" content="https://rulereceipt.dev/blog/ignored-or-never-saw-it">
+<meta property="og:title" content="Did your agent ignore your rule, or never see it? — RuleReceipt"><meta property="og:description" content="A rule can break two ways: the agent read it and ignored it, or the rule never loaded at all. Those are different problems, and RuleReceipt tells them apart. A break on a rule that never loaded is shown, but not counted as a violation.">
+<meta property="og:image" content="https://rulereceipt.dev/media/rulereceipt-3-catches-poster.png"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="https://rulereceipt.dev/media/rulereceipt-3-catches-poster.png">
+<style>
+:root{--bg:#FAF9F5;--paper:#141413;--paper-dim:#7A756E;--cyan:#17805F;--panel:#fff;--line:#e7e4dd}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--paper);font-family:Georgia,'Times New Roman',serif;line-height:1.65;font-size:18px}
+.wrap{max-width:720px;margin:0 auto;padding:0 20px}
+.top{display:flex;justify-content:space-between;align-items:center;padding:22px 0;border-bottom:1px solid var(--line);font-family:-apple-system,system-ui,sans-serif}
+.wordmark{font-weight:800;letter-spacing:.02em;text-transform:uppercase;color:var(--paper);text-decoration:none;font-size:1rem}
+.nav a{color:var(--cyan);text-decoration:none;font-size:.9rem;margin-left:16px}
+article,.index{padding:34px 0 64px}
+h1{font-size:2.1rem;line-height:1.2;margin:.2em 0;font-family:Georgia,serif}
+.meta{color:var(--paper-dim);font-size:.9rem;margin-bottom:26px;font-family:-apple-system,system-ui,sans-serif}
+article h2{font-size:1.45rem;margin-top:1.8em}article h3{font-size:1.15rem}
+code{background:#f0eee8;padding:1px 5px;border-radius:4px;font-size:.9em;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+pre{background:#14151a;color:#e6e6e6;padding:16px;border-radius:8px;overflow:auto;font-size:.86rem;line-height:1.5}
+pre code{background:none;padding:0;color:inherit;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+a{color:var(--cyan)}ul,ol{padding-left:1.3em}img{max-width:100%;height:auto;border-radius:8px;border:1px solid var(--line);display:block;margin:20px auto}
+video{max-width:100%;height:auto;border-radius:10px;border:1px solid var(--line);display:block;margin:0 auto 6px}
+figure{margin:24px 0}figcaption{text-align:center;color:var(--paper-dim);font-size:.82rem;font-family:-apple-system,system-ui,sans-serif}
+blockquote{border-left:3px solid var(--line);margin:1em 0;padding:4px 0 4px 16px;color:var(--paper-dim)}
+.post-list{list-style:none;padding:0}.post-list li{margin:0 0 26px;padding-bottom:22px;border-bottom:1px solid var(--line)}
+.post-list a{font-size:1.3rem;text-decoration:none;color:var(--paper);font-weight:600}
+.post-list .d{color:var(--paper-dim);font-size:.95rem;margin-top:4px}
+footer{border-top:1px solid var(--line);padding:22px 0;color:var(--paper-dim);font-size:.85rem;font-family:-apple-system,system-ui,sans-serif}
+</style></head>
+<body><div class="wrap">
+<header class="top"><a class="wordmark" href="/">RuleReceipt</a><nav class="nav"><a href="/blog">blog</a><a href="/">home</a></nav></header>
+<article>
+<h1>Did your agent ignore your rule, or never see it?</h1>
+<div class="meta">2026-10-21 · Chapter 2: ignored, or never saw it? · <a href="/blog">RuleReceipt blog</a></div>
+<p>There are two very different reasons an agent breaks a rule you wrote down.</p>
+<p>The first one is the one everybody pictures: the rule was right there in context, the agent read it, and it did the thing anyway. That is the agent ignoring you.</p>
+<p>The second one is quieter: the rule never loaded. The agent never had it in context when it made the edit, so it was never really given the choice. That is not the agent ignoring you. It never saw the rule.</p>
+<p>If a tool treats those two the same, it gives you the wrong answer every time the rule never loaded. So RuleReceipt keeps them apart.</p>
+<h2>Why a rule goes missing</h2>
+<p>Rules do not only live in the top-level <code>CLAUDE.md</code>. A lot of teams put a smaller rules file deeper in the tree, next to the code it governs: <code>src/payments/CLAUDE.md</code> with one line about the billing code, <code>infra/CLAUDE.md</code> with one line about the cluster. Those nested files only load when the agent actually opens something in that folder.</p>
+<p>Two things routinely stop that from happening:</p>
+<ol><li><strong>Compaction.</strong> Long sessions get compacted to save context. The summary that survives may not carry a nested rule that loaded an hour ago. After the compaction, the rule is gone from context, even though it loaded earlier.</li><li><strong>How the file was read.</strong> Whether reading a nested rules file actually loads it depends on your Claude Code version. This is tracked upstream as <a href="https://github.com/anthropics/claude-code/issues/90450">issue #90450</a>. In older versions a shell read loaded nothing. From 2.1.293 a plain single-file read loads the nested rule, but only with no pipe, no redirect, no chain. The exact table was measured against Claude Code 2.1.296 by a developer, yishait-tailor, using an InstructionsLoaded hook as ground truth: <code>cat</code>, <code>head</code>, <code>tail</code>, <code>nl</code>, <code>bat</code>, <code>sed -n</code>, <code>grep</code> and <code>rg</code> load it, but a pipe, a <code>2&gt;/dev/null</code> redirect, a <code>grep -r</code>, or a <code>cd dir &amp;&amp; cat file</code> load nothing.</li></ol>
+<p>This is not an edge case. On the same issue, another developer, miguelbacalhau, went through 1,749 real Claude Code transcripts and checked each change against the rules that should have covered it. Of the edits to files a rule covered, 67 percent were made with at least one matching rule not loaded. For writes of a new file it was 78 percent. The quiet case is the common one.</p>
+<p>RuleReceipt reads the version your session recorded and applies the matching table, so it does not accuse an agent of ignoring a rule its version never loaded from that kind of read.</p>
+<h2>What the receipt looks like</h2>
+<p>Here is a demo session. It is <strong>demo data</strong>, not a real incident: a small project with a nested rule.</p>
+<pre><code># src/payments/CLAUDE.md
+## 1. Never edit files under `src/payments/` without approval</code></pre>
+<p>The session was recorded on Claude Code 2.1.288, it got compacted partway through, and after the compaction the agent edited <code>src/payments/charge.ts</code>. It never opened the nested rules file first. This is the full, real output:</p>
+<pre><code>RuleReceipt · 2 rules checked
+────────────────────────────────────────
+
+⚠ Never loaded (1)
+  advisory, not a verdict — a file these rules cover was edited, with no record the rule was loaded first
+  • Never edit files under `src/payments/` without approval
+
+Checked — observable rules (2)
+
+Rule not visible (not a violation) (1)
+✕ FAIL    Rule 1 (project) — Never edit files under `src/payments/` without approval
+  ↳ ~/code/web-api/src/payments/CLAUDE.md:3
+  evidence: &quot;src/payments/&quot; was actually modified: Edit on src/payments/charge.ts
+  not a violation: the agent never had this rule in context at that moment.
+  fix: The rules file was in context earlier but not after the last compaction. Add a post-compaction hook (SessionStart:compact) that re-injects your rules.
+
+Couldn't tell (1)
+? UNCLEAR Rule 1 (project) — Run `npm test` before you push
+  ↳ ~/code/web-api/CLAUDE.md:3
+  evidence: required pattern &quot;npm test&quot; was not actually run this session — can't tell if the rule didn't apply, or applied and was skipped
+
+────────────────────────────────────────
+0 followed · 0 not followed · 1 rule not visible · 1 couldn't tell</code></pre>
+<figure>
+<img src="/media/blog/02-never-loaded-report.png" alt="RuleReceipt HTML report for the demo session. Headline: No rule violations found, 1 couldn't be determined. Counts: 0 followed, 0 not followed, 1 rule not visible, 1 couldn't tell. A Never loaded advisory at the top, and a Rule not visible (not a violation) section for the edit to src/payments/charge.ts." />
+<figcaption>The same session as a shareable HTML report (demo session). The edit is shown, but filed under "Rule not visible", not counted as a violation.</figcaption>
+</figure>
+<p>The edit was found. RuleReceipt saw that <code>src/payments/charge.ts</code> was modified. But it did not count it as a violation, because the rule was never in context at that moment. It puts the break under &quot;Rule not visible&quot;, tells you why, and the tally reads zero not followed.</p>
+<p>Now the same edit, the same rule, one thing changed: this session was on 2.1.296 and the agent ran <code>cat src/payments/CLAUDE.md</code> before the edit, so the rule loaded. Same check, full output:</p>
+<pre><code>RuleReceipt · 2 rules checked
+────────────────────────────────────────
+
+Checked — observable rules (2)
+
+Not followed (1)
+✕ FAIL    Rule 1 (project) — Never edit files under `src/payments/` without approval
+  ↳ ~/code/web-api/src/payments/CLAUDE.md:3
+  evidence: &quot;src/payments/&quot; was actually modified: Edit on src/payments/charge.ts
+     why it broke:
+       your rules file was in context before this.
+
+Couldn't tell (1)
+? UNCLEAR Rule 1 (project) — Run `npm test` before you push
+  ↳ ~/code/web-api/CLAUDE.md:3
+  evidence: required pattern &quot;npm test&quot; was not actually run this session — can't tell if the rule didn't apply, or applied and was skipped
+
+────────────────────────────────────────
+0 followed · 1 not followed · 1 couldn't tell</code></pre>
+<p>This time it is a plain FAIL. One not followed. The rule was in context before the edit, the agent had it, and it edited anyway. Same edit, same rule. The only difference is whether the agent saw it, and that is the difference between a violation and a note.</p>
+<h2>The honest part</h2>
+<p>&quot;Not visible&quot; is a possible explanation, not a verdict of innocence. A transcript cannot show you context it never recorded, so RuleReceipt says what it can prove and no more: the file was edited, the rule has no load record, draw your own conclusion. And if a nested folder was never touched at all, that rule is reported &quot;didn't apply&quot;, not a failure. A rule that had nothing to govern this session is not a miss.</p>
+<p>Point it at your last session and see which of your rules actually loaded:</p>
+<pre><code>npx rulereceipt check</code></pre>
+<p>(I built this.)</p>
+</article>
+<footer>RuleReceipt runs locally, nothing uploaded. <a href="/">rulereceipt.dev</a> · <a href="/blog/rss.xml">RSS</a></footer>
+</div></body></html>

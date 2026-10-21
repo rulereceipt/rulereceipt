@@ -5,6 +5,13 @@
   <description>Checking what AI coding agents actually did, against your written rules.</description>
   <language>en</language>
     <item>
+      <title>Did your agent ignore your rule, or never see it?</title>
+      <link>https://rulereceipt.dev/blog/ignored-or-never-saw-it</link>
+      <guid>https://rulereceipt.dev/blog/ignored-or-never-saw-it</guid>
+      <pubDate>Wed, 21 Oct 2026 09:00:00 GMT</pubDate>
+      <description>A rule can break two ways: the agent read it and ignored it, or the rule never loaded at all. Those are different problems, and RuleReceipt tells them apart. A break on a rule that never loaded is shown, but not counted as a violation.</description>
+    </item>
+    <item>
       <title>I wrote a rule. My agent broke it anyway.</title>
       <link>https://rulereceipt.dev/blog/three-rules</link>
       <guid>https://rulereceipt.dev/blog/three-rules</guid>
