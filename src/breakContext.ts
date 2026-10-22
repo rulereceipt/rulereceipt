@@ -80,7 +80,16 @@ function needles(evidence: string): string[] {
   // "/Users/…/.env" is distinctive. Placement-only; never changes a verdict.
   // (2026-10-20) A path token must contain a slash or end in an alphabetic
   // extension, so a bare version like "0.1.115" is not treated as a filename.
-  const paths = [...evidence.matchAll(/[^\s"'`,;()]*\/[^\s"'`,;()]+|[\w-]+(?:\.[\w-]+)*\.[A-Za-z][A-Za-z0-9]{0,11}/g)].map((m) => m[0]);
+  // Split on the delimiter class FIRST (linear), then test each token, instead
+  // of one global regex whose greedy alternatives backtracked O(n^2) over a long
+  // unbroken run (a 200k single-token evidence string took ~70s — real ReDoS,
+  // 2026-10-22). A token is a path when it holds a slash with a character after
+  // it, or contains a dotted alphabetic extension (<=12 chars). Both predicates
+  // are backtracking-free. Equivalent needles on real evidence (frozen-44 +
+  // breakContext/timeline placement tests unchanged).
+  const paths = evidence
+    .split(/[\s"'`,;()]+/)
+    .filter((t) => t.length > 0 && (/\/[^\s"'`,;()]/.test(t) || /\.[A-Za-z][A-Za-z0-9]{0,11}/.test(t)));
   const general = [...quoted, after].map(clean).filter((s) => s.length >= 6);
   const files = paths.map(clean).filter((s) => /[/.]/.test(s) && s.length >= 4);
   return [...general, ...files].sort((a, b) => b.length - a.length);
