@@ -563,7 +563,7 @@ export function runClaimEvidenceChecks(
           `${namedFail.line.replace(/\s+/g, " ").trim()}`,
       };
     }
-    if (scopedPartial && !contradiction && !namedFail) {
+    if (scopedPartial && !contradiction) {
       return unclear(
         rule,
         `the session stated: "${scopedPartial.claim}" — a claim about ONE named test, but the run ` +

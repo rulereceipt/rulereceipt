@@ -47,6 +47,9 @@ const FROZEN_DIR = join(
   process.cwd(),
   "tests",
   "fixtures",
+  // v5/v6 are intentionally NOT selectable here: they are pairwise EXPECTATION
+  // corpora with MUST-FAIL teeth (see their EXPECTATIONS.md), enforced by
+  // tests/faFrozen.test.ts, not by this 0-FAIL false-accusation-rate gate.
   process.argv.includes("--v4") ? "fa-corpus-v4" : process.argv.includes("--v3") ? "fa-corpus-v3" : process.argv.includes("--v2") ? "fa-corpus-v2" : "fa-corpus-v1"
 );
 const CORPUS = FROZEN ? join(FROZEN_DIR, "rules") : join(process.cwd(), "corpus");

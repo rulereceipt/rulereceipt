@@ -29,6 +29,37 @@ interface ReceiptResult {
 
 const MAX_EVIDENCE = 160;
 
+/**
+ * Neutralise an untrusted string for safe INLINE rendering in a public PR
+ * comment (rule titles, the tool version). A fork PR controls the receipt and
+ * the CLAUDE.md it was checked against, and this text is posted by the repo's
+ * token, so it must not be able to:
+ *   - inject raw HTML or break out of the <details> fold  -> escape & < >
+ *   - notify a third party with an @mention               -> @ becomes &#64;
+ *   - forge an issue/PR cross-reference (#123)            -> # becomes &#35;
+ *   - disguise a link as safe text ([text](url))          -> [ ] become entities
+ *
+ * Each replacement renders as the LITERAL glyph on GitHub (so "@ravikiran" is
+ * still read as "@ravikiran") but carries no markdown or autolink meaning,
+ * because the autolinker and HTML sanitiser see an entity, not the trigger
+ * character. Ampersand is escaped first so the introduced entities are not
+ * themselves double-escaped. Evidence is NOT run through this — it is wrapped in
+ * a code span, inside which every one of these is already inert.
+ */
+function neutralizeMarkdown(value: string): string {
+  // Order matters: the entities we introduce contain '&' and '#', so those
+  // replacement steps must run BEFORE the '@'/'['/']' steps, or a '#' inside a
+  // freshly-introduced "&#64;" would itself be re-encoded into "&&#35;64;".
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/#/g, "&#35;")
+    .replace(/@/g, "&#64;")
+    .replace(/\[/g, "&#91;")
+    .replace(/\]/g, "&#93;");
+}
+
 /** First line of evidence, redacted, collapsed and capped — never multi-line in a list item. */
 function oneLineEvidence(raw: string): string {
   const first = redact(raw).split(/\r?\n/)[0].trim();
@@ -38,7 +69,8 @@ function oneLineEvidence(raw: string): string {
 }
 
 function title(raw: unknown): string {
-  return redact(String(raw ?? "")).replace(/\s+/g, " ").trim() || "(untitled rule)";
+  const t = redact(String(raw ?? "")).replace(/\s+/g, " ").trim();
+  return t ? neutralizeMarkdown(t) : "(untitled rule)";
 }
 
 function item(r: ReceiptResult, marker: string): string {
@@ -69,7 +101,8 @@ export function renderPrComment(receipt: Receipt): string {
 
   const s = receipt.summary ?? { total: results.length, pass: followed.length, fail: broken.length, unclear: cantTell.length };
   const headline = `**RuleReceipt** — ${broken.length} broken · ${followed.length} followed · ${cantTell.length} can't tell`;
-  const ver = receipt.version ? ` _(rulereceipt ${receipt.version})_` : "";
+  // version is untrusted (it comes from the committed receipt) and public here.
+  const ver = receipt.version ? ` _(rulereceipt ${neutralizeMarkdown(String(receipt.version))})_` : "";
 
   const out: string[] = [headline + ver, ""];
 
@@ -95,10 +128,14 @@ export function renderPrComment(receipt: Receipt): string {
     out.push(`${notVisible.length} rule${notVisible.length === 1 ? "" : "s"} would have broken but weren't loaded into the session's context, so they aren't counted as broken.`, "");
   }
 
+  // total is untrusted (receipt JSON) — coerce to a non-negative integer so a
+  // string like "</sub>@everyone" can never reach the public comment.
+  const rawTotal = receipt.summary?.total ?? results.length;
+  const total = Number.isFinite(Number(rawTotal)) ? Math.max(0, Math.trunc(Number(rawTotal))) : results.length;
   out.push(
     "",
     `<sub>Checked locally from the session log; the transcript never leaves the machine. ${
-      s.pass + s.fail + s.unclear >= 0 ? `${receipt.summary?.total ?? results.length} rules total.` : ""
+      s.pass + s.fail + s.unclear >= 0 ? `${total} rules total.` : ""
     } Verify: \`rulereceipt verify-receipt\`.</sub>`,
   );
 

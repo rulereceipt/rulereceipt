@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync, statSync, realpathSync, existsSync, openSync, readSync, closeSync } from "node:fs";
+import { readFileSync, readdirSync, statSync, fstatSync, realpathSync, existsSync, openSync, readSync, closeSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, dirname, basename, sep, isAbsolute } from "node:path";
 import { parseTranscriptText, parseLine } from "./transcriptLine.js";
@@ -285,62 +285,85 @@ export function readTranscriptWithCoverage(
 ): TranscriptCoverage {
   const maxBytes = opts.maxBytes ?? maxTranscriptBytes();
   const timeBudgetMs = opts.timeBudgetMs ?? DEFAULT_TIME_BUDGET_MS;
-  let totalBytes = 0;
-  try { totalBytes = statSync(filePath).size; } catch { /* unreadable -> 0 */ }
 
-  // Small files: the whole-string path keeps the exact, long-tested behaviour.
-  if (totalBytes <= maxBytes) {
-    let raw = "";
-    try { raw = readFileSync(filePath, "utf-8"); } catch { return { events: [], truncated: false, bytesRead: 0, totalBytes }; }
-    return { events: parseTranscriptText(raw), truncated: false, bytesRead: Buffer.byteLength(raw), totalBytes };
-  }
-
-  // Large file: stream, bounded.
-  const events: TranscriptEvent[] = [];
-  let mode: string | undefined;
-  let bytesRead = 0;
-  let truncated = false;
-  const started = Date.now();
-  const processLine = (line: string): void => {
-    if (!line.trim()) return;
-    const m =
-      line.match(/"(?:permissionMode|permission_mode)":"([A-Za-z]+)"/) ??
-      (line.includes('"permission-mode"') ? line.match(/"mode":"([A-Za-z]+)"/) : null);
-    if (m) mode = m[1];
-    const parsed = parseLine(line);
-    if (mode) for (const e of parsed) if (e.kind === "tool_use") e.permissionMode = mode;
-    for (const e of parsed) events.push(e);
-  };
-
+  // Open once and size the file by fstat-ing the OPEN descriptor, not the path,
+  // so there is no check-then-use (TOCTOU) window between measuring the file and
+  // reading it: the size and every byte come from the same handle.
   let fd: number | undefined;
   try {
     fd = openSync(filePath, "r");
-    const buf = Buffer.allocUnsafe(READ_CHUNK);
-    let carry = "";
-    for (;;) {
-      if (bytesRead >= maxBytes) { truncated = true; break; }
-      if (Date.now() - started > timeBudgetMs) { truncated = true; break; }
-      // Read at most the remaining budget, so the read stops PRECISELY at maxBytes
-      // rather than overshooting by up to one chunk (which would read a whole
-      // sub-chunk file even past the budget).
-      const want = Math.min(READ_CHUNK, maxBytes - bytesRead);
-      const n = readSync(fd, buf, 0, want, null);
-      if (n === 0) break; // EOF
-      bytesRead += n;
-      const text = carry + buf.toString("utf-8", 0, n);
-      const lines = text.split("\n");
-      carry = lines.pop() ?? ""; // last element is a partial line (or "")
-      for (const line of lines) processLine(line);
-    }
-    // A clean EOF (not truncated) leaves a final line with no trailing newline.
-    if (!truncated && carry) processLine(carry);
   } catch {
-    /* partial read: return what we parsed, marked truncated below if applicable */
+    return { events: [], truncated: false, bytesRead: 0, totalBytes: 0 };
+  }
+
+  try {
+    const totalBytes = fstatSync(fd).size;
+
+    // Small files: the whole-string path keeps the exact, long-tested behaviour.
+    if (totalBytes <= maxBytes) {
+      let raw = "";
+      try {
+        if (totalBytes > 0) {
+          const whole = Buffer.allocUnsafe(totalBytes);
+          let off = 0;
+          while (off < totalBytes) {
+            const got = readSync(fd, whole, off, totalBytes - off, off);
+            if (got === 0) break; // file shrank under us — parse what we have
+            off += got;
+          }
+          raw = whole.toString("utf-8", 0, off);
+        }
+      } catch {
+        return { events: [], truncated: false, bytesRead: 0, totalBytes };
+      }
+      return { events: parseTranscriptText(raw), truncated: false, bytesRead: Buffer.byteLength(raw), totalBytes };
+    }
+
+    // Large file: stream, bounded.
+    const events: TranscriptEvent[] = [];
+    let mode: string | undefined;
+    let bytesRead = 0;
+    let truncated = false;
+    const started = Date.now();
+    const processLine = (line: string): void => {
+      if (!line.trim()) return;
+      const m =
+        line.match(/"(?:permissionMode|permission_mode)":"([A-Za-z]+)"/) ??
+        (line.includes('"permission-mode"') ? line.match(/"mode":"([A-Za-z]+)"/) : null);
+      if (m) mode = m[1];
+      const parsed = parseLine(line);
+      if (mode) for (const e of parsed) if (e.kind === "tool_use") e.permissionMode = mode;
+      for (const e of parsed) events.push(e);
+    };
+
+    try {
+      const buf = Buffer.allocUnsafe(READ_CHUNK);
+      let carry = "";
+      for (;;) {
+        if (bytesRead >= maxBytes) { truncated = true; break; }
+        if (Date.now() - started > timeBudgetMs) { truncated = true; break; }
+        // Read at most the remaining budget, so the read stops PRECISELY at maxBytes
+        // rather than overshooting by up to one chunk (which would read a whole
+        // sub-chunk file even past the budget).
+        const want = Math.min(READ_CHUNK, maxBytes - bytesRead);
+        const n = readSync(fd, buf, 0, want, null);
+        if (n === 0) break; // EOF
+        bytesRead += n;
+        const text = carry + buf.toString("utf-8", 0, n);
+        const lines = text.split("\n");
+        carry = lines.pop() ?? ""; // last element is a partial line (or "")
+        for (const line of lines) processLine(line);
+      }
+      // A clean EOF (not truncated) leaves a final line with no trailing newline.
+      if (!truncated && carry) processLine(carry);
+    } catch {
+      /* partial read: return what we parsed, marked truncated below if applicable */
+    }
+    if (bytesRead < totalBytes) truncated = true;
+    return { events, truncated, bytesRead, totalBytes };
   } finally {
     if (fd !== undefined) try { closeSync(fd); } catch { /* ignore */ }
   }
-  if (bytesRead < totalBytes) truncated = true;
-  return { events, truncated, bytesRead, totalBytes };
 }
 
 /**
@@ -351,19 +374,29 @@ export function readTranscriptWithCoverage(
  * say the scan only covered the first N bytes.
  */
 export function readBoundedText(filePath: string, maxBytes = maxTranscriptBytes()): { text: string; truncated: boolean; totalBytes: number } {
-  let totalBytes = 0;
-  try { totalBytes = statSync(filePath).size; } catch { return { text: "", truncated: false, totalBytes: 0 }; }
-  if (totalBytes <= maxBytes) {
-    try { return { text: readFileSync(filePath, "utf-8"), truncated: false, totalBytes }; } catch { return { text: "", truncated: false, totalBytes }; }
-  }
+  // Open once and size via fstat on the OPEN descriptor, not the path, so the
+  // size and the bytes come from the same handle with no TOCTOU window between.
   let fd: number | undefined;
   try {
     fd = openSync(filePath, "r");
-    const buf = Buffer.allocUnsafe(maxBytes);
-    const n = readSync(fd, buf, 0, maxBytes, 0);
-    return { text: buf.toString("utf-8", 0, n), truncated: true, totalBytes };
   } catch {
-    return { text: "", truncated: true, totalBytes };
+    return { text: "", truncated: false, totalBytes: 0 };
+  }
+  try {
+    const totalBytes = fstatSync(fd).size;
+    const truncated = totalBytes > maxBytes;
+    const want = truncated ? maxBytes : totalBytes;
+    if (want === 0) return { text: "", truncated, totalBytes };
+    const buf = Buffer.allocUnsafe(want);
+    let off = 0;
+    while (off < want) {
+      const n = readSync(fd, buf, off, want - off, off);
+      if (n === 0) break; // EOF (file shrank) — return what we have
+      off += n;
+    }
+    return { text: buf.toString("utf-8", 0, off), truncated, totalBytes };
+  } catch {
+    return { text: "", truncated: false, totalBytes: 0 };
   } finally {
     if (fd !== undefined) try { closeSync(fd); } catch { /* ignore */ }
   }

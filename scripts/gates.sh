@@ -35,6 +35,11 @@ run "false-accusation v1"       npx tsx scripts/false-accusation-rate.ts --froze
 run "false-accusation v2"       npx tsx scripts/false-accusation-rate.ts --frozen --v2
 run "false-accusation v3"       npx tsx scripts/false-accusation-rate.ts --frozen --v3
 run "false-accusation v4"       npx tsx scripts/false-accusation-rate.ts --frozen --v4
+# NOTE: fa-corpus-v5 and -v6 are PAIRWISE EXPECTATION corpora (see their
+# EXPECTATIONS.md) — each carries intentional MUST-FAIL "teeth", so they are NOT
+# 0-FAIL cross-products and must NOT be run through this 0-FAIL FA-rate gate.
+# They are enforced with their correct expectation semantics (NOFAIL pairs stay
+# clean AND MUST-FAIL pairs fire) by tests/faFrozen.test.ts in the suite above.
 run "surface count parity"      node scripts/surface-parity.mjs
 run "release tarball install"   bash scripts/validate-release.sh
 

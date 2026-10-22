@@ -1,5 +1,6 @@
-import { statSync, readFileSync } from "node:fs";
+import { statSync } from "node:fs";
 import { listAllSessions } from "./adapters/index.js";
+import { readBoundedText } from "./parsers/transcriptParser.js";
 import { evaluateSession } from "./evaluate.js";
 import { applyVisibility } from "./visibility.js";
 import { detectShadowSignals } from "./checks/shadowSignals.js";
@@ -134,20 +135,28 @@ export async function scanHistory(
     // the mtime only when the transcript carries no usable timestamp.
     const sessionMs = lastEventMs(events) ?? ms;
     const { results: rawResults } = await evaluateSession(cwd, rules, events, false, needsLlmResult);
+    // Read the raw transcript ONCE, bounded and via a single file descriptor
+    // (readBoundedText fstat's the open handle — no stat-then-read race, and a
+    // huge session can't blow up memory here any more than it does in `check`).
+    // Reused for both the advisory scan and the visibility pass below.
+    let rawText: string | undefined;
+    try {
+      const r = readBoundedText(file);
+      rawText = r.text || undefined;
+    } catch { /* keep undefined — a read failure must not sink the scan */ }
     // Never-loaded (advisory): a rule whose covered file was edited with no record
     // the rule loaded first. Aggregated for the ranking's secondary signal.
-    try {
-      const tx = readFileSync(file, "utf-8");
-      for (const f of detectShadowSignals(rules, events, tx)) {
-        if (f.signal === "edited-rule-not-loaded") {
-          neverLoaded.add(f.evidence.match(/governed by "([^"]+)"/)?.[1] ?? f.evidence);
+    if (rawText) {
+      try {
+        for (const f of detectShadowSignals(rules, events, rawText)) {
+          if (f.signal === "edited-rule-not-loaded") {
+            neverLoaded.add(f.evidence.match(/governed by "([^"]+)"/)?.[1] ?? f.evidence);
+          }
         }
-      }
-    } catch { /* advisory only — a read failure must not sink the scan */ }
+      } catch { /* advisory only — a read failure must not sink the scan */ }
+    }
     // "Rule not visible" (#4): a FAIL whose rule wasn't in context is not a break
     // here either, so the headline count stays honest across sessions.
-    let rawText: string | undefined;
-    try { rawText = readFileSync(file, "utf-8"); } catch { /* keep undefined */ }
     const results = applyVisibility(rawResults, rawText);
     for (const r of results) {
       const k = key(r);
