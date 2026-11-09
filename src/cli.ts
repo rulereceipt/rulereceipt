@@ -49,6 +49,7 @@ import { buildTeamExport, parseExport, mergeTeamExports, renderTeamHtml } from "
 import { applyVisibility } from "./visibility.js";
 import { teamPlanNote } from "./teamPlan.js";
 import { activateLicense } from "./license/activate.js";
+import { buildHookPlan, renderHookPlan } from "./hookGen.js";
 import { gateOffer, hookIsInstalled } from "./report/gateOffer.js";
 import { generateHtmlReport } from "./report/generateHtmlReport.js";
 import { buildTimeline, renderTimelineHtml } from "./timeline.js";
@@ -283,6 +284,8 @@ interface CheckOptions {
   requireSession: boolean;
   /** List the items the classifier decided were documentation, so a misclassified rule can be seen rather than silently dropped. */
   showSkipped: boolean;
+  /** Print paste-ready enforcement (permissions / guard) for the mechanically-checkable rules that broke or were unclear. Never writes settings. */
+  hooks: boolean;
   transcriptOverride?: string;
   /** false = not requested; true = default path; string = explicit path. A shareable team export (verdicts + evidence only, no transcript). */
   exportPath?: boolean | string;
@@ -291,7 +294,7 @@ interface CheckOptions {
 }
 
 async function runCheck(opts: CheckOptions) {
-  const { markdown, json, checkUpdates, share, email, emailAlways, llm, telemetry, html, timeline, exitZero, requireSession, showSkipped, transcriptOverride, exportPath, dev } = opts;
+  const { markdown, json, checkUpdates, share, email, emailAlways, llm, telemetry, html, timeline, exitZero, requireSession, showSkipped, hooks, transcriptOverride, exportPath, dev } = opts;
   // When --transcript points at a session recorded in ANOTHER project, load the
   // rules from that project's cwd (where the agent actually ran) rather than
   // wherever this command happens to be invoked — otherwise a Codex rollout from
@@ -560,6 +563,13 @@ async function runCheck(opts: CheckOptions) {
     // group, so keep it there.
     const shadowLines = renderShadowSignals(markdown ? shadowFindings : shadowFindings.filter((f) => f.signal !== "edited-rule-not-loaded"));
     if (shadowLines.length) console.log(shadowLines.join("\n"));
+    // --hooks: paste-ready enforcement for the mechanically-checkable rules that
+    // broke or were unclear. Opt-in (keeps default output clean); never writes
+    // settings; built on blockHintFor so it never overclaims a block.
+    if (hooks) {
+      const hookLines = renderHookPlan(buildHookPlan(rules, results));
+      if (hookLines.length) console.log(`\n${hookLines.join("\n")}`);
+    }
     // Name the tool when it is not the default Claude Code, so a Codex run is
     // not silently reported as if it were a Claude session.
     const sourceNote = transcriptOverride ? null : sessionSourceNote(cwd);
@@ -779,6 +789,10 @@ program
     "list the items that were treated as documentation and not checked. Worth running once on any rules file: the classifier is a heuristic over English verbs, so a rule it does not recognise is otherwise dropped without you seeing it."
   )
   .option(
+    "--hooks",
+    "for each rule that broke or came back unclear AND can be enforced mechanically, print a ready-to-paste Claude Code permission / `rulereceipt protect` guard that would stop it next time. Never writes your settings. Judgment rules are reported as such, not dressed up as a block."
+  )
+  .option(
     "--transcript <path>",
     "manual override: check this exact .jsonl session file instead of auto-detecting one. Useful if your Claude Code session lives somewhere non-standard that auto-detection doesn't cover."
   )
@@ -812,6 +826,7 @@ program
       exitZero: Boolean(opts.exitZero),
       requireSession: Boolean(opts.requireSession),
       showSkipped: Boolean(opts.showSkipped),
+      hooks: Boolean(opts.hooks),
       transcriptOverride: opts.transcript,
       exportPath: opts.export ?? false,
       dev: opts.dev,
