@@ -3,9 +3,10 @@
  * the CLI (the landing pages mirror these exact values; keep them in sync).
  *
  * OPEN-CORE: this file holds only a LINK, a flag, and copy — never any paid-tier
- * LOGIC. Real licence/key validation and the hosted team service live in the
- * separate PRIVATE repo. `activate` here does not validate or unlock anything;
- * while the flag is off it only points at early access.
+ * LOGIC. Offline licence VERIFICATION (public key only, verify-only) lives in
+ * `src/license/` and backs `rulereceipt activate`; SIGNING/issuance, the webhook
+ * and the hosted team service live in the separate PRIVATE repo. No private key
+ * or paid-tier logic is in this repo.
  *
  * TEAM_CHECKOUT_LIVE stays `false` until Polar setup is done and a test purchase
  * works. While false, every surface shows "early access, contact …" and no
@@ -32,17 +33,4 @@ export function teamPlanNote(): string {
     );
   }
   return `Team plan (trends over time, history, cross-repo dashboards): early access — contact ${TEAM_PLAN.contact}.`;
-}
-
-/** What `rulereceipt activate <key>` prints. No validation here — that is the private tier. */
-export function activateNote(key: string): string {
-  const masked = key.length > 6 ? `${key.slice(0, 3)}…${key.slice(-2)}` : "(key)";
-  if (!TEAM_PLAN.live) {
-    return `Team plan is in early access — nothing to activate yet. Contact ${TEAM_PLAN.contact} and we'll set you up.`;
-  }
-  return (
-    `Thanks for subscribing. Key ${masked} noted.\n` +
-    `Activation and the hosted team features are handled by the Team service (see rulereceipt.dev/#signup (team waitlist)).\n` +
-    `Manage your subscription: ${TEAM_PLAN.portalUrl || TEAM_PLAN.contact}`
-  );
 }

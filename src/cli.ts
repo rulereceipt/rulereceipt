@@ -47,7 +47,8 @@ import { runGuard } from "./guard.js";
 import { generateReport, generateMarkdownReport, generateJsonReport, computeTranscriptHash, type ReportMeta } from "./report/generateReport.js";
 import { buildTeamExport, parseExport, mergeTeamExports, renderTeamHtml } from "./teamExport.js";
 import { applyVisibility } from "./visibility.js";
-import { teamPlanNote, activateNote } from "./teamPlan.js";
+import { teamPlanNote } from "./teamPlan.js";
+import { activateLicense } from "./license/activate.js";
 import { gateOffer, hookIsInstalled } from "./report/gateOffer.js";
 import { generateHtmlReport } from "./report/generateHtmlReport.js";
 import { buildTimeline, renderTimelineHtml } from "./timeline.js";
@@ -1914,9 +1915,11 @@ program
 
 program
   .command("activate <key>")
-  .description("activate a Team plan seat. (Early access while the paid tier is being set up.)")
+  .description("activate a Team licence key — verifies it offline and stores the entitlement locally.")
   .action((key: string) => {
-    console.log(activateNote(key));
+    const out = activateLicense(key);
+    console.log(out.message);
+    process.exitCode = out.exitCode;
   });
 
 // Bare `rulereceipt` (no subcommand, no flags) runs history mode — the first-run
