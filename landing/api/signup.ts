@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from "./vercel-types.js";
 import { redis, rateLimited, withRedis, tooLarge } from "./_shared.js";
+import { doubleOptInEnabled, createPending, sendConfirmEmail } from "./_doubleOptIn.js";
 
 // Optional "get early access / updates" email signup. Separate from the CLI
 // entirely — running `rulereceipt check`/`demo` still requires no account and
@@ -72,6 +73,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const normalized = email.trim().toLowerCase();
+
+  // Double opt-in (only when flagged AND Resend is configured): store a pending
+  // token and email a confirm link instead of adding the address now. The
+  // address joins the list only when the link is opened. An already-confirmed
+  // address is skipped (no re-send). The HTTP response stays uniform either way,
+  // so this is not an enumeration oracle.
+  if (doubleOptInEnabled()) {
+    if (!(await withRedis(res, async () => {
+      const already = await redis.sismember("rulereceipt:signups", normalized);
+      if (!already) {
+        const token = await createPending(redis, normalized);
+        const base = process.env.SITE_ORIGIN ?? "https://rulereceipt.dev";
+        await sendConfirmEmail(
+          normalized,
+          `${base}/api/confirm?token=${token}`,
+          { apiKey: process.env.RESEND_API_KEY ?? "", from: process.env.LICENSE_FROM_EMAIL ?? "RuleReceipt <hello@rulereceipt.dev>" }
+        );
+      }
+    }))) return;
+    res.status(200).json({ ok: true });
+    return;
+  }
+
+  // Single opt-in (default until double opt-in is enabled).
   if (!(await withRedis(res, async () => { await redis.sadd("rulereceipt:signups", normalized); }))) return;
 
   // Uniform response regardless of whether this email was already present -

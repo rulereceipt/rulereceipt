@@ -5,11 +5,13 @@ export function mockReq(opts: {
   method?: string;
   body?: unknown;
   headers?: Record<string, string>;
+  query?: Record<string, string | string[]>;
 }): VercelRequest {
   return {
     method: opts.method ?? "GET",
     headers: opts.headers ?? {},
     body: opts.body,
+    query: opts.query ?? {},
   } as unknown as VercelRequest;
 }
 
@@ -51,15 +53,19 @@ export function mockRes(): MockRes {
 // In-memory stand-in for the Upstash Redis client, scoped to what
 // signup.ts/share.ts actually call. Reset between tests via clear().
 export function createMockRedis() {
-  const store = new Map<string, number>();
+  const store = new Map<string, number | string>();
   const sets = new Map<string, Set<string>>();
 
   return {
     incr: vi.fn(async (key: string) => {
-      const next = (store.get(key) ?? 0) + 1;
+      const next = (Number(store.get(key) ?? 0)) + 1;
       store.set(key, next);
       return next;
     }),
+    // String KV (double opt-in pending tokens): set/get/del + sismember.
+    set: vi.fn(async (key: string, value: string) => { store.set(key, value); return "OK"; }),
+    del: vi.fn(async (key: string) => (store.delete(key) ? 1 : 0)),
+    sismember: vi.fn(async (key: string, member: string) => (sets.get(key)?.has(member) ? 1 : 0)),
     expire: vi.fn(async () => 1),
     // Pretend keys already carry a TTL, so the rateLimited() TTL-guard's extra
     // branch is a no-op in tests; the count logic (what the tests assert) is

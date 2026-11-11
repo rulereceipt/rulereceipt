@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mockReq, mockRes, createMockRedis } from "./testUtils.js";
 
 const redisInstance = createMockRedis();
@@ -164,5 +164,41 @@ describe("email-enumeration regression (real fix, 2026-08-28)", () => {
     const { res, jsonBody } = mockRes();
     await handler(mockReq({ method: "POST", body: { email: "checked@example.com" } }), res);
     expect(jsonBody()).not.toHaveProperty("already_registered");
+  });
+});
+
+describe("double opt-in (flag on)", () => {
+  const fetchMock = vi.fn(async () => ({ ok: true, status: 200, text: async () => "" }));
+  beforeEach(() => {
+    process.env.SIGNUP_DOUBLE_OPT_IN = "1";
+    process.env.RESEND_API_KEY = "re_test";
+    vi.stubGlobal("fetch", fetchMock);
+  });
+  afterEach(() => {
+    delete process.env.SIGNUP_DOUBLE_OPT_IN;
+    delete process.env.RESEND_API_KEY;
+    vi.unstubAllGlobals();
+  });
+
+  it("does NOT add the address yet — stores a pending token and emails a confirm link", async () => {
+    const { res, statusCode, jsonBody } = mockRes();
+    await handler(mockReq({ method: "POST", body: { email: "new@example.com" } }), res);
+    expect(statusCode()).toBe(200);
+    expect(jsonBody()).toEqual({ ok: true });
+    // not confirmed yet
+    expect(redisInstance._sets.get("rulereceipt:signups")?.has("new@example.com") ?? false).toBe(false);
+    // a pending token was stored, and a confirm email was sent
+    const pendingKeys = [...redisInstance._store.keys()].filter((k) => k.startsWith("rulereceipt:pending:"));
+    expect(pendingKeys.length).toBe(1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("skips re-sending to an already-confirmed address, response still uniform", async () => {
+    await redisInstance.sadd("rulereceipt:signups", "already@example.com");
+    const { res, statusCode, jsonBody } = mockRes();
+    await handler(mockReq({ method: "POST", body: { email: "already@example.com" } }), res);
+    expect(statusCode()).toBe(200);
+    expect(jsonBody()).toEqual({ ok: true });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
