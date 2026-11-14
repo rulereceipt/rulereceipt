@@ -10,7 +10,7 @@
     {
       "name": "rulereceipt",
       "source": "./plugin",
-      "description": "rulereceipt skill + /rulereceipt:check, :audit, :health, :why. Runs the rulereceipt CLI locally; no hooks installed, zero network calls, blocks nothing — it reports after the fact.",
+      "description": "rulereceipt skill + /rulereceipt:check, :doctor, :report, :audit, :health, :why. Runs the rulereceipt CLI locally at a pinned version; no hooks installed, no settings written, no telemetry — it reports after the fact and blocks nothing.",
       "category": "quality",
       "tags": ["rules", "audit", "compliance", "claude-code"]
     }

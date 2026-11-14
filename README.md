@@ -16,6 +16,15 @@
 npx rulereceipt
 ```
 
+**Install as a Claude Code plugin** — this repo doubles as a plugin marketplace, so you get `/rulereceipt:check`, `/rulereceipt:doctor` and `/rulereceipt:report` inside Claude Code:
+
+```
+/plugin marketplace add rulereceipt/rulereceipt
+/plugin install rulereceipt@rulereceipt
+```
+
+The plugin is **read-only**: it installs **no hooks**, writes nothing to `settings.json`, sends no telemetry, and calls the CLI pinned to an exact version. It reports after the fact — it never blocks. [Full plugin details ↓](#as-a-claude-code-plugin) · prerequisite: `npm i -g rulereceipt`.
+
 > **Checking your rules file (stale paths, stale commands, contradictions)?** Use Claude Code's built-in `/doctor prompt-audit`, or agnix. RuleReceipt does something different: it checks what your agent actually did in each session against those rules, with the exact line as proof. Not a linter for your rules file; a receipt for your agent's behaviour.
 
 Runs entirely on your machine. Plain `rulereceipt check` makes zero network
@@ -550,16 +559,17 @@ npm install -g rulereceipt
 rulereceipt demo
 ```
 
+<a id="as-a-claude-code-plugin"></a>
 ### As a Claude Code plugin
 
-This repo doubles as a Claude Code plugin marketplace, so you can wire the guard,
-the Stop hook, and the commands in one step instead of editing `.claude/settings.json`
-yourself:
+This repo doubles as a Claude Code plugin marketplace, so you can add the
+`/rulereceipt:*` commands and a skill that suggests a check at the right moment —
+without editing any config yourself.
 
-**Prerequisite:** install the CLI first — `npm i -g rulereceipt`. The plugin's hooks
-call the installed `rulereceipt`; if it isn't on your `PATH` they **fail open** with a
-one-line message (`install: npm i -g rulereceipt`) and let the action through — they
-never silently download anything.
+**Prerequisite:** install the CLI first — `npm i -g rulereceipt`. The plugin's
+commands call the installed `rulereceipt` at a pinned version; if it isn't on your
+`PATH`, `npx` fetches that exact version on first run. The plugin itself downloads
+nothing and installs nothing.
 
 ```bash
 npm i -g rulereceipt            # prerequisite
@@ -568,20 +578,23 @@ claude plugin install rulereceipt@rulereceipt
 ```
 
 The full `https://` URL clones over HTTPS, so it works whether or not you have
-GitHub SSH keys set up. The shorthand `claude plugin marketplace add
-rulereceipt/rulereceipt` also works, but it clones over **SSH** (`git@github.com:…`),
-which fails if you don't have SSH keys configured — use the HTTPS URL above if in doubt.
+GitHub SSH keys set up. The shorthands `claude plugin marketplace add
+rulereceipt/rulereceipt` and `/plugin marketplace add rulereceipt/rulereceipt` also
+work, but they clone over **SSH** (`git@github.com:…`), which fails if you don't have
+SSH keys configured — use the HTTPS URL above if in doubt.
 
 > **Troubleshooting:** if `marketplace add` fails with *"source doesn't match its
 > `extraKnownMarketplaces` entry"*, run `claude plugin marketplace remove rulereceipt`
 > first, then add it again.
 
-It adds a **PreToolUse guard** (refuses a command that breaks a file/branch rule, asks
-before an unapproved push/commit), a **Stop hook** (won't let a session end on a broken
-rule), and `/rulereceipt:check`, `:audit`, `:health`, `:why`. The hooks call the
-`rulereceipt` CLI locally — the guard and checks make zero network calls. **Uninstall
-with `claude plugin uninstall rulereceipt@rulereceipt`** — that removes the hooks for
-you (no `protect --undo` needed; that's only for the manual `protect` wiring).
+It adds the commands `/rulereceipt:check` (check the latest session),
+`/rulereceipt:doctor` (setup + capability matrix), `/rulereceipt:report` (write and
+open a shareable HTML report), plus `:audit`, `:health`, `:why`, and a skill so Claude
+can suggest a check when you ask "did it follow my rules?". **It installs no hooks,
+writes nothing to `settings.json`, and sends no telemetry** — it reads the finished
+session locally and reports; it blocks nothing. (Want it to *block*? Wire the guard
+yourself with `rulereceipt protect` — see above; the plugin never does it for you.)
+**Uninstall with `claude plugin uninstall rulereceipt@rulereceipt`.**
 
 ### Local dev, from this repo
 

@@ -41,6 +41,7 @@ run "false-accusation v4"       npx tsx scripts/false-accusation-rate.ts --froze
 # They are enforced with their correct expectation semantics (NOFAIL pairs stay
 # clean AND MUST-FAIL pairs fire) by tests/faFrozen.test.ts in the suite above.
 run "surface count parity"      node scripts/surface-parity.mjs
+run "plugin manifest validate"  bash scripts/validate-plugin.sh
 run "release tarball install"   bash scripts/validate-release.sh
 
 echo ""

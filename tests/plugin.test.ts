@@ -51,8 +51,8 @@ describe("Claude Code plugin + marketplace manifest", () => {
     expect(body).toMatch(/Never pass `--llm`/);
   });
 
-  it("ships the four commands", () => {
-    for (const c of ["check", "audit", "health", "why"]) {
+  it("ships the commands, including check / doctor / report", () => {
+    for (const c of ["check", "doctor", "report", "audit", "health", "why"]) {
       expect(existsSync(join(root, "plugin", "commands", `${c}.md`)), c).toBe(true);
     }
   });
