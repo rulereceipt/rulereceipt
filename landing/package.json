@@ -8,7 +8,7 @@
     "build:blog": "node build-blog.mjs"
   },
   "dependencies": {
-    "@upstash/redis": "^1.38.4"
+    "@upstash/redis": "^1.40.0"
   },
   "devDependencies": {
     "vitest": "^5.0.1"
