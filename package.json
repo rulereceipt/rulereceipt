@@ -1,6 +1,6 @@
 {
   "name": "rulereceipt",
-  "version": "0.1.119",
+  "version": "0.1.120",
   "description": "Did it push straight to main? Touch a file you told it never to? RuleReceipt checks the finished session against your CLAUDE.md / AGENTS.md rules and marks each followed, broken, or can't-tell, with the exact line as proof. Reads sessions from Claude Code, OpenAI Codex, GitHub Copilot CLI, Cursor, Google Antigravity, OpenCode, Cline and Devin Desktop; also reads Cursor, Copilot, Windsurf and Gemini rules files. Runs locally, nothing uploaded.",
   "repository": {
     "type": "git",
@@ -53,7 +53,7 @@
     "build:checker": "esbuild src/browser/analyze.ts --bundle --format=esm --minify --outfile=landing/checker.js",
     "verify": "npm run lint && npm run typecheck && npm test",
     "agents-table": "npm run build && node scripts/gen-agents-table.mjs",
-  "gates": "bash scripts/gates.sh",
+    "gates": "bash scripts/gates.sh",
     "gates:selftest": "bash scripts/gate-selftest.sh",
     "version": "node scripts/bump-readme-action-tag.mjs && node scripts/bump-plugin-version.mjs && git add README.md plugin/.claude-plugin/plugin.json plugin/commands"
   },
