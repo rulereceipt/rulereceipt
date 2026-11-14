@@ -52,7 +52,8 @@
     "prepublishOnly": "npm run build && npm run sbom && npm test",
     "build:checker": "esbuild src/browser/analyze.ts --bundle --format=esm --minify --outfile=landing/checker.js",
     "verify": "npm run lint && npm run typecheck && npm test",
-    "gates": "bash scripts/gates.sh",
+    "agents-table": "npm run build && node scripts/gen-agents-table.mjs",
+  "gates": "bash scripts/gates.sh",
     "gates:selftest": "bash scripts/gate-selftest.sh",
     "version": "node scripts/bump-readme-action-tag.mjs && git add README.md"
   },

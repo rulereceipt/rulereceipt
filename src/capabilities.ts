@@ -51,6 +51,85 @@ export function agentCapabilities(): AgentCapability[] {
   return rows;
 }
 
+/**
+ * Display names + table notes for the generated "Agent session support" tables
+ * (README and the site homepage). Single source, keyed by the SAME tool ids as
+ * agentCapabilities(), so the published tables are built FROM the capability
+ * matrix and cannot list an agent `doctor --capabilities` doesn't, or miss one it
+ * does. A drift test (tests/agentsTable.test.ts) fails if the rendered README/site
+ * tables stop matching agentsTableMarkdown(). Add an adapter → a new row appears
+ * here automatically (falling back to the capability note if no entry is added),
+ * and the drift test then fails until the published tables are regenerated.
+ */
+export const AGENT_LABEL: Record<string, string> = {
+  "claude-code": "Claude Code",
+  codex: "OpenAI Codex CLI",
+  "copilot-cli": "GitHub Copilot CLI",
+  cursor: "Cursor CLI",
+  antigravity: "Antigravity CLI (Google)",
+  opencode: "OpenCode",
+  cline: "Cline",
+  devin: "Devin Desktop (Windsurf / Codeium)",
+  "gemini-cli": "Gemini CLI",
+  aider: "Aider",
+  windsurf: "Windsurf IDE",
+};
+
+const TABLE_NOTE: Record<string, string> = {
+  "claude-code": "incl. hosted/enterprise homes you configure via `RULERECEIPT_CLAUDE_HOMES` / `CLAUDE_CONFIG_DIR`",
+  codex: "reads `rollout-*.jsonl` and compressed `rollout-*.jsonl.zst` (zst needs Node ≥ 22.15); validated on a real end-to-end rollout (CLI 0.160.1), incl. the 0.160 exec-harness (`exec_command` / `apply_patch`)",
+  "copilot-cli": "reads `events.jsonl`; validated on a real session (CLI 1.0.92), incl. apply_patch edits and the ask-user/permission approval step (a human-approved action reads as Followed)",
+  cursor: "reads the agent-transcripts JSONL; validated on a real session (agent v2026.10.01) — message-wrapped lines, JSON-string tool input, <user_query> unwrap",
+  antigravity: "reads ~/.gemini/antigravity-cli/brain/<id>/…/transcript.jsonl; validated on a real session (CLI 1.3.1) — PLANNER_RESPONSE tool_calls + GENERIC outputs, incl. an approved push to main (Followed)",
+  opencode: "reads the SQLite `opencode.db` (OpenCode 1.18+, via built-in `node:sqlite` on Node ≥ 22.5; older Node skips it) and the legacy JSON store; validated on a real session (1.18.35). Rules scoped to what OpenCode loads (AGENTS.md/CLAUDE.md, `~/.config/opencode/AGENTS.md`, and `~/.claude/CLAUDE.md` for Claude Code compat)",
+  cline: "reads `~/.cline/data/sessions/<id>/` (meta + `.messages.json`); validated on a real session (CLI v3.0.70) — maps `ask_question` to the user's approval (an authorised push reads as Followed). Rules scoped to what Cline loads (`.clinerules`, `.cline/rules`, `.cursorrules`, `.windsurfrules`, AGENTS.md — not CLAUDE.md/GEMINI.md)",
+  devin: "reads the SQLite `~/.local/share/devin/cli/sessions.db` (via built-in `node:sqlite` on Node ≥ 22.5; older Node skips it), walking each session's main chain so retry branches are deduped; validated on a real session (Devin Desktop 3.10.48, backend windsurf, model swe-1-6-slow). Rules scoped to what Devin loads (project AGENTS.md + CLAUDE.md, `~/.claude/CLAUDE.md` and `~/.codeium/windsurf/memories/global_rules.md` — not GEMINI.md)",
+  "gemini-cli": "the standalone Gemini CLI refuses a personal Google login (\"client no longer supported, migrate to Antigravity\") — use Antigravity",
+  aider: "history is Markdown only, no tool record",
+  windsurf: "the editor itself is IDE-embedded; its Devin Desktop CLI *is* read (see the Devin Desktop row above)",
+};
+
+/** Short, human status for the published tables — derived from the capability, so it tracks the code. */
+export function agentStatusLabel(a: AgentCapability): string {
+  if (a.read === "full") return a.validated ? "Supported" : "In testing";
+  if (a.read === "experimental") return a.tool === "gemini-cli" ? "Legacy / untested" : "Experimental";
+  return a.tool === "windsurf" ? "No, use Devin Desktop" : "Not supported";
+}
+
+export interface AgentTableRow {
+  tool: string;
+  label: string;
+  status: string;
+  supported: boolean; // read !== "none" → the status is bolded in the published tables
+  note: string;
+}
+
+/** One row per agent, built straight from agentCapabilities() — the single source the tables render from. */
+export function agentsTableRows(): AgentTableRow[] {
+  return agentCapabilities().map((a) => ({
+    tool: a.tool,
+    label: AGENT_LABEL[a.tool] ?? a.tool,
+    status: agentStatusLabel(a),
+    supported: a.read !== "none",
+    note: TABLE_NOTE[a.tool] ?? a.note,
+  }));
+}
+
+/** Count of fully-validated, supported agents — the "8 validated agents" headline figure. */
+export function supportedAgentCount(): number {
+  return agentCapabilities().filter((a) => a.read === "full" && a.validated).length;
+}
+
+/** The "Agent session support" table as the exact Markdown block the README embeds (drift-checked). */
+export function agentsTableMarkdown(): string {
+  const lines = ["| Agent | Session support | Notes |", "| :- | :- | :- |"];
+  for (const r of agentsTableRows()) {
+    const status = r.supported ? `**${r.status}**` : r.status;
+    lines.push(`| ${r.label} | ${status} | ${r.note} |`);
+  }
+  return lines.join("\n");
+}
+
 /** What each check method inspects — plain descriptions, no claims of certainty. */
 export const CHECK_METHODS: { method: string; checks: string }[] = [
   { method: "text_scan", checks: "a literal string a rule forbids/requires, matched in the right places only (not in prose or tool output)" },

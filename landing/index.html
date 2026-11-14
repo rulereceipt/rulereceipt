@@ -403,6 +403,13 @@
      empty space beside them — balance equalises line lengths, so in a
      narrow container every line ends early. Wider box, natural wrapping. */
   .band-sub { color: var(--paper-dim); margin: 0 0 34px; max-width: 860px; }
+  .hero-agents { color: var(--paper-dim); font-size: 0.92rem; margin: 10px 0 0; }
+  .agents-table { width: 100%; border-collapse: collapse; font-size: 0.94rem; max-width: 640px; }
+  .agents-table th, .agents-table td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--panel-line); }
+  .agents-table th { color: var(--paper-dim); font-weight: 600; }
+  .agents-table .ag-ok { color: var(--cyan, #0b8f8f); font-weight: 600; }
+  .agents-table .ag-warn { color: var(--paper-dim); }
+  .agents-table .ag-no { color: var(--paper-dim); opacity: 0.75; }
 
   .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; }
   .step .n { font-family: var(--font-mono); color: var(--amber-dim); font-size: 0.85rem; margin-bottom: 10px; }
@@ -762,6 +769,7 @@
       <div class="eyebrow">for AI coding agents &middot; runs locally</div>
       <h1>Your agent read the rules.<br><span>Did it follow them?</span></h1>
       <p class="sub">Did it push straight to main? Touch a file you told it never to? RuleReceipt checks the finished session against your rules file (CLAUDE.md, AGENTS.md, .cursor/rules) and marks each rule followed, broken, or can't tell, with the exact line as proof.</p>
+      <p class="hero-agents">Works with Claude Code, Codex, Cursor, Copilot CLI <a href="#agents">and 4 more</a>.</p>
       <div class="install" id="copy-hero" data-copy="npx rulereceipt check" data-loc="hero" role="button" tabindex="0" title="Click to copy">
         <span class="prompt">$</span>
         <span class="cmd">npx rulereceipt check</span>
@@ -910,6 +918,32 @@
       </div>
       <div style="height:20px"></div>
       <div class="security-note"><strong>You can verify the package you install came from the code you read.</strong> Every release is built and published by GitHub Actions and signed with npm provenance — no publishing token exists on anyone's laptop to be stolen. After installing, run <code>npm audit signatures</code> and npm will confirm the package was built from this public repository, at a specific commit. That's the appropriate standard for a tool whose whole job is verification, and it's checkable by you, not asserted by us.</div>
+    </div>
+  </section>
+
+  <section class="band" id="agents">
+    <div class="wrap-wide">
+      <h2>Works with your agent</h2>
+      <p class="band-sub">Eight agents are supported for <em>checking</em>, each validated on a real session; blocking with guard hooks is Claude Code only (<code>protect --git</code> works with any agent). This table is generated from <code>rulereceipt doctor --capabilities</code> &mdash; the same source as the tool itself, so it can't claim an agent the code can't read.</p>
+      <!-- agents-table:start -->
+      <table class="agents-table">
+        <thead><tr><th>Agent</th><th>Session support</th></tr></thead>
+        <tbody>
+          <tr><td>Claude Code</td><td class="ag-ok">Supported</td></tr>
+          <tr><td>OpenAI Codex CLI</td><td class="ag-ok">Supported</td></tr>
+          <tr><td>GitHub Copilot CLI</td><td class="ag-ok">Supported</td></tr>
+          <tr><td>Cursor CLI</td><td class="ag-ok">Supported</td></tr>
+          <tr><td>Antigravity CLI (Google)</td><td class="ag-ok">Supported</td></tr>
+          <tr><td>OpenCode</td><td class="ag-ok">Supported</td></tr>
+          <tr><td>Cline</td><td class="ag-ok">Supported</td></tr>
+          <tr><td>Devin Desktop (Windsurf / Codeium)</td><td class="ag-ok">Supported</td></tr>
+          <tr><td>Gemini CLI</td><td class="ag-warn">Legacy / untested</td></tr>
+          <tr><td>Aider</td><td class="ag-no">Not supported</td></tr>
+          <tr><td>Windsurf IDE</td><td class="ag-no">No, use Devin Desktop</td></tr>
+        </tbody>
+      </table>
+      <!-- agents-table:end -->
+      <p class="band-sub" style="margin-top:22px">Rule <em>files</em> are read far more broadly &mdash; CLAUDE.md, AGENTS.md, Cursor/Copilot/Windsurf rules, Gemini <code>GEMINI.md</code>, Google <code>.agents/rules</code>, and Claude Code memory.</p>
     </div>
   </section>
 

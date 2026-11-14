@@ -101,6 +101,9 @@ Which agents' session transcripts RuleReceipt can check (rule *files* —
 CLAUDE.md, AGENTS.md, Cursor, Copilot, Windsurf, Gemini, `.agents/rules`,
 memory — are read far more broadly; this table is about reading a *session*):
 
+<!-- agents-table:start -->
+<!-- GENERATED from src/capabilities.ts (agentsTableMarkdown()) — the same source as `rulereceipt doctor --capabilities`.
+     Do not hand-edit: run `npm run agents-table` to regenerate. tests/agentsTable.test.ts fails if this drifts. -->
 | Agent | Session support | Notes |
 | :- | :- | :- |
 | Claude Code | **Supported** | incl. hosted/enterprise homes you configure via `RULERECEIPT_CLAUDE_HOMES` / `CLAUDE_CONFIG_DIR` |
@@ -108,12 +111,13 @@ memory — are read far more broadly; this table is about reading a *session*):
 | GitHub Copilot CLI | **Supported** | reads `events.jsonl`; validated on a real session (CLI 1.0.92), incl. apply_patch edits and the ask-user/permission approval step (a human-approved action reads as Followed) |
 | Cursor CLI | **Supported** | reads the agent-transcripts JSONL; validated on a real session (agent v2026.10.01) — message-wrapped lines, JSON-string tool input, <user_query> unwrap |
 | Antigravity CLI (Google) | **Supported** | reads ~/.gemini/antigravity-cli/brain/<id>/…/transcript.jsonl; validated on a real session (CLI 1.3.1) — PLANNER_RESPONSE tool_calls + GENERIC outputs, incl. an approved push to main (Followed) |
-| Gemini CLI | **Legacy / untested** | the standalone Gemini CLI refuses a personal Google login ("client no longer supported, migrate to Antigravity") — use Antigravity |
 | OpenCode | **Supported** | reads the SQLite `opencode.db` (OpenCode 1.18+, via built-in `node:sqlite` on Node ≥ 22.5; older Node skips it) and the legacy JSON store; validated on a real session (1.18.35). Rules scoped to what OpenCode loads (AGENTS.md/CLAUDE.md, `~/.config/opencode/AGENTS.md`, and `~/.claude/CLAUDE.md` for Claude Code compat) |
 | Cline | **Supported** | reads `~/.cline/data/sessions/<id>/` (meta + `.messages.json`); validated on a real session (CLI v3.0.70) — maps `ask_question` to the user's approval (an authorised push reads as Followed). Rules scoped to what Cline loads (`.clinerules`, `.cline/rules`, `.cursorrules`, `.windsurfrules`, AGENTS.md — not CLAUDE.md/GEMINI.md) |
 | Devin Desktop (Windsurf / Codeium) | **Supported** | reads the SQLite `~/.local/share/devin/cli/sessions.db` (via built-in `node:sqlite` on Node ≥ 22.5; older Node skips it), walking each session's main chain so retry branches are deduped; validated on a real session (Devin Desktop 3.10.48, backend windsurf, model swe-1-6-slow). Rules scoped to what Devin loads (project AGENTS.md + CLAUDE.md, `~/.claude/CLAUDE.md` and `~/.codeium/windsurf/memories/global_rules.md` — not GEMINI.md) |
+| Gemini CLI | **Legacy / untested** | the standalone Gemini CLI refuses a personal Google login ("client no longer supported, migrate to Antigravity") — use Antigravity |
 | Aider | Not supported | history is Markdown only, no tool record |
-| Windsurf IDE | No, use Devin Desktop | the editor itself is IDE-embedded; its Devin Desktop CLI *is* read (row above) |
+| Windsurf IDE | No, use Devin Desktop | the editor itself is IDE-embedded; its Devin Desktop CLI *is* read (see the Devin Desktop row above) |
+<!-- agents-table:end -->
 
 Auto-detection picks the newest session across supported tools.
 
