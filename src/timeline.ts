@@ -39,8 +39,9 @@ import type { ShadowFinding } from "./checks/shadowSignals.js";
 import { applyVisibility } from "./visibility.js";
 import { evidenceLineIndex, isCompactionLine } from "./breakContext.js";
 import { bucketOf } from "./report/buckets.js";
+import { judgeSummaryClause } from "./judgments.js";
 
-export type TimelineLane = "broken" | "not-visible" | "followed" | "needs-judgment" | "cant-tell" | "not-applicable";
+export type TimelineLane = "broken" | "not-visible" | "followed" | "needs-judgment" | "cant-tell" | "not-applicable" | "not-checkable";
 
 export interface TimelineVerdict {
   lane: TimelineLane;
@@ -68,6 +69,7 @@ export interface TimelineCounts {
   needsJudgment: number;
   cantTell: number;
   notApplicable: number;
+  notCheckable: number;
 }
 
 export interface SessionTimeline {
@@ -78,6 +80,8 @@ export interface SessionTimeline {
   /** Compaction points, in session order. */
   markers: TimelineMarker[];
   counts: TimelineCounts;
+  /** Labelled "judged by Claude" clause for the sub-headline, or "" if none. */
+  judgeClause: string;
 }
 
 export interface TimelineMeta {
@@ -104,6 +108,7 @@ function laneOf(r: CheckResult): TimelineLane {
     case "RULE_NOT_VISIBLE": return "not-visible";
     case "PASS": return "followed";
     case "UNCLEAR_JUDGMENT": return "needs-judgment";
+    case "NOT_CHECKABLE": return "not-checkable";
     case "UNCLEAR_EVIDENCE": return "cant-tell";
     case "NOT_APPLICABLE":
     case "NOT_RUN": return "not-applicable";
@@ -149,9 +154,10 @@ export function buildTimeline(results: CheckResult[], transcriptText: string): S
     needsJudgment: verdicts.filter((v) => v.lane === "needs-judgment").length,
     cantTell: verdicts.filter((v) => v.lane === "cant-tell").length,
     notApplicable: verdicts.filter((v) => v.lane === "not-applicable").length,
+    notCheckable: verdicts.filter((v) => v.lane === "not-checkable").length,
   };
 
-  return { placed, unplaced, markers, counts };
+  return { placed, unplaced, markers, counts, judgeClause: judgeSummaryClause(results) };
 }
 
 // --- rendering -------------------------------------------------------------
@@ -190,6 +196,7 @@ const LANE_LABEL: Record<TimelineLane, string> = {
   "needs-judgment": "Needs your judgment",
   "cant-tell": "Couldn't tell",
   "not-applicable": "Didn't apply this session",
+  "not-checkable": "Not checkable from a session",
 };
 
 /** One line of evidence, redacted + collapsed, for the compact timeline node. */
@@ -294,7 +301,9 @@ export function renderTimelineHtml(t: SessionTimeline, meta: TimelineMeta, shado
     `${c.broken} broken`,
     `${c.cantTell} couldn't tell`,
     `${c.needsJudgment} need your judgment`,
+    ...(c.notCheckable > 0 ? [`${c.notCheckable} not checkable from a session`] : []),
     ...(c.notVisible > 0 ? [`${c.notVisible} not visible`] : []),
+    ...(t.judgeClause ? [clean(t.judgeClause)] : []),
   ].join(" · ");
 
   return `<!doctype html>
@@ -348,6 +357,7 @@ export function renderTimelineHtml(t: SessionTimeline, meta: TimelineMeta, shado
   .node--cant-tell .dot { background: var(--unclear); }
   .node--not-applicable .dot { background: var(--unclear); }
   .node--needs-judgment .dot { background: var(--judgment); }
+  .node--not-checkable .dot { background: var(--judgment); }
   .node--not-visible .dot { background: var(--notvis); }
   .node--compaction .dot { background: var(--compact); }
   .node__body { }
@@ -357,6 +367,7 @@ export function renderTimelineHtml(t: SessionTimeline, meta: TimelineMeta, shado
   .badge--cant-tell { color: var(--unclear); border-color: var(--unclear); }
   .badge--not-applicable { color: var(--unclear); border-color: var(--unclear); }
   .badge--needs-judgment { color: var(--judgment); }
+  .badge--not-checkable { color: var(--judgment); }
   .badge--not-visible { color: var(--notvis); border-color: var(--notvis); }
   .badge--compaction { color: var(--compact); border-color: var(--compact); }
   .node__src { font-size: 11px; color: var(--muted); margin-left: 8px; }

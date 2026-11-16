@@ -216,6 +216,33 @@ export interface CheckResult {
   sourceLine?: number;
   /** Other files carrying this same rule text (see Rule.alsoSources). */
   alsoSources?: { sourcePath?: string; sourceLine?: number }[];
+
+  /**
+   * An optional OPINION on a rule the deterministic pass could not resolve
+   * (couldn't-tell or needs-judgment), supplied from outside via
+   * `check --judgments`. It is Claude's read of THIS rule from its evidence
+   * alone — never the deterministic verdict. It is displayed, clearly labelled
+   * "judged by Claude", and is NEVER counted, never changes `status`/`outcome`,
+   * and never affects the exit code (the permanent rule: an opinion cannot FAIL
+   * a build). Attached only to a result whose bucket is UNCLEAR_* — a
+   * deterministic PASS/FAIL is never annotated. See src/judgments.ts.
+   */
+  judgment?: JudgeOpinion;
+}
+
+/** One rule's "judged by Claude" opinion (opinion only — never counted). */
+export interface JudgeOpinion {
+  /**
+   * The opinion. A judgment claiming PASS or FAIL with no exact quote from the
+   * evidence is downgraded to UNCLEAR on ingest (no quote = UNCLEAR), so a FAIL
+   * here always carries proof — though it is still only an opinion, never a
+   * counted verdict.
+   */
+  verdict: "PASS" | "FAIL" | "UNCLEAR";
+  /** One line on why. */
+  reason: string;
+  /** The exact quote from this rule's evidence that backs the opinion. */
+  quote: string;
 }
 
 /**

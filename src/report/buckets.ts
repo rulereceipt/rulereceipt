@@ -1,4 +1,5 @@
 import type { CheckResult } from "../types.js";
+import { isNotCheckableFromSession } from "../notCheckable.js";
 
 /**
  * The ONE classification every surface shares — the terminal report, the HTML
@@ -19,7 +20,19 @@ export type Bucket =
   | "NOT_RUN"
   | "PASS"
   | "NOT_APPLICABLE"
-  | "UNCLEAR_JUDGMENT";
+  | "UNCLEAR_JUDGMENT"
+  | "NOT_CHECKABLE";
+
+/**
+ * A needs-judgment rule that is about internal intent/mindset/care — not a
+ * session question at all — is split out as NOT_CHECKABLE. Its STATUS is
+ * unchanged (still UNCLEAR); only the bucket, so every verdict is identical and
+ * only the display/count refines. Decided here so every surface agrees.
+ */
+function judgmentBucket(result: CheckResult): Bucket {
+  if (result.needsHuman && isNotCheckableFromSession(result.ruleTitle)) return "NOT_CHECKABLE";
+  return result.needsHuman ? "UNCLEAR_JUDGMENT" : "UNCLEAR_EVIDENCE";
+}
 
 export function bucketOf(result: CheckResult): Bucket {
   if (result.notVisible) return "RULE_NOT_VISIBLE";
@@ -33,11 +46,11 @@ export function bucketOf(result: CheckResult): Bucket {
     case "not_applicable":
       return "NOT_APPLICABLE";
     case "inconclusive":
-      return result.needsHuman ? "UNCLEAR_JUDGMENT" : "UNCLEAR_EVIDENCE";
+      return judgmentBucket(result);
   }
   if (result.status === "FAIL") return "FAIL";
   if (result.status === "PASS") return "PASS";
-  return result.needsHuman ? "UNCLEAR_JUDGMENT" : "UNCLEAR_EVIDENCE";
+  return judgmentBucket(result);
 }
 
 export interface Counts {
@@ -48,6 +61,7 @@ export interface Counts {
   needsJudgment: number;
   notRun: number;
   notApplicable: number;
+  notCheckable: number;
 }
 
 /** The canonical per-bucket counts. Every surface's headline/summary derives from this. */
@@ -61,5 +75,6 @@ export function summarize(results: CheckResult[]): Counts {
     needsJudgment: n("UNCLEAR_JUDGMENT"),
     notRun: n("NOT_RUN"),
     notApplicable: n("NOT_APPLICABLE"),
+    notCheckable: n("NOT_CHECKABLE"),
   };
 }

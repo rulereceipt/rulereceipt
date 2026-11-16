@@ -4,6 +4,7 @@ import { homedir } from "node:os";
 import type { CheckResult } from "../types.js";
 import { breakContext, renderBreakContext } from "../breakContext.js";
 import { type Bucket, bucketOf, summarize } from "./buckets.js";
+import { JUDGE_LABEL, JUDGE_NOTE, judgeGlyph, judgeSummaryClause } from "../judgments.js";
 
 /**
  * Where a rule lives, for the report — "~/proj/CLAUDE.md:42", or just the path
@@ -101,6 +102,13 @@ function summaryLine(results: CheckResult[]): string {
   if (n("NOT_RUN") > 0) parts.push(`${n("NOT_RUN")} not run`);
   if (n("NOT_APPLICABLE") > 0) parts.push(`${n("NOT_APPLICABLE")} didn't apply`);
   if (n("UNCLEAR_JUDGMENT") > 0) parts.push(`${n("UNCLEAR_JUDGMENT")} need your judgment`);
+  if (n("NOT_CHECKABLE") > 0) parts.push(`${n("NOT_CHECKABLE")} not checkable from a session`);
+  // Judged-by-Claude tallies ride ALONGSIDE the deterministic counts, clearly
+  // labelled and always after them, so the headline visibly reflects the judge
+  // while the mechanical counts (what the exit code and gates use) are untouched
+  // and still read first. Empty when no opinions were attached.
+  const judged = judgeSummaryClause(results);
+  if (judged) parts.push(judged);
   return parts.join(" · ");
 }
 
@@ -129,6 +137,7 @@ const BUCKET_LABEL: Record<Bucket, string> = {
   PASS: "Followed",
   NOT_APPLICABLE: "Didn't apply this session",
   UNCLEAR_JUDGMENT: "Needs your judgment",
+  NOT_CHECKABLE: "Not checkable from a session",
 };
 
 /**
@@ -270,6 +279,33 @@ export function generateReport(results: CheckResult[], meta: ReportMeta, transcr
     }
   }
 
+  // GROUP 4 — Not checkable from a session: rules about intent/mindset/care that
+  // NO transcript can settle. Separate from "needs judgment" so they are not
+  // mistaken for a gap the tool could have closed. Never counted, no exit effect.
+  const notCheckable = clean.filter((r) => bucketOf(r) === "NOT_CHECKABLE");
+  if (notCheckable.length > 0) {
+    lines.push("");
+    lines.push(`Not checkable from a session (${notCheckable.length})   [about intent or style — a transcript can't confirm these]`);
+    for (const r of notCheckable) {
+      lines.push(`  • ${ruleLabel(r, clean)}`);
+    }
+  }
+
+  // JUDGED BY CLAUDE — opinions on the unresolved rules, supplied via
+  // --judgments. Shown, never counted; never in summaryLine; never in the exit
+  // code. Placed after the real verdicts so nothing reads it as one.
+  const judged = clean.filter((r) => r.judgment);
+  if (judged.length > 0) {
+    lines.push("");
+    lines.push(`${JUDGE_LABEL} — ${JUDGE_NOTE} (${judged.length})`);
+    for (const r of judged) {
+      const j = r.judgment!;
+      lines.push(`  ${judgeGlyph(j.verdict)} ${j.verdict} (judged) · ${ruleLabel(r, clean)}`);
+      if (j.reason) lines.push(`      why: ${stripControlChars(j.reason)}`);
+      if (j.quote) lines.push(`      > ${stripControlChars(j.quote)}`);
+    }
+  }
+
   lines.push("");
   lines.push("─".repeat(40));
   lines.push(summaryLine(clean));
@@ -320,6 +356,18 @@ export function generateMarkdownReport(results: CheckResult[], meta: ReportMeta)
     const label = loc ? `${ruleLabel(r, clean)}<br>\`${loc}\`` : ruleLabel(r, clean);
     lines.push(`| ${MARK[r.status]} ${r.status} | ${escapeMarkdownCell(label)} | ${evidence} |`);
   }
+  const judged = clean.filter((r) => r.judgment);
+  if (judged.length > 0) {
+    lines.push("");
+    lines.push(`**${JUDGE_LABEL}** — ${JUDGE_NOTE}`);
+    lines.push("");
+    lines.push("| Opinion | Rule | Why | Quote |");
+    lines.push("|---|---|---|---|");
+    for (const r of judged) {
+      const j = r.judgment!;
+      lines.push(`| ${judgeGlyph(j.verdict)} ${j.verdict} (judged) | ${escapeMarkdownCell(ruleLabel(r, clean))} | ${escapeMarkdownCell(j.reason)} | ${escapeMarkdownCell(j.quote)} |`);
+    }
+  }
   lines.push("");
   const hash = computeTranscriptHash(meta.sessionFilePath);
   lines.push(hash ? `\`verify: sha256:${hash.slice(0, 16)}...\` · checked ${new Date().toISOString()}` : `demo data · checked ${new Date().toISOString()}`);
@@ -338,7 +386,7 @@ export function generateMarkdownReport(results: CheckResult[], meta: ReportMeta)
  * way as every other output: a hostile CLAUDE.md does not get to smuggle
  * control characters through the JSON either.
  */
-export function generateJsonReport(results: CheckResult[], meta: ReportMeta, toolVersion: string, editedRuleFiles: string[] = []): string {
+export function generateJsonReport(results: CheckResult[], meta: ReportMeta, toolVersion: string, editedRuleFiles: string[] = [], judgeQuoteFailures = 0): string {
   const clean = results.map(sanitize);
   const count = (s: CheckResult["status"]): number => clean.filter((r) => r.status === s).length;
   const report = {
@@ -368,6 +416,7 @@ export function generateJsonReport(results: CheckResult[], meta: ReportMeta, too
         notRun: c.notRun,
         didntApply: c.notApplicable,
         ruleNotVisible: c.notVisible,
+        notCheckable: c.notCheckable,
         unclear: count("UNCLEAR"),
       };
     })(),
@@ -385,7 +434,26 @@ export function generateJsonReport(results: CheckResult[], meta: ReportMeta, too
       method: r.method ?? null,
       needsHuman: r.needsHuman ?? false,
       evidence: r.evidence,
+      // A "judged by Claude" opinion, present ONLY on unresolved rules and only
+      // when --judgments supplied one. Opinion, never a verdict — it is absent
+      // from `summary` and never affects the exit code.
+      ...(r.judgment ? { judgment: r.judgment } : {}),
     })),
+    // Top-level opinion layer, kept OUT of `summary` so no consumer counts it.
+    // Absent entirely when no judgments were attached.
+    ...(clean.some((r) => r.judgment)
+      ? {
+          judged: {
+            by: "claude",
+            note: JUDGE_NOTE,
+            count: clean.filter((r) => r.judgment).length,
+            // PASS/FAIL opinions whose quote did not appear verbatim in the
+            // session, downgraded to UNCLEAR. The tool's accuracy check on the
+            // judge — a non-zero number means the judge over-claimed.
+            quoteVerificationFailures: judgeQuoteFailures,
+          },
+        }
+      : {}),
   };
   return JSON.stringify(report, null, 2);
 }

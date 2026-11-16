@@ -16,6 +16,7 @@ import type { Receipt } from "./receipt.js";
 import type { CheckResult } from "./types.js";
 import { type Bucket, bucketOf } from "./report/buckets.js";
 import { redact } from "./wrong.js";
+import { JUDGE_LABEL, JUDGE_NOTE } from "./judgments.js";
 
 /** One rule's fields as they appear in a `check --json` receipt (see generateJsonReport). */
 interface ReceiptResult {
@@ -25,6 +26,7 @@ interface ReceiptResult {
   evidence?: unknown;
   notVisible?: unknown;
   needsHuman?: unknown;
+  judgment?: { verdict?: unknown; reason?: unknown; quote?: unknown };
 }
 
 const MAX_EVIDENCE = 160;
@@ -98,9 +100,18 @@ export function renderPrComment(receipt: Receipt): string {
   const notVisible = bag("RULE_NOT_VISIBLE");
   const cantTell = bag("UNCLEAR_EVIDENCE");
   const needsJudgment = bag("UNCLEAR_JUDGMENT");
+  const notCheckable = bag("NOT_CHECKABLE");
 
   const s = receipt.summary ?? { total: results.length, pass: followed.length, fail: broken.length, unclear: cantTell.length };
-  const headline = `**RuleReceipt** — ${broken.length} broken · ${followed.length} followed · ${cantTell.length} can't tell`;
+  // Judged-by-Claude tallies ride beside the deterministic counts in the
+  // headline, labelled, never counted (the broken/followed above drive any gate).
+  const jVerdict = (r: ReceiptResult) => (r.judgment && typeof (r.judgment as { verdict?: unknown }).verdict === "string" ? String((r.judgment as { verdict: string }).verdict).toUpperCase() : "");
+  const jWith = results.filter((r) => r.judgment && typeof r.judgment === "object");
+  const jf = jWith.filter((r) => jVerdict(r) === "PASS").length;
+  const jb = jWith.filter((r) => jVerdict(r) === "FAIL").length;
+  const ju = jWith.length - jf - jb;
+  const jClause = jWith.length === 0 ? "" : ` · ${JUDGE_LABEL}: ${[jf ? `${jf} followed` : "", jb ? `${jb} broken` : "", ju ? `${ju} still unclear` : ""].filter(Boolean).join(" · ")}`;
+  const headline = `**RuleReceipt** — ${broken.length} broken · ${followed.length} followed · ${cantTell.length} can't tell${jClause}`;
   // version is untrusted (it comes from the committed receipt) and public here.
   const ver = receipt.version ? ` _(rulereceipt ${neutralizeMarkdown(String(receipt.version))})_` : "";
 
@@ -124,8 +135,29 @@ export function renderPrComment(receipt: Receipt): string {
     out.push(`${needsJudgment.length} rule${needsJudgment.length === 1 ? "" : "s"} need a human's judgment (never a mechanical question).`, "");
   }
 
+  if (notCheckable.length > 0) {
+    out.push(`${notCheckable.length} rule${notCheckable.length === 1 ? "" : "s"} aren't checkable from a session (about intent or style, not an observable action).`, "");
+  }
+
   if (notVisible.length > 0) {
     out.push(`${notVisible.length} rule${notVisible.length === 1 ? "" : "s"} would have broken but weren't loaded into the session's context, so they aren't counted as broken.`, "");
+  }
+
+  // JUDGED BY CLAUDE — opinions on unresolved rules (from --judgments). Labelled,
+  // never counted, no exit-code effect. Title/reason are neutralised (untrusted,
+  // public); the quote is wrapped in a code span where markdown is inert.
+  const judged = results.filter((r) => r.judgment && typeof r.judgment === "object");
+  if (judged.length > 0) {
+    out.push(`<details><summary>${JUDGE_LABEL} — ${JUDGE_NOTE} (${judged.length})</summary>`, "");
+    for (const r of judged) {
+      const j = r.judgment as { verdict?: unknown; reason?: unknown; quote?: unknown };
+      const verdict = typeof j.verdict === "string" ? j.verdict.toUpperCase() : "UNCLEAR";
+      const reason = typeof j.reason === "string" ? neutralizeMarkdown(j.reason) : "";
+      const quoteRaw = typeof j.quote === "string" ? j.quote : "";
+      const quote = quoteRaw ? ` — \`${redact(quoteRaw).replace(/`/g, "'").slice(0, MAX_EVIDENCE)}\`` : "";
+      out.push(`- **${neutralizeMarkdown(verdict)} (judged)** · ${neutralizeMarkdown(String(r.ruleTitle ?? ""))} — ${reason}${quote}`);
+    }
+    out.push("", "</details>", "");
   }
 
   // total is untrusted (receipt JSON) — coerce to a non-negative integer so a

@@ -34,7 +34,7 @@ describe("generateJsonReport", () => {
     // is kept as the legacy BROAD total for back-compat.
     expect(j.summary).toEqual({
       total: 3, pass: 1, fail: 1, couldntTell: 0, needsJudgment: 1,
-      notRun: 0, didntApply: 0, ruleNotVisible: 0, unclear: 1,
+      notRun: 0, didntApply: 0, ruleNotVisible: 0, notCheckable: 0, unclear: 1,
     });
   });
 

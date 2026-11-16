@@ -16,6 +16,7 @@ import { openCodeFormatIsKnown, openCodeSessionCwd } from "./adapters/opencode.j
 import { clineFormatIsKnown, clineSessionCwd } from "./adapters/cline.js";
 import { devinFormatIsKnown, devinSessionCwd } from "./adapters/devin.js";
 import { loadRules, lastRuleScanInfo } from "./rules.js";
+import { loadJudgments, attachJudgments } from "./judgments.js";
 import { adviseRules } from "./checkability.js";
 import { shadowedAgentsMd } from "./shadowedAgents.js";
 import { auditSessions, renderComplianceReport } from "./report/complianceReport.js";
@@ -287,6 +288,8 @@ interface CheckOptions {
   /** Print paste-ready enforcement (permissions / guard) for the mechanically-checkable rules that broke or were unclear. Never writes settings. */
   hooks: boolean;
   transcriptOverride?: string;
+  /** Path to a plugin-produced judgments JSON — "judged by Claude" opinions on unresolved rules. Opinions only; never counted, never affect the exit code. */
+  judgmentsPath?: string;
   /** false = not requested; true = default path; string = explicit path. A shareable team export (verdicts + evidence only, no transcript). */
   exportPath?: boolean | string;
   /** Name recorded in the export (default: RULERECEIPT_DEV, then git user.name). */
@@ -294,7 +297,7 @@ interface CheckOptions {
 }
 
 async function runCheck(opts: CheckOptions) {
-  const { markdown, json, checkUpdates, share, email, emailAlways, llm, telemetry, html, timeline, exitZero, requireSession, showSkipped, hooks, transcriptOverride, exportPath, dev } = opts;
+  const { markdown, json, checkUpdates, share, email, emailAlways, llm, telemetry, html, timeline, exitZero, requireSession, showSkipped, hooks, transcriptOverride, judgmentsPath, exportPath, dev } = opts;
   // When --transcript points at a session recorded in ANOTHER project, load the
   // rules from that project's cwd (where the agent actually ran) rather than
   // wherever this command happens to be invoked — otherwise a Codex rollout from
@@ -532,9 +535,13 @@ async function runCheck(opts: CheckOptions) {
   const neverLoaded = shadowFindings
     .filter((f) => f.signal === "edited-rule-not-loaded")
     .map((f) => f.evidence.match(/governed by "([^"]+)"/)?.[1] ?? f.evidence);
+  // "Judged by Claude" opinions on the unresolved rules, if the plugin supplied
+  // a judgments file. Attaches in place to couldn't-tell / needs-judgment rules
+  // only; never touches a deterministic verdict, the counts, or the exit code.
+  const judgeAttach = judgmentsPath ? attachJudgments(results, loadJudgments(judgmentsPath), transcriptText ?? "") : { quoteFailures: 0, attached: 0 };
   const reportText = markdown ? generateMarkdownReport(results, meta) : generateReport(results, meta, transcriptText, neverLoaded);
   if (json) {
-    console.log(generateJsonReport(results, meta, pkg.version, editedRuleFiles));
+    console.log(generateJsonReport(results, meta, pkg.version, editedRuleFiles, judgeAttach.quoteFailures));
   } else {
     if (editedNote) console.log(`${editedNote}\n`);
     // Bad news first (Rule 4): if the session was read short, say so BEFORE the
@@ -560,6 +567,12 @@ async function runCheck(opts: CheckOptions) {
       console.log(`ℹ Scope: \`${basename(ruleScan.scopeRoot)}\` only — not a git repo, so the scan stopped here.${tail}\n`);
     }
     console.log(reportText);
+    // The judge's accuracy check: PASS/FAIL opinions whose quote did not appear
+    // verbatim in the session were downgraded to UNCLEAR. Say how many, so an
+    // over-claiming judge is visible, not silently absorbed.
+    if (judgeAttach.quoteFailures > 0) {
+      console.log(`\nℹ ${judgeAttach.quoteFailures} judged grade${judgeAttach.quoteFailures === 1 ? "" : "s"} had no quote that matched the session and ${judgeAttach.quoteFailures === 1 ? "was" : "were"} shown as unclear (quote verification).`);
+    }
     // Shadow advisory (not a verdict, not counted, no exit-code effect): did the
     // session edit/bypass its own guard wiring? hasBranchRule is derived from the
     // results (a git_events verdict means a branch rule is loaded).
@@ -812,6 +825,10 @@ program
     "list recent sessions for this project (tool, time, first prompt) so you can pick one for --transcript, instead of checking."
   )
   .option(
+    "--judgments <path>",
+    "attach a 'judged by Claude' opinion to the rules the check left unresolved (couldn't-tell / needs-judgment), from a JSON file of {ruleId, verdict, reason, quote} the Claude Code plugin produces. Opinions are shown clearly labelled and NEVER counted — they can't change a verdict or the exit code; a PASS/FAIL with no exact quote from the evidence is shown as UNCLEAR."
+  )
+  .option(
     "--export [path]",
     "team preview: write a shareable export (verdicts + the quoted evidence line only, no transcript, no absolute paths) to PATH or .rulereceipt/export-<date>.json. Local; nothing is uploaded. Merge several with `rulereceipt team <folder>`."
   )
@@ -839,6 +856,7 @@ program
       showSkipped: Boolean(opts.showSkipped),
       hooks: Boolean(opts.hooks),
       transcriptOverride: opts.transcript,
+      judgmentsPath: opts.judgments,
       exportPath: opts.export ?? false,
       dev: opts.dev,
     }).catch((err) => {

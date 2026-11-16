@@ -5,6 +5,7 @@ import type { CheckResult } from "../types.js";
 import type { ShadowFinding } from "../checks/shadowSignals.js";
 import { computeTranscriptHash, type ReportMeta } from "./generateReport.js";
 import { type Bucket, bucketOf, summarize } from "./buckets.js";
+import { JUDGE_LABEL, JUDGE_NOTE, judgeGlyph, judgeSummaryClause } from "../judgments.js";
 
 /**
  * A shareable, self-contained report — one HTML file with no external
@@ -132,6 +133,7 @@ const BUCKET_LABEL: Record<Bucket, string> = {
   PASS: "Followed",
   NOT_APPLICABLE: "Didn't apply this session",
   UNCLEAR_JUDGMENT: "Needs your judgment",
+  NOT_CHECKABLE: "Not checkable from a session",
 };
 
 const BUCKET_CLASS: Record<Bucket, string> = {
@@ -142,6 +144,7 @@ const BUCKET_CLASS: Record<Bucket, string> = {
   PASS: "pass",
   NOT_APPLICABLE: "unclear",
   UNCLEAR_JUDGMENT: "judgment",
+  NOT_CHECKABLE: "judgment",
 };
 
 /**
@@ -385,6 +388,9 @@ export function generateHtmlReport(results: CheckResult[], meta: HtmlReportMeta,
       if (c.notRun) parts.push(`${c.notRun} not run`);
       if (c.notApplicable) parts.push(`${c.notApplicable} didn&#39;t apply`);
       if (c.needsJudgment) parts.push(`${c.needsJudgment} need your judgment`);
+      if (c.notCheckable) parts.push(`${c.notCheckable} not checkable from a session`);
+      const judged = judgeSummaryClause(results);
+      if (judged) parts.push(clean(judged));
       return parts.join(" · ");
     })()}</span>
   </div>
@@ -407,6 +413,7 @@ ${(() => {
       const sec = (b: Bucket) => renderSection(b, results, results, meta.toolVersion);
       const checked = (["FAIL", "RULE_NOT_VISIBLE", "UNCLEAR_EVIDENCE", "NOT_RUN", "PASS", "NOT_APPLICABLE"] as Bucket[]).map(sec).join("");
       const judgment = (["UNCLEAR_JUDGMENT"] as Bucket[]).map(sec).join("");
+      const notCheckable = (["NOT_CHECKABLE"] as Bucket[]).map(sec).join("");
       const groupHead = (t: string) => `\n      <h2 class="section__title">${clean(t)}</h2>`;
       const neverLoadedSec = nl.length === 0 ? "" : `
       <section class="section advisory">
@@ -414,7 +421,20 @@ ${(() => {
         <p class="section__note">Advisory, not a verdict — a file these rules cover was edited with no record the rule was loaded first. Not counted, no exit-code effect.</p>
         <ul class="advisory__list">${nl.map((f) => `<li class="advisory__item">${clean(f.evidence)}</li>`).join("")}</ul>
       </section>`;
-      return `${neverLoadedSec}${groupHead("Checked — observable rules")}${checked}${judgment ? `${groupHead("Not checked — needs your judgment")}${judgment}` : ""}${renderShadowAdvisory(other)}`;
+      // JUDGED BY CLAUDE — opinions on unresolved rules (--judgments). Labelled,
+      // never counted, no exit-code effect; modeled on the advisory section.
+      const judged = results.filter((r) => r.judgment);
+      const judgedSec = judged.length === 0 ? "" : `
+      <section class="section advisory">
+        <h2 class="section__title">${clean(JUDGE_LABEL)} <span class="section__count">${judged.length}</span></h2>
+        <p class="section__note">${clean(JUDGE_NOTE)}. Each is one fresh read of a single rule from its evidence alone.</p>
+        <ul class="advisory__list">${judged.map((r) => {
+          const j = r.judgment!;
+          const q = j.quote ? ` — <code>${clean(j.quote)}</code>` : "";
+          return `<li class="advisory__item"><strong>${judgeGlyph(j.verdict)} ${clean(j.verdict)} (judged)</strong> · ${clean(r.ruleTitle)} — ${clean(j.reason)}${q}</li>`;
+        }).join("")}</ul>
+      </section>`;
+      return `${neverLoadedSec}${groupHead("Checked — observable rules")}${checked}${judgment ? `${groupHead("Not checked — needs your judgment")}${judgment}` : ""}${notCheckable ? `${groupHead("Not checkable from a session")}${notCheckable}` : ""}${judgedSec}${renderShadowAdvisory(other)}`;
     })()}
 
   <div class="note">
