@@ -17,6 +17,8 @@ import { clineFormatIsKnown, clineSessionCwd } from "./adapters/cline.js";
 import { devinFormatIsKnown, devinSessionCwd } from "./adapters/devin.js";
 import { loadRules, lastRuleScanInfo } from "./rules.js";
 import { loadJudgments, attachJudgments } from "./judgments.js";
+import { extractExcerpt } from "./judgeContext.js";
+import { bucketOf } from "./report/buckets.js";
 import { adviseRules } from "./checkability.js";
 import { shadowedAgentsMd } from "./shadowedAgents.js";
 import { auditSessions, renderComplianceReport } from "./report/complianceReport.js";
@@ -290,6 +292,8 @@ interface CheckOptions {
   transcriptOverride?: string;
   /** Path to a plugin-produced judgments JSON — "judged by Claude" opinions on unresolved rules. Opinions only; never counted, never affect the exit code. */
   judgmentsPath?: string;
+  /** With --json: add a bounded keyword-matched session excerpt + transcript path to each unresolved rule, for the plugin's judge subagents. */
+  judgeContext?: boolean;
   /** false = not requested; true = default path; string = explicit path. A shareable team export (verdicts + evidence only, no transcript). */
   exportPath?: boolean | string;
   /** Name recorded in the export (default: RULERECEIPT_DEV, then git user.name). */
@@ -297,7 +301,7 @@ interface CheckOptions {
 }
 
 async function runCheck(opts: CheckOptions) {
-  const { markdown, json, checkUpdates, share, email, emailAlways, llm, telemetry, html, timeline, exitZero, requireSession, showSkipped, hooks, transcriptOverride, judgmentsPath, exportPath, dev } = opts;
+  const { markdown, json, checkUpdates, share, email, emailAlways, llm, telemetry, html, timeline, exitZero, requireSession, showSkipped, hooks, transcriptOverride, judgmentsPath, judgeContext, exportPath, dev } = opts;
   // When --transcript points at a session recorded in ANOTHER project, load the
   // rules from that project's cwd (where the agent actually ran) rather than
   // wherever this command happens to be invoked — otherwise a Codex rollout from
@@ -539,6 +543,17 @@ async function runCheck(opts: CheckOptions) {
   // a judgments file. Attaches in place to couldn't-tell / needs-judgment rules
   // only; never touches a deterministic verdict, the counts, or the exit code.
   const judgeAttach = judgmentsPath ? attachJudgments(results, loadJudgments(judgmentsPath), transcriptText ?? "") : { quoteFailures: 0, attached: 0 };
+  // --judge-context (with --json): attach a bounded keyword excerpt + the
+  // transcript path to each UNRESOLVED rule, as the starting context the plugin
+  // hands a fresh judge subagent. Unresolved = couldn't-tell / needs-judgment
+  // (a not-checkable rule is not a session question, so it gets none).
+  if (judgeContext && json) {
+    for (const r of results) {
+      const b = bucketOf(r);
+      if (b !== "UNCLEAR_EVIDENCE" && b !== "UNCLEAR_JUDGMENT") continue;
+      r.judgeContext = extractExcerpt(r.ruleTitle, transcriptText ?? "", sessionFilePath);
+    }
+  }
   const reportText = markdown ? generateMarkdownReport(results, meta) : generateReport(results, meta, transcriptText, neverLoaded);
   if (json) {
     console.log(generateJsonReport(results, meta, pkg.version, editedRuleFiles, judgeAttach.quoteFailures));
@@ -826,7 +841,11 @@ program
   )
   .option(
     "--judgments <path>",
-    "attach a 'judged by Claude' opinion to the rules the check left unresolved (couldn't-tell / needs-judgment), from a JSON file of {ruleId, verdict, reason, quote} the Claude Code plugin produces. Opinions are shown clearly labelled and NEVER counted — they can't change a verdict or the exit code; a PASS/FAIL with no exact quote from the evidence is shown as UNCLEAR."
+    "attach a 'judged by Claude' opinion to the rules the check left unresolved (couldn't-tell / needs-judgment), from a JSON file of {ruleId, verdict, reason, quote} the Claude Code plugin produces. Opinions are shown clearly labelled and NEVER counted — they can't change a verdict or the exit code; a PASS/FAIL with no exact quote from the transcript is shown as UNCLEAR."
+  )
+  .option(
+    "--judge-context",
+    "with --json: add a bounded, keyword-matched session excerpt (plus the transcript path) to each unresolved rule, as the starting context the plugin hands a fresh judge subagent. No effect on verdicts, counts, or the exit code."
   )
   .option(
     "--export [path]",
@@ -857,6 +876,7 @@ program
       hooks: Boolean(opts.hooks),
       transcriptOverride: opts.transcript,
       judgmentsPath: opts.judgments,
+      judgeContext: Boolean(opts.judgeContext),
       exportPath: opts.export ?? false,
       dev: opts.dev,
     }).catch((err) => {

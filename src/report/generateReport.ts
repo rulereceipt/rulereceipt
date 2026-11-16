@@ -438,6 +438,9 @@ export function generateJsonReport(results: CheckResult[], meta: ReportMeta, too
       // when --judgments supplied one. Opinion, never a verdict — it is absent
       // from `summary` and never affects the exit code.
       ...(r.judgment ? { judgment: r.judgment } : {}),
+      // Starting context for the plugin's judge subagent, present only under
+      // --judge-context on unresolved rules. Never a verdict or a count.
+      ...(r.judgeContext ? { judgeContext: r.judgeContext } : {}),
     })),
     // Top-level opinion layer, kept OUT of `summary` so no consumer counts it.
     // Absent entirely when no judgments were attached.

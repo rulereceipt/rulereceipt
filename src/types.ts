@@ -228,6 +228,15 @@ export interface CheckResult {
    * deterministic PASS/FAIL is never annotated. See src/judgments.ts.
    */
   judgment?: JudgeOpinion;
+
+  /**
+   * A bounded, keyword-matched excerpt of the session for an unresolved rule,
+   * plus the transcript path — the starting context the plugin hands a fresh
+   * judge subagent (which can then read/grep the path for more). Populated only
+   * for unresolved rules under `check --json --judge-context`; absent otherwise,
+   * and never a verdict or a count. See src/judgeContext.ts.
+   */
+  judgeContext?: { transcriptPath: string | null; excerpt: string; matchCount: number };
 }
 
 /** One rule's "judged by Claude" opinion (opinion only — never counted). */
