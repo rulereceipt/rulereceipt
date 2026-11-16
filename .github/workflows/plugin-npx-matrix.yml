@@ -1,0 +1,114 @@
+name: Plugin npx matrix
+
+# Launch blocker (added 2026-11-16): the Claude Code plugin invokes the CLI as
+#   npx rulereceipt@<pinned> check
+# On the dev machine (node 26.7.0 / npm 11.19) npx's on-demand DOWNLOAD step was
+# observed to silently skip install and fall back to PATH ("command not found").
+# This matrix proves, on CLEAN GitHub runners, which npx/npm-exec form actually
+# fetches-and-runs the published package on each Node the plugin's users run.
+# If the form the plugin uses fails on any row, the plugin commands must switch
+# to a form that passes on every row (keeping the exact version pin).
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/plugin-npx-matrix.yml"
+      - "plugin/commands/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/plugin-npx-matrix.yml"
+      - "plugin/commands/**"
+
+permissions:
+  contents: read
+
+jobs:
+  npx-forms:
+    name: ${{ matrix.os }} · node ${{ matrix.node-version }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        node-version: [24, 26]
+    env:
+      # The exact version the plugin commands pin. Keep in sync with
+      # plugin/commands/*.md (scripts/bump-plugin-version.mjs owns that pin).
+      PIN: "0.1.120"
+    steps:
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Versions
+        run: |
+          echo "node $(node --version)  npm $(npm --version)"
+
+      # Form A — the plain form a person types, and today's plugin form.
+      - name: "Form A: npx -y rulereceipt@PIN --version"
+        id: form_a
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          out=$(npx -y "rulereceipt@${PIN}" --version 2>&1) || { echo "EXIT nonzero"; echo "$out"; exit 1; }
+          echo "$out"
+          echo "$out" | grep -qx "${PIN}"
+
+      # Form B — explicit package + command (removes bin-name inference).
+      - name: "Form B: npx -y -p rulereceipt@PIN rulereceipt --version"
+        id: form_b
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          out=$(npx -y -p "rulereceipt@${PIN}" rulereceipt --version 2>&1) || { echo "EXIT nonzero"; echo "$out"; exit 1; }
+          echo "$out"
+          echo "$out" | grep -qx "${PIN}"
+
+      # Form C — npm exec, the mechanism npx wraps.
+      - name: "Form C: npm exec --yes --package=rulereceipt@PIN -- rulereceipt --version"
+        id: form_c
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          out=$(npm exec --yes --package="rulereceipt@${PIN}" -- rulereceipt --version 2>&1) || { echo "EXIT nonzero"; echo "$out"; exit 1; }
+          echo "$out"
+          echo "$out" | grep -qx "${PIN}"
+
+      # Form A, exercising a real subcommand end-to-end (what the plugin runs).
+      - name: "Form A (check): npx -y rulereceipt@PIN check --require-session"
+        id: form_a_check
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          # No session in a bare runner: --require-session should exit 1 with a
+          # clear message. We only care that the CLI STARTED (no "command not
+          # found" / module-not-found), so accept its own clean non-zero.
+          out=$(npx -y "rulereceipt@${PIN}" check --require-session 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -qiv "command not found"
+          echo "$out" | grep -qi "rulereceipt"
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### ${{ matrix.os }} · node ${{ matrix.node-version }}"
+            echo ""
+            echo "| Form | Result |"
+            echo "| --- | --- |"
+            echo "| A \`npx -y rulereceipt@${PIN} --version\` | ${{ steps.form_a.outcome }} |"
+            echo "| B \`npx -y -p rulereceipt@${PIN} rulereceipt --version\` | ${{ steps.form_b.outcome }} |"
+            echo "| C \`npm exec --yes --package=rulereceipt@${PIN} -- rulereceipt --version\` | ${{ steps.form_c.outcome }} |"
+            echo "| A+check \`npx -y rulereceipt@${PIN} check\` | ${{ steps.form_a_check.outcome }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # The gate: the form the plugin actually uses (A + check) MUST work on
+      # every row. If this fails, the plugin commands have to change.
+      - name: Gate on the plugin's form
+        if: steps.form_a_check.outcome != 'success'
+        run: |
+          echo "::error::Plugin form 'npx rulereceipt@${PIN} check' failed on ${{ matrix.os }} node ${{ matrix.node-version }}"
+          exit 1
