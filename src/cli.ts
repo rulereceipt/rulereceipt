@@ -548,6 +548,17 @@ async function runCheck(opts: CheckOptions) {
     if (ruleScan.stoppedEarly) {
       console.log(`⚠ Rules scan stopped at ${ruleScan.dirsScanned} directories (cap ${ruleScan.capDirs} dirs / ${(ruleScan.capMs / 1000).toFixed(0)}s). A subfolder rules file deeper than that was not scanned; run \`check\` from that subfolder to include it.\n`);
     }
+    // One line on what was scanned, shown when the boundary could surprise: run
+    // from a folder that is NOT a git repo, so nearby sibling projects (each its
+    // own repo) were deliberately left out. In a normal in-repo run the scope is
+    // unsurprising and this stays quiet.
+    if (!ruleScan.scopeIsRepo) {
+      const skipped = ruleScan.siblingsSkipped;
+      const tail = skipped > 0
+        ? ` ${skipped} sibling project${skipped === 1 ? "" : "s"} (their own git repos) were not scanned — run \`check\` inside one to check it.`
+        : "";
+      console.log(`ℹ Scope: \`${basename(ruleScan.scopeRoot)}\` only — not a git repo, so the scan stopped here.${tail}\n`);
+    }
     console.log(reportText);
     // Shadow advisory (not a verdict, not counted, no exit-code effect): did the
     // session edit/bypass its own guard wiring? hasBranchRule is derived from the

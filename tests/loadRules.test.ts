@@ -290,18 +290,36 @@ describe("loadRules does not report a home-directory rules file twice", () => {
     expect(found[0].source).toBe("global");
   });
 
-  it("still reads a genuine project rules file on the way up", () => {
-    // The fix must not throw away real intermediate rules — a CLAUDE.md in
-    // a parent folder between cwd and home still applies.
+  it("a parent-folder rules file still applies when cwd is inside a git repo", () => {
+    // Up-walk within a repo: a CLAUDE.md in a parent folder between cwd and the
+    // repo root still applies. (The scope boundary is the git root.)
+    mkdirSync(join(tempHome, ".claude"), { recursive: true });
+    writeFileSync(join(tempHome, ".claude", "CLAUDE.md"), "## Rule\n- global-marker\n");
+    const repo = join(tempHome, "Desktop", "myrepo");
+    const project = join(repo, "service");
+    mkdirSync(project, { recursive: true });
+    mkdirSync(join(repo, ".git"), { recursive: true });
+    writeFileSync(join(repo, "CLAUDE.md"), "## Rule\n- parent-marker\n");
+
+    const rules = loadRules(project);
+    expect(countMarker(rules, "parent-marker")).toBe(1);
+    expect(countMarker(rules, "global-marker")).toBe(1);
+  });
+
+  it("does NOT climb into a non-git parent folder — scope stops at cwd when there is no repo", () => {
+    // Behavior change 2026-11-16 (Shilpa): running from a folder that is not a
+    // git repo scopes the scan to cwd, so a rules file in a shared parent dir
+    // (a workspace holding several projects) is not pulled in. This is the
+    // up-walk half of "never scan sibling projects". Globals still apply.
     mkdirSync(join(tempHome, ".claude"), { recursive: true });
     writeFileSync(join(tempHome, ".claude", "CLAUDE.md"), "## Rule\n- global-marker\n");
     const mid = join(tempHome, "Desktop");
-    const project = join(mid, "work");
+    const project = join(mid, "work"); // neither `work` nor `Desktop` is a git repo
     mkdirSync(project, { recursive: true });
     writeFileSync(join(mid, "CLAUDE.md"), "## Rule\n- parent-marker\n");
 
     const rules = loadRules(project);
-    expect(countMarker(rules, "parent-marker")).toBe(1);
+    expect(countMarker(rules, "parent-marker")).toBe(0);
     expect(countMarker(rules, "global-marker")).toBe(1);
   });
 });

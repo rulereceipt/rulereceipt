@@ -390,6 +390,11 @@ function ruleFilesAtLevel(dir: string, pi: ProjectInstructions, agentTool = "cla
  * Global rules are handled separately, deliberately, below.
  */
 function projectLevels(cwd: string): string[] {
+  // No enclosing git repo (a workspace/parent dir): the scan stops at cwd and
+  // never climbs into a shared parent that holds unrelated projects. "Stop at
+  // the git root, or cwd when there is no repo."
+  if (enclosingGitRoot(cwd) === null) return [cwd];
+
   const levels: string[] = [];
   const { root } = parse(cwd);
   const home = homedir();
@@ -445,8 +450,53 @@ const MAX_DESCEND_MS = 2000;
  */
 let lastScanStoppedEarly = false;
 let lastScanDirs = 0;
-export function lastRuleScanInfo(): { stoppedEarly: boolean; dirsScanned: number; capDirs: number; capMs: number } {
-  return { stoppedEarly: lastScanStoppedEarly, dirsScanned: lastScanDirs, capDirs: MAX_DESCEND_DIRS, capMs: MAX_DESCEND_MS };
+// The scope the LAST descendant walk used: the boundary it treated as "this
+// project" and, when cwd is not itself in a repo, how many sibling projects
+// (child git repos) it deliberately skipped rather than scanning. Surfaced by
+// the CLI as one honest line so a user running `check` from a workspace parent
+// sees exactly what was and was not included.
+let lastScanScopeRoot = "";
+let lastScanScopeIsRepo = false;
+let lastScanSiblingsSkipped = 0;
+export function lastRuleScanInfo(): {
+  stoppedEarly: boolean;
+  dirsScanned: number;
+  capDirs: number;
+  capMs: number;
+  scopeRoot: string;
+  scopeIsRepo: boolean;
+  siblingsSkipped: number;
+} {
+  return {
+    stoppedEarly: lastScanStoppedEarly,
+    dirsScanned: lastScanDirs,
+    capDirs: MAX_DESCEND_DIRS,
+    capMs: MAX_DESCEND_MS,
+    scopeRoot: lastScanScopeRoot,
+    scopeIsRepo: lastScanScopeIsRepo,
+    siblingsSkipped: lastScanSiblingsSkipped,
+  };
+}
+
+/**
+ * The nearest directory at or above `cwd` that is a git repository root
+ * (contains a `.git`), or null if there is no enclosing repo before the
+ * filesystem/home boundary. This defines the scan boundary: a session's rules
+ * belong to its own project, never to sibling projects in a shared parent dir.
+ */
+function enclosingGitRoot(cwd: string): string | null {
+  const { root } = parse(cwd);
+  const home = homedir();
+  let dir = cwd;
+  for (;;) {
+    if (existsSync(join(dir, ".git"))) return dir;
+    // Do not treat the home directory (or above) as a project root: its rules
+    // are global and handled separately.
+    if (dir === home || dir === root) return null;
+    const parent = dirname(dir);
+    if (parent === dir) return null;
+    dir = parent;
+  }
 }
 
 /**
@@ -475,6 +525,18 @@ function descendantLevels(cwd: string): string[] {
   // tree or waiting 2s; production uses the constants.
   const capDirs = Number(process.env.RR_MAX_DESCEND_DIRS) || MAX_DESCEND_DIRS;
   const capMs = Number(process.env.RR_MAX_DESCEND_MS) || MAX_DESCEND_MS;
+  // Scope boundary. When cwd is inside a git repo, that repo is the project and
+  // we descend freely within it — including nested repos, which Claude's
+  // nested_memory does load (the 2026-10-03 fix, preserved). When cwd is NOT in
+  // a repo (a workspace/parent dir), a child directory that is its own git repo
+  // is a SEPARATE project: skip it, so `check` from a parent folder can't pull
+  // in sibling projects' rules (the 4931-rule bug, 2026-11-16). Loose subfolders
+  // that are not their own repo still count.
+  const repoRoot = enclosingGitRoot(cwd);
+  const inRepo = repoRoot !== null;
+  lastScanScopeRoot = repoRoot ?? cwd;
+  lastScanScopeIsRepo = inRepo;
+  lastScanSiblingsSkipped = 0;
   let queue: { dir: string; depth: number }[] = [{ dir: cwd, depth: 0 }];
   let budget = capDirs;
   const deadline = Date.now() + capMs;
@@ -495,6 +557,12 @@ function descendantLevels(cwd: string): string[] {
         if (!e.isDirectory()) continue;
         if (SKIP_DESCEND.has(e.name) || e.name.startsWith(".")) continue; // dotdirs hold tooling, not project subtrees
         const full = join(dir, e.name);
+        // Outside an enclosing repo, a child that is its own git repo is a
+        // sibling project: do not enter it; record that it was skipped.
+        if (!inRepo && existsSync(join(full, ".git"))) {
+          lastScanSiblingsSkipped++;
+          continue;
+        }
         budget--;
         out.push(full);
         if (depth + 1 < MAX_DESCEND_DEPTH) next.push({ dir: full, depth: depth + 1 });
