@@ -31,6 +31,22 @@ describe("classifier: not checkable from a session", () => {
       expect(isNotCheckableFromSession(title), title).toBe(false);
     }
   });
+
+  it("does NOT fire on behavioural/meta rules a transcript CAN inform", () => {
+    // These describe observable behaviour over the session (did the report lead
+    // with bad news? did claims carry evidence?), so the judge should get them —
+    // they must stay judgeable, not be written off as uncheckable.
+    for (const title of [
+      "Surface bad news first",
+      "Evidence or it didn't happen",
+      "No silent scope changes",
+      "Distinguish the three states honestly",
+      "Execution mode, not validation mode",
+      "In-sample results are not results",
+    ]) {
+      expect(isNotCheckableFromSession(title), title).toBe(false);
+    }
+  });
 });
 
 describe("not-checkable is its own bucket, status unchanged", () => {

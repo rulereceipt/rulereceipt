@@ -4,7 +4,7 @@ import { homedir } from "node:os";
 import type { CheckResult } from "../types.js";
 import { breakContext, renderBreakContext } from "../breakContext.js";
 import { type Bucket, bucketOf, summarize } from "./buckets.js";
-import { JUDGE_LABEL, JUDGE_NOTE, judgeGlyph, judgeSummaryClause } from "../judgments.js";
+import { JUDGE_LABEL, JUDGE_NOTE, judgeGlyph, judgeVerdictLabel, judgeSummaryClause } from "../judgments.js";
 
 /**
  * Where a rule lives, for the report — "~/proj/CLAUDE.md:42", or just the path
@@ -300,7 +300,7 @@ export function generateReport(results: CheckResult[], meta: ReportMeta, transcr
     lines.push(`${JUDGE_LABEL} — ${JUDGE_NOTE} (${judged.length})`);
     for (const r of judged) {
       const j = r.judgment!;
-      lines.push(`  ${judgeGlyph(j.verdict)} ${j.verdict} (judged) · ${ruleLabel(r, clean)}`);
+      lines.push(`  ${judgeGlyph(j.verdict)} ${judgeVerdictLabel(j.verdict)} (judged) · ${ruleLabel(r, clean)}`);
       if (j.reason) lines.push(`      why: ${stripControlChars(j.reason)}`);
       if (j.quote) lines.push(`      > ${stripControlChars(j.quote)}`);
     }
@@ -365,7 +365,7 @@ export function generateMarkdownReport(results: CheckResult[], meta: ReportMeta)
     lines.push("|---|---|---|---|");
     for (const r of judged) {
       const j = r.judgment!;
-      lines.push(`| ${judgeGlyph(j.verdict)} ${j.verdict} (judged) | ${escapeMarkdownCell(ruleLabel(r, clean))} | ${escapeMarkdownCell(j.reason)} | ${escapeMarkdownCell(j.quote)} |`);
+      lines.push(`| ${judgeGlyph(j.verdict)} ${judgeVerdictLabel(j.verdict)} (judged) | ${escapeMarkdownCell(ruleLabel(r, clean))} | ${escapeMarkdownCell(j.reason)} | ${escapeMarkdownCell(j.quote)} |`);
     }
   }
   lines.push("");

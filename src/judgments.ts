@@ -85,6 +85,11 @@ export function toOpinion(
 ): { opinion: JudgeOpinion; quoteFailed: boolean } {
   const reason = raw.reason.trim();
   const quote = raw.quote.trim();
+  // DIDNT_APPLY is a valid opinion with no quote: the rule's trigger never
+  // occurred, so there is no line to point at. It is not a quote failure.
+  if (raw.verdict === "DIDNT_APPLY") {
+    return { opinion: { verdict: "DIDNT_APPLY", reason, quote: "" }, quoteFailed: false };
+  }
   const wantsGrade = raw.verdict === "PASS" || raw.verdict === "FAIL";
   const quoteVerified = quote.length > 0 && norm(haystack).includes(norm(quote));
   if (wantsGrade && quoteVerified) {
@@ -148,26 +153,33 @@ export const JUDGE_NOTE = "opinion — not a verdict, never counted, never fails
 
 /** A glyph for an opinion's verdict (distinct from the verdict badges). */
 export function judgeGlyph(v: JudgeOpinion["verdict"]): string {
-  return v === "PASS" ? "✓" : v === "FAIL" ? "✕" : "?";
+  return v === "PASS" ? "✓" : v === "FAIL" ? "✕" : v === "DIDNT_APPLY" ? "–" : "?";
 }
 
-/** How many unresolved rules the judge called followed / broken / still-unclear. */
+/** The human label for an opinion's verdict. */
+export function judgeVerdictLabel(v: JudgeOpinion["verdict"]): string {
+  return v === "DIDNT_APPLY" ? "DIDN'T APPLY" : v;
+}
+
+/** How many unresolved rules the judge called followed / broken / didn't-apply / still-unclear. */
 export interface JudgeTally {
   followed: number;
   broken: number;
+  didntApply: number;
   unclear: number;
   any: boolean;
 }
 
 export function judgeTally(results: CheckResult[]): JudgeTally {
-  let followed = 0, broken = 0, unclear = 0;
+  let followed = 0, broken = 0, didntApply = 0, unclear = 0;
   for (const r of results) {
     if (!r.judgment) continue;
     if (r.judgment.verdict === "PASS") followed++;
     else if (r.judgment.verdict === "FAIL") broken++;
+    else if (r.judgment.verdict === "DIDNT_APPLY") didntApply++;
     else unclear++;
   }
-  return { followed, broken, unclear, any: followed + broken + unclear > 0 };
+  return { followed, broken, didntApply, unclear, any: followed + broken + didntApply + unclear > 0 };
 }
 
 /**
@@ -183,6 +195,7 @@ export function judgeSummaryClause(results: CheckResult[]): string {
   const parts: string[] = [];
   if (t.followed) parts.push(`${t.followed} followed`);
   if (t.broken) parts.push(`${t.broken} broken`);
+  if (t.didntApply) parts.push(`${t.didntApply} didn't apply`);
   if (t.unclear) parts.push(`${t.unclear} still unclear`);
   return `${JUDGE_LABEL}: ${parts.join(" · ")}`;
 }

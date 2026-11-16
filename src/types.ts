@@ -242,15 +242,20 @@ export interface CheckResult {
 /** One rule's "judged by Claude" opinion (opinion only — never counted). */
 export interface JudgeOpinion {
   /**
-   * The opinion. A judgment claiming PASS or FAIL with no exact quote from the
-   * evidence is downgraded to UNCLEAR on ingest (no quote = UNCLEAR), so a FAIL
-   * here always carries proof — though it is still only an opinion, never a
-   * counted verdict.
+   * The opinion:
+   * - PASS / FAIL: the session shows the rule followed / violated. Must carry a
+   *   quote that verifies against the transcript, or it is downgraded to UNCLEAR
+   *   on ingest (no quote = UNCLEAR), so a FAIL always points at a real line.
+   * - DIDNT_APPLY: the rule's trigger never occurred, so there was nothing to
+   *   follow or break — e.g. "run the tests before done" in a repo with no tests.
+   *   Distinct from PASS (which asserts the rule WAS satisfied). No quote needed.
+   * - UNCLEAR: the evidence does not settle it.
+   * It is always an opinion, never a counted verdict.
    */
-  verdict: "PASS" | "FAIL" | "UNCLEAR";
+  verdict: "PASS" | "FAIL" | "UNCLEAR" | "DIDNT_APPLY";
   /** One line on why. */
   reason: string;
-  /** The exact quote from this rule's evidence that backs the opinion. */
+  /** The exact quote from the transcript that backs a PASS/FAIL opinion. */
   quote: string;
 }
 

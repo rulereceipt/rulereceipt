@@ -5,7 +5,7 @@ import type { CheckResult } from "../types.js";
 import type { ShadowFinding } from "../checks/shadowSignals.js";
 import { computeTranscriptHash, type ReportMeta } from "./generateReport.js";
 import { type Bucket, bucketOf, summarize } from "./buckets.js";
-import { JUDGE_LABEL, JUDGE_NOTE, judgeGlyph, judgeSummaryClause } from "../judgments.js";
+import { JUDGE_LABEL, JUDGE_NOTE, judgeGlyph, judgeVerdictLabel, judgeSummaryClause } from "../judgments.js";
 
 /**
  * A shareable, self-contained report — one HTML file with no external
@@ -431,7 +431,7 @@ ${(() => {
         <ul class="advisory__list">${judged.map((r) => {
           const j = r.judgment!;
           const q = j.quote ? ` — <code>${clean(j.quote)}</code>` : "";
-          return `<li class="advisory__item"><strong>${judgeGlyph(j.verdict)} ${clean(j.verdict)} (judged)</strong> · ${clean(r.ruleTitle)} — ${clean(j.reason)}${q}</li>`;
+          return `<li class="advisory__item"><strong>${judgeGlyph(j.verdict)} ${clean(judgeVerdictLabel(j.verdict))} (judged)</strong> · ${clean(r.ruleTitle)} — ${clean(j.reason)}${q}</li>`;
         }).join("")}</ul>
       </section>`;
       return `${neverLoadedSec}${groupHead("Checked — observable rules")}${checked}${judgment ? `${groupHead("Not checked — needs your judgment")}${judgment}` : ""}${notCheckable ? `${groupHead("Not checkable from a session")}${notCheckable}` : ""}${judgedSec}${renderShadowAdvisory(other)}`;

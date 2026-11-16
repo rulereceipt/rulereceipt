@@ -59,6 +59,15 @@ describe("judge opinions: ingest + validation", () => {
     });
   });
 
+  it("DIDNT_APPLY is a valid outcome with no quote, and is not a quote failure", () => {
+    // "run the tests before done" in a repo with no tests: the trigger never
+    // arose, so it DIDN'T APPLY — distinct from PASS, and needs no quote.
+    const r = toOpinion({ verdict: "DIDNT_APPLY", reason: "no test suite exists in the repo", quote: "" }, "any session text");
+    expect(r.opinion.verdict).toBe("DIDNT_APPLY");
+    expect(r.opinion.quote).toBe("");
+    expect(r.quoteFailed).toBe(false);
+  });
+
   it("attaches only to unresolved rules; never annotates a deterministic PASS/FAIL", () => {
     const results = [
       needsJudgment("nj", "no command targeted main this session"),

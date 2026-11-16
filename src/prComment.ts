@@ -151,7 +151,8 @@ export function renderPrComment(receipt: Receipt): string {
     out.push(`<details><summary>${JUDGE_LABEL} — ${JUDGE_NOTE} (${judged.length})</summary>`, "");
     for (const r of judged) {
       const j = r.judgment as { verdict?: unknown; reason?: unknown; quote?: unknown };
-      const verdict = typeof j.verdict === "string" ? j.verdict.toUpperCase() : "UNCLEAR";
+      const vUp = typeof j.verdict === "string" ? j.verdict.toUpperCase() : "UNCLEAR";
+      const verdict = vUp === "DIDNT_APPLY" ? "DIDN'T APPLY" : vUp;
       const reason = typeof j.reason === "string" ? neutralizeMarkdown(j.reason) : "";
       const quoteRaw = typeof j.quote === "string" ? j.quote : "";
       const quote = quoteRaw ? ` — \`${redact(quoteRaw).replace(/`/g, "'").slice(0, MAX_EVIDENCE)}\`` : "";
