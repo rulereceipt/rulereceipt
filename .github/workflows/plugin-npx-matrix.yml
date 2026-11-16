@@ -33,7 +33,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
-        node-version: [24, 26]
+        node-version: [20, 22, 24, 26]
     env:
       # The exact version the plugin commands pin. Keep in sync with
       # plugin/commands/*.md (scripts/bump-plugin-version.mjs owns that pin).
@@ -88,8 +88,13 @@ jobs:
           # found" / module-not-found), so accept its own clean non-zero.
           out=$(npx -y "rulereceipt@${PIN}" check --require-session 2>&1 || true)
           echo "$out"
-          echo "$out" | grep -qiv "command not found"
-          echo "$out" | grep -qi "rulereceipt"
+          # The CLI must have STARTED via npx. Fail only on launcher/module-load
+          # errors — NOT on the CLI's own "no rules / no session" message, which
+          # is a correct clean run in a bare runner and does not echo the pkg name.
+          if printf '%s' "$out" | grep -qiE "command not found|ERR_MODULE_NOT_FOUND|Cannot find (package|module)|MODULE_NOT_FOUND|code E404"; then
+            echo "::error::npx failed to fetch-and-launch the CLI"; exit 1
+          fi
+          test -n "$out"
 
       - name: Summary
         if: always()
