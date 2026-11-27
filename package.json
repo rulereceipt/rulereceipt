@@ -63,7 +63,7 @@
   "license": "SEE LICENSE IN LICENSE",
   "dependencies": {
     "@anthropic-ai/sdk": "~0.131.0",
-    "commander": "~15.0.0",
+    "commander": "~15.1.0",
     "nodemailer": "~10.5.0"
   },
   "devDependencies": {
