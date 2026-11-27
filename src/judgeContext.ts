@@ -10,6 +10,9 @@
  * giant excerpt — and nothing here is a verdict or affects a count.
  */
 
+import { parseTranscriptText } from "./parsers/transcriptLine.js";
+import type { TranscriptEvent } from "./types.js";
+
 // Words too common to be a useful search key. Kept small and generic.
 const STOPWORDS = new Set([
   "the", "a", "an", "and", "or", "but", "if", "then", "else", "for", "to", "of", "in", "on", "at", "by",
@@ -94,15 +97,41 @@ export interface JudgeContext {
 interface ExcerptOpts {
   maxChars?: number;
   maxLines?: number;
-  context?: number; // lines of context on each side of a match
+  context?: number; // events of context on each side of a match
   scanLineCap?: number; // never scan more than this many lines (huge-session guard)
 }
 
+// Salient string fields of a tool call — the part a RULE is about (what was run,
+// which file, the edit, the pattern). Ids, timestamps and flags are left out.
+const TOOL_INPUT_KEYS = ["command", "file_path", "old_string", "new_string", "pattern", "description", "prompt", "url", "content"];
+
 /**
- * A bounded excerpt of `transcriptText` around the lines that mention any of the
- * rule's keywords. Deterministic, size-capped, and safe on a very large session
- * (it stops scanning after `scanLineCap` lines). Returns the excerpt plus the
- * raw match count so the caller knows how much was there.
+ * One parsed transcript EVENT → the text a rule should be judged against: real
+ * user words, assistant words, the command/edit a tool ran, or a tool result.
+ * Harness-injected scaffolding never reaches here — parseTranscriptText already
+ * strips <system-reminder>/<ide_opened_file>/… tag-wrapped context from user
+ * turns and only emits real said/done events, so the environment block, the
+ * echoed CLAUDE.md and skill/tool listings are gone before matching.
+ */
+function eventText(e: TranscriptEvent): string {
+  if (e.kind === "text") return (e.text ?? "").trim();
+  if (e.kind === "tool_result") return (typeof e.content === "string" ? e.content : "").trim();
+  if (e.kind === "tool_use") {
+    const input = e.input && typeof e.input === "object" ? (e.input as Record<string, unknown>) : {};
+    const salient = TOOL_INPUT_KEYS.map((k) => (typeof input[k] === "string" ? (input[k] as string) : "")).filter(Boolean).join(" ");
+    return `${e.toolName ?? "tool"} ${salient}`.trim();
+  }
+  return "";
+}
+
+/**
+ * A bounded excerpt of the session around the real said/done events that mention
+ * any of the rule's keywords. Built from PARSED events, not raw JSONL — so it
+ * never contains harness-injected system-reminders, the environment block, the
+ * echoed rules file, or tool/skill-listing scaffolding, only what the user and
+ * assistant actually said and what tools actually ran. Deterministic, size-
+ * capped, and safe on a very large session (it stops scanning after
+ * `scanLineCap` raw lines). Returns the excerpt plus the raw match count.
  */
 export function extractExcerpt(
   ruleTitle: string,
@@ -120,16 +149,16 @@ export function extractExcerpt(
   if (keys.length === 0 || transcriptText.length === 0) {
     return { transcriptPath, excerpt: "", matchCount: 0 };
   }
+  // Bound the parse to the first scanLineCap lines (huge-session guard), then
+  // parse to events so matching/excerpt see only real content, not scaffolding.
   const rawLines = transcriptText.split("\n");
-  const scanN = Math.min(rawLines.length, scanLineCap);
-  // Project each line to its readable content ONCE, so matching and the excerpt
-  // both see what was said/done, not JSON scaffolding.
-  const readable: string[] = new Array(scanN);
+  const scanText = rawLines.length > scanLineCap ? rawLines.slice(0, scanLineCap).join("\n") : transcriptText;
+  const readable = parseTranscriptText(scanText).map(eventText).map((t) => t.replace(/\s+/g, " ").trim());
+  const scanN = readable.length;
   const wanted = new Set<number>();
   let matchCount = 0;
   for (let i = 0; i < scanN; i++) {
-    const text = readableLine(rawLines[i]);
-    readable[i] = text;
+    const text = readable[i];
     if (text.length === 0) continue;
     const low = text.toLowerCase();
     if (keys.some((k) => low.includes(k))) {
@@ -137,8 +166,8 @@ export function extractExcerpt(
       for (let j = Math.max(0, i - context); j <= Math.min(scanN - 1, i + context); j++) wanted.add(j);
     }
   }
-  // Assemble in order, with gap markers, within the line and char caps. Blank
-  // (scaffolding-only) lines are skipped so the excerpt is dense with content.
+  // Assemble in order, with gap markers, within the event and char caps. Blank
+  // (non-content) events are skipped so the excerpt is dense with content.
   const idxs = [...wanted].sort((a, b) => a - b);
   const parts: string[] = [];
   let prev = -2;
