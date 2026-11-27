@@ -1,9 +1,12 @@
 name: Claude Code compat watch
 
-# Weekly: notice when a new Claude Code version ships, so we re-verify that our
-# transcript parsing still holds against it before a user hits a broken parse.
-# It does NOT post anywhere — it fails the job and writes a step summary, which
-# shows up in the Actions tab for a human to review and bump the baseline.
+# Weekly: re-verify that our transcript parsing still holds, and notice when a
+# new Claude Code version ships.
+#
+# The job FAILS only on a REAL break — if `npm test` (which includes the
+# transcript-parser suite) goes red. A mere version bump is NOT a failure: the
+# job stays green and opens (or reuses) a tracking issue asking a human to
+# re-verify parsing against the new version and bump the recorded baseline.
 on:
   schedule:
     - cron: "17 6 * * 1" # Mondays 06:17 UTC
@@ -11,6 +14,7 @@ on:
 
 permissions:
   contents: read
+  issues: write # only to open the re-verify reminder; never to fail the run
 
 jobs:
   compat:
@@ -22,10 +26,13 @@ jobs:
           node-version: 22
       - run: npm ci
       - run: npm run build
-      # Our suite must still pass — if a dependency or our own code rotted, catch it here too.
+      # THE break gate: the transcript-parser suite. If parsing rotted against a
+      # dependency or our own code, this goes red — that is the only red run.
       - run: npm test
 
-      - name: Compare latest Claude Code version to our recorded baseline
+      - name: Open a re-verify issue when a newer Claude Code shipped (never fails the run)
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           BASELINE="$(tr -d '[:space:]' < .github/claude-code-version.txt)"
@@ -37,15 +44,39 @@ jobs:
             echo ""
             echo "- Baseline (last verified): \`$BASELINE\`"
             echo "- Latest on npm: \`$LATEST\`"
+            echo "- Parser suite (\`npm test\`): passed (this step only runs if it did)."
           } >> "$GITHUB_STEP_SUMMARY"
-          if [ "$BASELINE" != "$LATEST" ]; then
-            {
-              echo ""
-              echo "⚠️ A new Claude Code version shipped. Re-verify transcript parsing against it"
-              echo "(run the adapter tests against a real $LATEST session), then bump"
-              echo "\`.github/claude-code-version.txt\` to \`$LATEST\`."
-            } >> "$GITHUB_STEP_SUMMARY"
-            echo "::warning::Claude Code $LATEST is newer than verified baseline $BASELINE — re-verify parsing and bump the baseline."
-            exit 1
+
+          if [ "$BASELINE" = "$LATEST" ]; then
+            echo "Baseline is current — nothing to do."
+            exit 0
           fi
-          echo "Baseline is current — nothing to do."
+
+          TITLE="compat: re-verify transcript parsing for Claude Code $LATEST"
+          # Idempotent: if a matching open issue already exists, do not open another.
+          EXISTING="$(gh issue list --state open --search "in:title $TITLE" --json number,title \
+            --jq "map(select(.title == \"$TITLE\")) | .[0].number // empty" 2>/dev/null || true)"
+          if [ -n "$EXISTING" ]; then
+            echo "Re-verify issue already open: #$EXISTING — not opening another."
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "A newer Claude Code (\`$LATEST\`) shipped; reminder already tracked in #$EXISTING." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          BODY=$(cat <<EOF
+          A newer Claude Code (\`$LATEST\`) shipped; our last verified baseline is \`$BASELINE\`.
+
+          The parser suite still passes on our committed fixtures, so **this is a reminder, not a break**.
+
+          To close this:
+          1. Capture a real \`$LATEST\` session transcript and run \`rulereceipt check --transcript <file>\` against it.
+          2. If the JSONL shape changed, add a fixture and a parser test for it.
+          3. Bump \`.github/claude-code-version.txt\` to \`$LATEST\`.
+          EOF
+          )
+          if gh issue create --title "$TITLE" --body "$BODY" 2>/dev/null; then
+            echo "::notice::Opened a re-verify reminder issue for Claude Code $LATEST (run stays green)."
+          else
+            echo "::warning::Could not open the re-verify issue; baseline $BASELINE trails $LATEST — re-verify parsing and bump the baseline."
+          fi
+          exit 0
